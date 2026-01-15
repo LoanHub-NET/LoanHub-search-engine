@@ -11,7 +11,8 @@ pr:
       - develop
 
 pool:
-  vmImage: ubuntu-latest
+  name: 'loanHub-self'
+
 
 variables:
   buildConfiguration: Release
@@ -36,18 +37,23 @@ steps:
     displayName: "Build"
     inputs:
       command: "build"
-      projects: "**/*.sln"
+      projects: "LoanHub.SearchEngine.sln"
       arguments: "--configuration $(buildConfiguration) --no-restore"
 
-  # Testy odpalamy tylko jeśli istnieją projekty testowe
-  - bash: |
-      set -e
-      if [ -d "tests" ] && find tests -name "*.csproj" | grep -q .; then
-        dotnet test **/*.sln --configuration $(buildConfiguration) --no-build
-      else
-        echo "No test projects found under ./tests - skipping."
-      fi
+  - pwsh: |
+      $testsDir = Join-Path $env:BUILD_SOURCESDIRECTORY "tests"
+      if (Test-Path $testsDir) {
+        $hasTests = Get-ChildItem -Path $testsDir -Recurse -Filter *.csproj -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($null -ne $hasTests) {
+          dotnet test .\LoanHub.SearchEngine.sln --configuration "$(buildConfiguration)" --no-build
+        } else {
+          Write-Host "No test projects found under ./tests - skipping."
+        }
+      } else {
+        Write-Host "No ./tests directory - skipping."
+      }
     displayName: "Test (if present)"
+
 
   - task: DotNetCoreCLI@2
     displayName: "Publish API"
