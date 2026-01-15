@@ -1,65 +1,34 @@
 trigger:
   branches:
     include:
-      - main
       - develop
 
 pr:
   branches:
     include:
-      - main
       - develop
 
 pool:
   vmImage: ubuntu-latest
 
 variables:
-  buildConfiguration: Release
+  buildConfiguration: 'Release'
 
 steps:
-  - task: UseDotNet@2
-    displayName: "Use .NET SDK"
-    inputs:
-      packageType: "sdk"
-      version: "9.0.x"
+- task: UseDotNet@2
+  displayName: "Install .NET SDK 9"
+  inputs:
+    packageType: 'sdk'
+    version: '9.0.x'
 
-  - script: dotnet --info
-    displayName: "dotnet --info"
+- script: dotnet --info
+  displayName: "dotnet --info"
 
-  - task: DotNetCoreCLI@2
-    displayName: "Restore"
-    inputs:
-      command: "restore"
-      projects: "**/*.sln"
+- script: dotnet restore LoanHub.SearchEngine.sln
+  displayName: "Restore"
 
-  - task: DotNetCoreCLI@2
-    displayName: "Build"
-    inputs:
-      command: "build"
-      projects: "**/*.sln"
-      arguments: "--configuration $(buildConfiguration) --no-restore"
+- script: dotnet build LoanHub.SearchEngine.sln -c $(buildConfiguration) --no-restore
+  displayName: "Build"
 
-  # Testy odpalamy tylko jeśli istnieją projekty testowe
-  - bash: |
-      set -e
-      if [ -d "tests" ] && find tests -name "*.csproj" | grep -q .; then
-        dotnet test **/*.sln --configuration $(buildConfiguration) --no-build
-      else
-        echo "No test projects found under ./tests - skipping."
-      fi
-    displayName: "Test (if present)"
-
-  - task: DotNetCoreCLI@2
-    displayName: "Publish API"
-    inputs:
-      command: "publish"
-      publishWebProjects: false
-      projects: "src/LoanHub.Search.Api/LoanHub.Search.Api.csproj"
-      arguments: "--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/app"
-      zipAfterPublish: true
-
-  - task: PublishBuildArtifacts@1
-    displayName: "Publish artifact"
-    inputs:
-      PathtoPublish: "$(Build.ArtifactStagingDirectory)/app"
-      ArtifactName: "drop"
+- script: dotnet test LoanHub.SearchEngine.sln -c $(buildConfiguration) --no-build
+  displayName: "Test"
