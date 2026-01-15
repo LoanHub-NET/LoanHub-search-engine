@@ -13,7 +13,6 @@ pr:
 pool:
   name: 'loanHub-self'
 
-
 variables:
   buildConfiguration: Release
 
@@ -40,21 +39,19 @@ steps:
       projects: "LoanHub.SearchEngine.sln"
       arguments: "--configuration $(buildConfiguration) --no-restore"
 
-- powershell: |
-    $testsDir = Join-Path $env:BUILD_SOURCESDIRECTORY "tests"
-    if (Test-Path $testsDir) {
-      $hasTests = Get-ChildItem -Path $testsDir -Recurse -Filter *.csproj -ErrorAction SilentlyContinue | Select-Object -First 1
-      if ($null -ne $hasTests) {
-        dotnet test .\LoanHub.SearchEngine.sln --configuration "$(buildConfiguration)" --no-build
+  - powershell: |
+      $testsDir = Join-Path $env:BUILD_SOURCESDIRECTORY "tests"
+      if (Test-Path $testsDir) {
+        $hasTests = Get-ChildItem -Path $testsDir -Recurse -Filter *.csproj -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($null -ne $hasTests) {
+          dotnet test LoanHub.SearchEngine.sln --configuration "$(buildConfiguration)" --no-build
+        } else {
+          Write-Host "No test projects found under ./tests - skipping."
+        }
       } else {
-        Write-Host "No test projects found under ./tests - skipping."
+        Write-Host "No ./tests directory - skipping."
       }
-    } else {
-      Write-Host "No ./tests directory - skipping."
-    }
-  displayName: "Test (if present)"
-
-
+    displayName: "Test (if present)"
 
   - task: DotNetCoreCLI@2
     displayName: "Publish API"
