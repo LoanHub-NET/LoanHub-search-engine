@@ -1,11 +1,13 @@
 using LoanHub.Search.Core.Models.Applications;
 using LoanHub.Search.Core.Services.Applications;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LoanHub.Search.Api.Controllers.Admin;
 
 [ApiController]
 [Route("api/admin/applications")]
+[Authorize(Roles = "Admin")]
 public sealed class AdminApplicationsController : ControllerBase
 {
     private readonly ApplicationService _service;

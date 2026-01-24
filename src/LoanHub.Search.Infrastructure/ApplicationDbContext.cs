@@ -55,6 +55,7 @@ public sealed class ApplicationDbContext : DbContext
             entity.HasKey(user => user.Id);
             entity.Property(user => user.Email).HasMaxLength(200).IsRequired();
             entity.Property(user => user.PasswordHash).HasMaxLength(512);
+            entity.Property(user => user.Role).HasConversion<int>();
             entity.Property(user => user.FirstName).HasMaxLength(120);
             entity.Property(user => user.LastName).HasMaxLength(120);
             entity.Property(user => user.JobTitle).HasMaxLength(160);

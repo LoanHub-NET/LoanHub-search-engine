@@ -1,5 +1,7 @@
+using LoanHub.Search.Core.Abstractions.Auth;
 using LoanHub.Search.Core.Models.Users;
 using LoanHub.Search.Core.Services.Users;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LoanHub.Search.Api.Controllers;
@@ -9,11 +11,16 @@ namespace LoanHub.Search.Api.Controllers;
 public sealed class UsersController : ControllerBase
 {
     private readonly UserService _service;
+    private readonly ITokenService _tokenService;
 
-    public UsersController(UserService service) => _service = service;
+    public UsersController(UserService service, ITokenService tokenService)
+    {
+        _service = service;
+        _tokenService = tokenService;
+    }
 
     [HttpPost("register")]
-    public async Task<ActionResult<UserResponse>> Register([FromBody] RegisterRequest request, CancellationToken ct)
+    public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Email))
             return BadRequest("Email is required.");
@@ -29,7 +36,7 @@ public sealed class UsersController : ControllerBase
                 request.Profile,
                 ct);
 
-            return Ok(UserResponse.From(created));
+            return Ok(AuthResponse.From(created, _tokenService.CreateToken(created)));
         }
         catch (InvalidOperationException ex)
         {
@@ -38,7 +45,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpPost("login")]
-    public async Task<ActionResult<UserResponse>> Login([FromBody] LoginRequest request, CancellationToken ct)
+    public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Email))
             return BadRequest("Email is required.");
@@ -50,11 +57,11 @@ public sealed class UsersController : ControllerBase
         if (user is null)
             return Unauthorized();
 
-        return Ok(UserResponse.From(user));
+        return Ok(AuthResponse.From(user, _tokenService.CreateToken(user)));
     }
 
     [HttpPost("external/register")]
-    public async Task<ActionResult<UserResponse>> RegisterExternal([FromBody] ExternalRegisterRequest request, CancellationToken ct)
+    public async Task<ActionResult<AuthResponse>> RegisterExternal([FromBody] ExternalRegisterRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Provider))
             return BadRequest("Provider is required.");
@@ -74,7 +81,7 @@ public sealed class UsersController : ControllerBase
                 request.Profile,
                 ct);
 
-            return Ok(UserResponse.From(created));
+            return Ok(AuthResponse.From(created, _tokenService.CreateToken(created)));
         }
         catch (InvalidOperationException ex)
         {
@@ -83,7 +90,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpPost("external/login")]
-    public async Task<ActionResult<UserResponse>> LoginExternal([FromBody] ExternalLoginRequest request, CancellationToken ct)
+    public async Task<ActionResult<AuthResponse>> LoginExternal([FromBody] ExternalLoginRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Provider))
             return BadRequest("Provider is required.");
@@ -95,27 +102,29 @@ public sealed class UsersController : ControllerBase
         if (user is null)
             return Unauthorized();
 
-        return Ok(UserResponse.From(user));
+        return Ok(AuthResponse.From(user, _tokenService.CreateToken(user)));
     }
 
+    [Authorize]
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<UserResponse>> Get(Guid id, CancellationToken ct)
+    public async Task<ActionResult<AuthResponse>> Get(Guid id, CancellationToken ct)
     {
         var user = await _service.GetAsync(id, ct);
         if (user is null)
             return NotFound();
 
-        return Ok(UserResponse.From(user));
+        return Ok(AuthResponse.From(user, _tokenService.CreateToken(user)));
     }
 
+    [Authorize]
     [HttpPut("{id:guid}")]
-    public async Task<ActionResult<UserResponse>> Update(Guid id, [FromBody] UserService.UserProfile profile, CancellationToken ct)
+    public async Task<ActionResult<AuthResponse>> Update(Guid id, [FromBody] UserService.UserProfile profile, CancellationToken ct)
     {
         var user = await _service.UpdateProfileAsync(id, profile, ct);
         if (user is null)
             return NotFound();
 
-        return Ok(UserResponse.From(user));
+        return Ok(AuthResponse.From(user, _tokenService.CreateToken(user)));
     }
 
     public sealed record RegisterRequest(
@@ -135,9 +144,10 @@ public sealed class UsersController : ControllerBase
 
     public sealed record ExternalLoginRequest(string Provider, string Subject);
 
-    public sealed record UserResponse(
+    public sealed record AuthResponse(
         Guid Id,
         string Email,
+        UserRole Role,
         string? FirstName,
         string? LastName,
         int? Age,
@@ -146,13 +156,15 @@ public sealed class UsersController : ControllerBase
         string? IdDocumentNumber,
         IReadOnlyList<ExternalIdentityResponse> ExternalIdentities,
         DateTimeOffset CreatedAt,
-        DateTimeOffset UpdatedAt
+        DateTimeOffset UpdatedAt,
+        string Token
     )
     {
-        public static UserResponse From(UserAccount user)
+        public static AuthResponse From(UserAccount user, string token)
             => new(
                 user.Id,
                 user.Email,
+                user.Role,
                 user.FirstName,
                 user.LastName,
                 user.Age,
@@ -161,7 +173,8 @@ public sealed class UsersController : ControllerBase
                 user.IdDocumentNumber,
                 user.ExternalIdentities.Select(ExternalIdentityResponse.From).ToList(),
                 user.CreatedAt,
-                user.UpdatedAt
+                user.UpdatedAt,
+                token
             );
     }
 

@@ -23,6 +23,7 @@ public sealed class UserService
         var user = new UserAccount
         {
             Email = email,
+            Role = UserRole.User,
             FirstName = profile.FirstName,
             LastName = profile.LastName,
             Age = profile.Age,
@@ -61,6 +62,7 @@ public sealed class UserService
             user = new UserAccount
             {
                 Email = email,
+                Role = UserRole.User,
                 FirstName = profile.FirstName,
                 LastName = profile.LastName,
                 Age = profile.Age,
