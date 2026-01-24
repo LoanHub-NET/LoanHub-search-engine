@@ -58,6 +58,19 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     dbContext.Database.EnsureCreated();
+    bool usersTableExists;
+    using (var connection = dbContext.Database.GetDbConnection())
+    {
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='Users';";
+        usersTableExists = command.ExecuteScalar() != null;
+    }
+    if (!usersTableExists)
+    {
+        dbContext.Database.EnsureDeleted();
+        dbContext.Database.EnsureCreated();
+    }
 }
 
 app.UseSwagger();
