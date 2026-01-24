@@ -54,6 +54,24 @@ public sealed class ApplicationsController : ControllerBase
         return Ok(ApplicationResponse.From(application));
     }
 
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<ApplicationResponse>>> List(
+        [FromQuery] string applicantEmail,
+        [FromQuery] ApplicationStatus? status,
+        [FromQuery] int days = 10,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(applicantEmail))
+            return BadRequest("ApplicantEmail is required.");
+
+        var applications = await _service.ListRecentAsync(applicantEmail, status, days, ct);
+        var responses = applications
+            .Select(ApplicationResponse.From)
+            .ToList();
+
+        return Ok(responses);
+    }
+
     [HttpPost("{id:guid}/cancel")]
     public async Task<ActionResult<ApplicationResponse>> Cancel(Guid id, CancellationToken ct)
     {

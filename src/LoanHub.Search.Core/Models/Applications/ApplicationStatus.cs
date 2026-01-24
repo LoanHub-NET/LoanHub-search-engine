@@ -6,5 +6,6 @@ public enum ApplicationStatus
     PreliminarilyAccepted = 2,
     Accepted = 3,
     Rejected = 4,
-    Cancelled = 5
+    Cancelled = 5,
+    Granted = 6
 }

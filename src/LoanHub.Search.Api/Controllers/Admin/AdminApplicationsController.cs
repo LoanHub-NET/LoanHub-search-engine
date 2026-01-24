@@ -43,6 +43,26 @@ public sealed class AdminApplicationsController : ControllerBase
         return Ok(ApplicationsController.ApplicationResponse.From(application));
     }
 
+    [HttpPost("{id:guid}/preliminary-accept")]
+    public async Task<ActionResult<ApplicationsController.ApplicationResponse>> PreliminarilyAccept(Guid id, CancellationToken ct)
+    {
+        var application = await _service.PreliminarilyAcceptAsync(id, ct);
+        if (application is null)
+            return NotFound();
+
+        return Ok(ApplicationsController.ApplicationResponse.From(application));
+    }
+
+    [HttpPost("{id:guid}/grant")]
+    public async Task<ActionResult<ApplicationsController.ApplicationResponse>> Grant(Guid id, CancellationToken ct)
+    {
+        var application = await _service.GrantAsync(id, ct);
+        if (application is null)
+            return NotFound();
+
+        return Ok(ApplicationsController.ApplicationResponse.From(application));
+    }
+
     [HttpPost("{id:guid}/reject")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> Reject(Guid id, [FromBody] RejectRequest request, CancellationToken ct)
     {
