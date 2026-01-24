@@ -5,6 +5,7 @@ public sealed class UserAccount
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Email { get; set; } = string.Empty;
     public string? PasswordHash { get; set; }
+    public UserRole Role { get; set; } = UserRole.User;
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
     public int? Age { get; set; }
