@@ -1,0 +1,109 @@
+using LoanHub.Search.Core.Models.Applications;
+using LoanHub.Search.Core.Services.Applications;
+using Microsoft.AspNetCore.Mvc;
+
+namespace LoanHub.Search.Api.Controllers;
+
+[ApiController]
+[Route("api/applications")]
+public sealed class ApplicationsController : ControllerBase
+{
+    private readonly ApplicationService _service;
+
+    public ApplicationsController(ApplicationService service) => _service = service;
+
+    [HttpPost]
+    public async Task<ActionResult<ApplicationResponse>> Create([FromBody] CreateApplicationRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.ApplicantEmail))
+            return BadRequest("ApplicantEmail is required.");
+
+        var application = new LoanApplication
+        {
+            ApplicantEmail = request.ApplicantEmail,
+            ApplicantDetails = new ApplicantDetails(
+                request.FirstName,
+                request.LastName,
+                request.Age,
+                request.JobTitle,
+                request.Address,
+                request.IdDocumentNumber
+            ),
+            OfferSnapshot = new OfferSnapshot(
+                request.Provider,
+                request.ProviderOfferId,
+                request.Installment,
+                request.Apr,
+                request.TotalCost,
+                request.Amount,
+                request.DurationMonths
+            )
+        };
+
+        var created = await _service.CreateAsync(application, ct);
+        return Ok(ApplicationResponse.From(created));
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<ApplicationResponse>> Get(Guid id, CancellationToken ct)
+    {
+        var application = await _service.GetAsync(id, ct);
+        if (application is null)
+            return NotFound();
+
+        return Ok(ApplicationResponse.From(application));
+    }
+
+    [HttpPost("{id:guid}/cancel")]
+    public async Task<ActionResult<ApplicationResponse>> Cancel(Guid id, CancellationToken ct)
+    {
+        var application = await _service.CancelAsync(id, ct);
+        if (application is null)
+            return NotFound();
+
+        return Ok(ApplicationResponse.From(application));
+    }
+
+    public sealed record CreateApplicationRequest(
+        string ApplicantEmail,
+        string FirstName,
+        string LastName,
+        int Age,
+        string JobTitle,
+        string Address,
+        string IdDocumentNumber,
+        string Provider,
+        string ProviderOfferId,
+        decimal Installment,
+        decimal Apr,
+        decimal TotalCost,
+        decimal Amount,
+        int DurationMonths
+    );
+
+    public sealed record ApplicationResponse(
+        Guid Id,
+        string ApplicantEmail,
+        ApplicationStatus Status,
+        string? RejectReason,
+        ApplicantDetails ApplicantDetails,
+        OfferSnapshot OfferSnapshot,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset UpdatedAt,
+        IReadOnlyList<StatusHistoryEntry> StatusHistory
+    )
+    {
+        public static ApplicationResponse From(LoanApplication application)
+            => new(
+                application.Id,
+                application.ApplicantEmail,
+                application.Status,
+                application.RejectReason,
+                application.ApplicantDetails,
+                application.OfferSnapshot,
+                application.CreatedAt,
+                application.UpdatedAt,
+                application.StatusHistory
+            );
+    }
+}
