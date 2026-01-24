@@ -27,10 +27,20 @@ public sealed class ApplicationService
         if (application is null)
             return null;
 
-        if (application.Status is ApplicationStatus.Accepted)
+        if (application.Status is ApplicationStatus.Accepted or ApplicationStatus.Granted)
             return application;
 
         application.AddStatus(ApplicationStatus.Cancelled, "Cancelled by user");
+        return await _repo.UpdateAsync(application, ct);
+    }
+
+    public async Task<LoanApplication?> PreliminarilyAcceptAsync(Guid id, CancellationToken ct)
+    {
+        var application = await _repo.GetAsync(id, ct);
+        if (application is null)
+            return null;
+
+        application.AddStatus(ApplicationStatus.PreliminarilyAccepted, null);
         return await _repo.UpdateAsync(application, ct);
     }
 
@@ -44,6 +54,16 @@ public sealed class ApplicationService
         return await _repo.UpdateAsync(application, ct);
     }
 
+    public async Task<LoanApplication?> GrantAsync(Guid id, CancellationToken ct)
+    {
+        var application = await _repo.GetAsync(id, ct);
+        if (application is null)
+            return null;
+
+        application.AddStatus(ApplicationStatus.Granted, null);
+        return await _repo.UpdateAsync(application, ct);
+    }
+
     public async Task<LoanApplication?> RejectAsync(Guid id, string reason, CancellationToken ct)
     {
         var application = await _repo.GetAsync(id, ct);
@@ -52,5 +72,25 @@ public sealed class ApplicationService
 
         application.AddStatus(ApplicationStatus.Rejected, reason);
         return await _repo.UpdateAsync(application, ct);
+    }
+
+    public async Task<IReadOnlyList<LoanApplication>> ListRecentAsync(
+        string applicantEmail,
+        ApplicationStatus? status,
+        int days,
+        CancellationToken ct)
+    {
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-days);
+        var applications = await _repo.ListAsync(ct);
+        var filtered = applications
+            .Where(application => application.CreatedAt >= cutoff)
+            .Where(application => application.ApplicantEmail.Equals(applicantEmail, StringComparison.OrdinalIgnoreCase));
+
+        if (status is not null)
+            filtered = filtered.Where(application => application.Status == status);
+
+        return filtered
+            .OrderByDescending(application => application.CreatedAt)
+            .ToList();
     }
 }
