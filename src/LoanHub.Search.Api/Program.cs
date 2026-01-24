@@ -1,7 +1,9 @@
 using LoanHub.Search.Core.Abstractions;
 using LoanHub.Search.Core.Abstractions.Applications;
+using LoanHub.Search.Core.Abstractions.Users;
 using LoanHub.Search.Core.Services;
 using LoanHub.Search.Core.Services.Applications;
+using LoanHub.Search.Core.Services.Users;
 using LoanHub.Search.Infrastructure;
 using LoanHub.Search.Infrastructure.Providers;
 using LoanHub.Search.Infrastructure.Repositories;
@@ -20,6 +22,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Applications")));
 builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
 builder.Services.AddScoped<ApplicationService>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<UserService>();
 
 var app = builder.Build();
 

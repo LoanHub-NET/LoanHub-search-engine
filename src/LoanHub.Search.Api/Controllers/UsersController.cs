@@ -1,0 +1,173 @@
+using LoanHub.Search.Core.Models.Users;
+using LoanHub.Search.Core.Services.Users;
+using Microsoft.AspNetCore.Mvc;
+
+namespace LoanHub.Search.Api.Controllers;
+
+[ApiController]
+[Route("api/users")]
+public sealed class UsersController : ControllerBase
+{
+    private readonly UserService _service;
+
+    public UsersController(UserService service) => _service = service;
+
+    [HttpPost("register")]
+    public async Task<ActionResult<UserResponse>> Register([FromBody] RegisterRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email))
+            return BadRequest("Email is required.");
+
+        if (string.IsNullOrWhiteSpace(request.Password))
+            return BadRequest("Password is required.");
+
+        try
+        {
+            var created = await _service.RegisterLocalAsync(
+                request.Email,
+                request.Password,
+                request.Profile,
+                ct);
+
+            return Ok(UserResponse.From(created));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
+    }
+
+    [HttpPost("login")]
+    public async Task<ActionResult<UserResponse>> Login([FromBody] LoginRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email))
+            return BadRequest("Email is required.");
+
+        if (string.IsNullOrWhiteSpace(request.Password))
+            return BadRequest("Password is required.");
+
+        var user = await _service.LoginAsync(request.Email, request.Password, ct);
+        if (user is null)
+            return Unauthorized();
+
+        return Ok(UserResponse.From(user));
+    }
+
+    [HttpPost("external/register")]
+    public async Task<ActionResult<UserResponse>> RegisterExternal([FromBody] ExternalRegisterRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Provider))
+            return BadRequest("Provider is required.");
+
+        if (string.IsNullOrWhiteSpace(request.Subject))
+            return BadRequest("Subject is required.");
+
+        if (string.IsNullOrWhiteSpace(request.Email))
+            return BadRequest("Email is required.");
+
+        try
+        {
+            var created = await _service.RegisterExternalAsync(
+                request.Provider,
+                request.Subject,
+                request.Email,
+                request.Profile,
+                ct);
+
+            return Ok(UserResponse.From(created));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
+    }
+
+    [HttpPost("external/login")]
+    public async Task<ActionResult<UserResponse>> LoginExternal([FromBody] ExternalLoginRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Provider))
+            return BadRequest("Provider is required.");
+
+        if (string.IsNullOrWhiteSpace(request.Subject))
+            return BadRequest("Subject is required.");
+
+        var user = await _service.LoginExternalAsync(request.Provider, request.Subject, ct);
+        if (user is null)
+            return Unauthorized();
+
+        return Ok(UserResponse.From(user));
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<UserResponse>> Get(Guid id, CancellationToken ct)
+    {
+        var user = await _service.GetAsync(id, ct);
+        if (user is null)
+            return NotFound();
+
+        return Ok(UserResponse.From(user));
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<UserResponse>> Update(Guid id, [FromBody] UserService.UserProfile profile, CancellationToken ct)
+    {
+        var user = await _service.UpdateProfileAsync(id, profile, ct);
+        if (user is null)
+            return NotFound();
+
+        return Ok(UserResponse.From(user));
+    }
+
+    public sealed record RegisterRequest(
+        string Email,
+        string Password,
+        UserService.UserProfile Profile
+    );
+
+    public sealed record LoginRequest(string Email, string Password);
+
+    public sealed record ExternalRegisterRequest(
+        string Provider,
+        string Subject,
+        string Email,
+        UserService.UserProfile Profile
+    );
+
+    public sealed record ExternalLoginRequest(string Provider, string Subject);
+
+    public sealed record UserResponse(
+        Guid Id,
+        string Email,
+        string? FirstName,
+        string? LastName,
+        int? Age,
+        string? JobTitle,
+        string? Address,
+        string? IdDocumentNumber,
+        IReadOnlyList<ExternalIdentityResponse> ExternalIdentities,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset UpdatedAt
+    )
+    {
+        public static UserResponse From(UserAccount user)
+            => new(
+                user.Id,
+                user.Email,
+                user.FirstName,
+                user.LastName,
+                user.Age,
+                user.JobTitle,
+                user.Address,
+                user.IdDocumentNumber,
+                user.ExternalIdentities.Select(ExternalIdentityResponse.From).ToList(),
+                user.CreatedAt,
+                user.UpdatedAt
+            );
+    }
+
+    public sealed record ExternalIdentityResponse(Guid Id, string Provider, string Subject)
+    {
+        public static ExternalIdentityResponse From(ExternalIdentity identity)
+            => new(identity.Id, identity.Provider, identity.Subject);
+    }
+}
