@@ -97,13 +97,17 @@ export function CounterWidget({ successCount }: CounterWidgetProps) {
       return;
     }
 
-    const start = performance.now();
-    const duration = 1200;
+    const prefersReducedMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)',
+    ).matches;
+
     const targets = stats.map((stat) => stat.value);
+    const start = performance.now();
+    const duration = prefersReducedMotion ? 0 : 1200;
 
     const tick = (now: number) => {
       const progress = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - progress, 3);
+      const eased = duration > 0 ? 1 - Math.pow(1 - progress, 3) : 1;
       setDisplayValues(targets.map((target) => Math.round(target * eased)));
 
       if (progress < 1) {
