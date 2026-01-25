@@ -110,3 +110,13 @@ the team can iterate on UI and API integration in one repo.
 Common scripts (run inside `src/LoanHub.Search.Web`):
 - `npm install`
 - `npm run dev`
+
+### Docker (API + Web)
+To build and run the backend and frontend containers together:
+```bash
+docker compose up --build
+```
+
+Services:
+- API: http://localhost:8080
+- Web: http://localhost:5173
