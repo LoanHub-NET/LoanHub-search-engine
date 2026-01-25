@@ -122,6 +122,21 @@ img {
   height: auto;
 }
 
+.page-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  margin-bottom: 0.75rem;
+}
+
+.page-back-link:hover {
+  color: var(--color-text-primary);
+}
+
 /* Custom selection color */
 ::selection {
   background: rgba(45, 90, 135, 0.2);
