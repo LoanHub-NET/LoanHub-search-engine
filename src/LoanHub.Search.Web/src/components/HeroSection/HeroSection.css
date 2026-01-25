@@ -169,6 +169,7 @@
   color: var(--color-text-muted);
   font-weight: 500;
   pointer-events: none;
+  z-index: 1;
 }
 
 .input-prefix {
@@ -182,13 +183,22 @@
 .form-input {
   width: 100%;
   padding: 1rem;
-  padding-left: 2rem;
   font-size: 1.1rem;
   border: 2px solid var(--color-border);
   border-radius: 12px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   background: var(--color-bg-input);
   color: var(--color-text-primary);
+}
+
+/* Add left padding for inputs with prefix (e.g., $ sign) */
+.input-prefix + .form-input {
+  padding-left: 2.5rem;
+}
+
+/* Add right padding for inputs with suffix (e.g., months) */
+.input-wrapper:has(.input-suffix) .form-input {
+  padding-right: 5rem;
 }
 
 .form-input:focus {
