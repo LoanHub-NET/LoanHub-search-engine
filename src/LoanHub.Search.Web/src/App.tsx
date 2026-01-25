@@ -13,6 +13,7 @@ import {
   GdprPage,
   LoginPage,
   AdminDashboardPage,
+  UserDashboardPage,
 } from './pages';
 import './App.css';
 
@@ -34,6 +35,7 @@ function App() {
           <Route path="/gdpr" element={<GdprPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/dashboard" element={<UserDashboardPage />} />
           <Route path="/apply" element={<ApplyPlaceholder />} />
           <Route path="/search/refine" element={<RefinePlaceholder />} />
           <Route path="*" element={<NotFoundPlaceholder />} />

@@ -48,7 +48,7 @@ export function LoginPage() {
           navigate('/admin');
           return;
         }
-        navigate('/');
+        navigate('/dashboard');
       }, 900);
     }, 900);
   };
