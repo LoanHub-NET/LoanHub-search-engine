@@ -46,13 +46,25 @@ export function CounterWidget({ successCount }: CounterWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [hasAnimated, setHasAnimated] = useState(false);
   const [displayValues, setDisplayValues] = useState<number[]>([0, 0, 0]);
-
-  const prefersReducedMotion = useMemo(
-    () =>
-      typeof window !== 'undefined' &&
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(
+    typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-    [],
   );
+
+  // Listen for changes to the prefers-reduced-motion preference
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      setPrefersReducedMotion(e.matches);
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   const stats = useMemo<Stat[]>(
     () => [
