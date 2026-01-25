@@ -279,7 +279,11 @@ public sealed class ApplicationService
 
         if (application.Status == ApplicationStatus.PreliminarilyAccepted)
         {
-            await NotifyPreliminaryAcceptedAsync(application, tokens, ct);
+            var preliminaryTokens = new Dictionary<string, string>(tokens, StringComparer.OrdinalIgnoreCase)
+            {
+                ["ContractLink"] = _contractLinkGenerator.GetContractLink(application.Id)
+            };
+            await NotifyPreliminaryAcceptedAsync(application, preliminaryTokens, ct);
             await NotifyStatusForProviderAsync(application, tokens, ct);
         }
         else
@@ -346,11 +350,9 @@ public sealed class ApplicationService
 
     private Task NotifyPreliminaryAcceptedAsync(
         LoanApplication application,
-        IDictionary<string, string> tokens,
+        IReadOnlyDictionary<string, string> tokens,
         CancellationToken ct)
     {
-        var contractLink = _contractLinkGenerator.GetContractLink(application.Id);
-        tokens["ContractLink"] = contractLink;
         var subject = _emailTemplateRenderer.Render(ApplicationEmailTemplates.PreliminaryAcceptedSubject, tokens);
         var body = _emailTemplateRenderer.Render(ApplicationEmailTemplates.PreliminaryAcceptedBody, tokens);
         var contract = _contractDocumentGenerator.GeneratePreliminaryContract(application);
