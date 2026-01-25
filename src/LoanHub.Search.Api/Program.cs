@@ -19,6 +19,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using LoanHub.Search.Core.Models.Users;
 
@@ -30,12 +31,43 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+builder.Services.Configure<OidcOptions>(builder.Configuration.GetSection("Oidc"));
 builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("SendGrid"));
 builder.Services.Configure<ProviderContactOptions>(builder.Configuration.GetSection("ProviderContacts"));
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
+builder.Services.AddHttpClient();
 builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+    .AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = "Bearer";
+        options.DefaultChallengeScheme = "Bearer";
+    })
+    .AddPolicyScheme("Bearer", "Bearer", options =>
+    {
+        var oidcOptions = builder.Configuration.GetSection("Oidc").Get<OidcOptions>() ?? new OidcOptions();
+        options.ForwardDefaultSelector = context =>
+        {
+            var authorization = context.Request.Headers.Authorization.ToString();
+            if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                var token = authorization["Bearer ".Length..].Trim();
+                var handler = new JwtSecurityTokenHandler();
+                if (handler.CanReadToken(token))
+                {
+                    var jwt = handler.ReadJwtToken(token);
+                    var issuer = jwt.Issuer ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(oidcOptions.Authority) &&
+                        issuer.StartsWith(oidcOptions.Authority.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
+                    {
+                        return "Oidc";
+                    }
+                }
+            }
+
+            return "LocalJwt";
+        };
+    })
+    .AddJwtBearer("LocalJwt", options =>
     {
         var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
         options.TokenValidationParameters = new TokenValidationParameters
@@ -49,6 +81,23 @@ builder.Services
             ClockSkew = TimeSpan.FromMinutes(1),
             RoleClaimType = "role"
         };
+    })
+    .AddJwtBearer("Oidc", options =>
+    {
+        var oidcOptions = builder.Configuration.GetSection("Oidc").Get<OidcOptions>() ?? new OidcOptions();
+        options.Authority = oidcOptions.Authority;
+        options.Audience = oidcOptions.Audience;
+        options.RequireHttpsMetadata = oidcOptions.RequireHttpsMetadata;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            RoleClaimType = "roles"
+        };
+        if (oidcOptions.ValidIssuers.Length > 0)
+        {
+            options.TokenValidationParameters.ValidIssuers = oidcOptions.ValidIssuers;
+        }
     });
 
 builder.Services.AddAuthorization(options =>
@@ -69,6 +118,7 @@ builder.Services.AddScoped<IOfferSelectionRepository, OfferSelectionRepository>(
 builder.Services.AddScoped<OfferSelectionService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<IExternalTokenValidator, OidcTokenValidator>();
 builder.Services.AddSingleton<IProviderContactResolver, ProviderContactResolver>();
 builder.Services.AddSingleton<IRealtimeNotifier, SignalRApplicationNotifier>();
 
