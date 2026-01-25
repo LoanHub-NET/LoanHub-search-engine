@@ -12,6 +12,7 @@ export function LoginPage() {
   const [role, setRole] = useState<Role>('user');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -185,7 +186,7 @@ export function LoginPage() {
                 <input
                   id="password"
                   name="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={handleChange('password')}
                   required
@@ -198,13 +199,22 @@ export function LoginPage() {
                   <input
                     id="confirmPassword"
                     name="confirmPassword"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     value={formData.confirmPassword}
                     onChange={handleChange('confirmPassword')}
                     required
                   />
                 </div>
               )}
+
+              <label className="password-toggle">
+                <input
+                  type="checkbox"
+                  checked={showPassword}
+                  onChange={(event) => setShowPassword(event.target.checked)}
+                />
+                <span>Show password</span>
+              </label>
 
               {mode === 'register' && role === 'admin' && (
                 <>
