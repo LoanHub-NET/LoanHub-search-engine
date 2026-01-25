@@ -1,5 +1,5 @@
 .footer {
-  background: #1e3a5f;
+  background: var(--color-accent-secondary);
   color: white;
   padding: 4rem 1.5rem 2rem;
 }

@@ -6,7 +6,7 @@
   padding: 100px 1.5rem 3rem;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ed 100%);
+  background: var(--gradient-hero);
 }
 
 .hero-background {
@@ -26,7 +26,7 @@
 .hero-shape-1 {
   width: 500px;
   height: 500px;
-  background: linear-gradient(135deg, #2d5a87 0%, #4a90c2 100%);
+  background: linear-gradient(135deg, var(--color-accent-primary) 0%, #4a90c2 100%);
   top: -200px;
   right: -100px;
   animation: float 8s ease-in-out infinite;
@@ -35,7 +35,7 @@
 .hero-shape-2 {
   width: 400px;
   height: 400px;
-  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  background: linear-gradient(135deg, var(--color-accent-green) 0%, #38a169 100%);
   bottom: -150px;
   left: -100px;
   animation: float 10s ease-in-out infinite reverse;
@@ -83,7 +83,7 @@
 }
 
 .hero-text {
-  color: #1e3a5f;
+  color: var(--color-text-primary);
 }
 
 .hero-title {
@@ -94,7 +94,7 @@
 }
 
 .highlight {
-  background: linear-gradient(135deg, #2d5a87 0%, #48bb78 100%);
+  background: linear-gradient(135deg, var(--color-accent-primary) 0%, var(--color-accent-green) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -102,7 +102,7 @@
 
 .hero-subtitle {
   font-size: 1.25rem;
-  color: #4a5568;
+  color: var(--color-text-secondary);
   line-height: 1.7;
   margin: 0 0 2rem;
 }
@@ -111,10 +111,10 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  background: white;
+  background: var(--color-bg-card);
   padding: 1rem 1.5rem;
   border-radius: 15px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px var(--color-shadow);
   max-width: fit-content;
 }
 
@@ -130,12 +130,12 @@
 .counter-number {
   font-size: 1.8rem;
   font-weight: 700;
-  color: #2d5a87;
+  color: var(--color-accent-primary);
 }
 
 .counter-label {
   font-size: 0.9rem;
-  color: #718096;
+  color: var(--color-text-muted);
 }
 
 .hero-form-container {
@@ -144,10 +144,10 @@
 }
 
 .quick-search-card {
-  background: white;
+  background: var(--color-bg-card);
   border-radius: 20px;
   padding: 2.5rem;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 20px 60px var(--color-shadow-strong);
   width: 100%;
   max-width: 420px;
 }
@@ -155,14 +155,14 @@
 .form-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #1e3a5f;
+  color: var(--color-text-primary);
   margin: 0 0 0.5rem;
   text-align: center;
 }
 
 .form-subtitle {
   font-size: 0.95rem;
-  color: #718096;
+  color: var(--color-text-muted);
   margin: 0 0 2rem;
   text-align: center;
 }
@@ -182,7 +182,7 @@
 .form-label {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #4a5568;
+  color: var(--color-text-secondary);
 }
 
 .input-wrapper {
@@ -194,7 +194,7 @@
 .input-prefix,
 .input-suffix {
   position: absolute;
-  color: #718096;
+  color: var(--color-text-muted);
   font-weight: 500;
   pointer-events: none;
 }
@@ -212,21 +212,22 @@
   padding: 1rem;
   padding-left: 2rem;
   font-size: 1.1rem;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--color-border);
   border-radius: 12px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  background: #f7fafc;
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
 }
 
 .form-input:focus {
   outline: none;
-  border-color: #2d5a87;
+  border-color: var(--color-accent-primary);
   box-shadow: 0 0 0 4px rgba(45, 90, 135, 0.1);
-  background: white;
+  background: var(--color-bg-input-focus);
 }
 
 .form-input::placeholder {
-  color: #a0aec0;
+  color: var(--color-text-placeholder);
 }
 
 /* Remove number input arrows */
@@ -251,22 +252,22 @@
 .preset-btn {
   padding: 0.4rem 0.8rem;
   font-size: 0.8rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 20px;
-  background: white;
-  color: #4a5568;
+  background: var(--color-bg-card);
+  color: var(--color-text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .preset-btn:hover {
-  border-color: #2d5a87;
-  color: #2d5a87;
+  border-color: var(--color-accent-primary);
+  color: var(--color-accent-primary);
 }
 
 .preset-btn.active {
-  background: #2d5a87;
-  border-color: #2d5a87;
+  background: var(--color-accent-primary);
+  border-color: var(--color-accent-primary);
   color: white;
 }
 
@@ -280,7 +281,7 @@
   font-size: 1.1rem;
   font-weight: 600;
   color: white;
-  background: linear-gradient(135deg, #2d5a87 0%, #1e3a5f 100%);
+  background: linear-gradient(135deg, var(--color-accent-primary) 0%, var(--color-accent-secondary) 100%);
   border: none;
   border-radius: 12px;
   cursor: pointer;
@@ -307,7 +308,7 @@
 
 .form-disclaimer {
   font-size: 0.85rem;
-  color: #718096;
+  color: var(--color-text-muted);
   text-align: center;
   margin: 1.5rem 0 0;
 }

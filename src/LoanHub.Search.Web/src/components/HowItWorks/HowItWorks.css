@@ -1,6 +1,6 @@
 .how-it-works {
   padding: 6rem 1.5rem;
-  background: white;
+  background: var(--color-bg-primary);
 }
 
 .how-it-works-container {
@@ -17,7 +17,7 @@
   display: inline-block;
   padding: 0.5rem 1rem;
   background: linear-gradient(135deg, rgba(45, 90, 135, 0.1) 0%, rgba(72, 187, 120, 0.1) 100%);
-  color: #2d5a87;
+  color: var(--color-accent-primary);
   font-size: 0.875rem;
   font-weight: 600;
   border-radius: 20px;
@@ -27,13 +27,13 @@
 .section-title {
   font-size: 2.5rem;
   font-weight: 800;
-  color: #1e3a5f;
+  color: var(--color-text-primary);
   margin: 0 0 1rem;
 }
 
 .section-subtitle {
   font-size: 1.1rem;
-  color: #718096;
+  color: var(--color-text-muted);
   max-width: 600px;
   margin: 0 auto;
   line-height: 1.7;
@@ -51,14 +51,14 @@
   position: relative;
   text-align: center;
   padding: 2rem 1.5rem;
-  background: #f7fafc;
+  background: var(--color-bg-secondary);
   border-radius: 20px;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .step-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 15px 40px var(--color-shadow);
 }
 
 .step-connector {
@@ -74,7 +74,7 @@
 .connector-line {
   width: 100%;
   height: 2px;
-  background: linear-gradient(90deg, #2d5a87, #48bb78);
+  background: linear-gradient(90deg, var(--color-accent-primary), var(--color-accent-green));
 }
 
 .step-card:last-child .step-connector {
@@ -89,7 +89,7 @@
 .step-number {
   display: inline-block;
   padding: 0.25rem 0.75rem;
-  background: linear-gradient(135deg, #2d5a87 0%, #1e3a5f 100%);
+  background: linear-gradient(135deg, var(--color-accent-primary) 0%, var(--color-accent-secondary) 100%);
   color: white;
   font-size: 0.75rem;
   font-weight: 600;
@@ -100,13 +100,13 @@
 .step-title {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #1e3a5f;
+  color: var(--color-text-primary);
   margin: 0 0 0.75rem;
 }
 
 .step-description {
   font-size: 0.95rem;
-  color: #718096;
+  color: var(--color-text-muted);
   line-height: 1.6;
   margin: 0;
 }
@@ -120,14 +120,14 @@
 .feature-card {
   text-align: center;
   padding: 2rem 1.5rem;
-  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+  background: var(--gradient-card);
   border-radius: 15px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   transition: border-color 0.3s ease;
 }
 
 .feature-card:hover {
-  border-color: #2d5a87;
+  border-color: var(--color-accent-primary);
 }
 
 .feature-icon {
@@ -138,13 +138,13 @@
 .feature-title {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #1e3a5f;
+  color: var(--color-text-primary);
   margin: 0 0 0.5rem;
 }
 
 .feature-description {
   font-size: 0.9rem;
-  color: #718096;
+  color: var(--color-text-muted);
   margin: 0;
   line-height: 1.5;
 }
