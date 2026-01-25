@@ -59,23 +59,6 @@ export function LoginPage() {
 
         <section className="login-content">
           <div className="login-card">
-            <div className="mode-toggle">
-              <button
-                type="button"
-                className={`toggle-btn ${mode === 'login' ? 'active' : ''}`}
-                onClick={() => setMode('login')}
-              >
-                Log in
-              </button>
-              <button
-                type="button"
-                className={`toggle-btn ${mode === 'register' ? 'active' : ''}`}
-                onClick={() => setMode('register')}
-              >
-                Register
-              </button>
-            </div>
-
             <div className="role-toggle">
               <button
                 type="button"
