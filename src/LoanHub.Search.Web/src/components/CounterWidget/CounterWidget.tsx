@@ -125,7 +125,7 @@ export function CounterWidget({ successCount }: CounterWidgetProps) {
 
     const tick = (now: number) => {
       const progress = Math.min(1, (now - start) / duration);
-      const eased = duration > 0 ? 1 - Math.pow(1 - progress, EASING_POWER) : 1;
+      const eased = prefersReducedMotion ? 1 : 1 - Math.pow(1 - progress, EASING_POWER);
       setDisplayValues(targets.map((target) => Math.round(target * eased)));
 
       if (progress < 1) {
