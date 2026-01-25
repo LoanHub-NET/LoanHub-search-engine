@@ -61,7 +61,8 @@ public sealed class OfferSelectionService
             selected.Apr,
             selected.TotalCost,
             selection.SelectedOffer.Amount,
-            selection.SelectedOffer.DurationMonths);
+            selection.SelectedOffer.DurationMonths,
+            DateTimeOffset.UtcNow.AddDays(30));
 
         selection.ApplyRecalculation(recalculated, income, livingCosts, dependents);
         var updated = await _repository.UpdateAsync(selection, ct);

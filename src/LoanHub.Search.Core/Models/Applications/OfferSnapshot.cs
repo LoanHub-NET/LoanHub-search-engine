@@ -7,5 +7,6 @@ public sealed record OfferSnapshot(
     decimal Apr,
     decimal TotalCost,
     decimal Amount,
-    int DurationMonths
+    int DurationMonths,
+    DateTimeOffset ValidUntil
 );

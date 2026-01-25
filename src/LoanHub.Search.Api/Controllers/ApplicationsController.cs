@@ -36,7 +36,8 @@ public sealed class ApplicationsController : ControllerBase
                 request.Apr,
                 request.TotalCost,
                 request.Amount,
-                request.DurationMonths
+                request.DurationMonths,
+                DateTimeOffset.UtcNow.AddDays(30)
             )
         };
 

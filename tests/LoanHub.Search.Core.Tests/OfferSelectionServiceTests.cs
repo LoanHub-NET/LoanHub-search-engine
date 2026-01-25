@@ -26,7 +26,7 @@ public sealed class OfferSelectionServiceTests
         var repository = new InMemoryOfferSelectionRepository();
         var selection = new OfferSelection
         {
-            SelectedOffer = new OfferSnapshot("Unknown", "OFF-1", 100m, 8m, 1200m, 1000m, 12)
+            SelectedOffer = new OfferSnapshot("Unknown", "OFF-1", 100m, 8m, 1200m, 1000m, 12, DateTimeOffset.UtcNow.AddDays(30))
         };
         await repository.AddAsync(selection, CancellationToken.None);
 
@@ -44,7 +44,7 @@ public sealed class OfferSelectionServiceTests
         var repository = new InMemoryOfferSelectionRepository();
         var selection = new OfferSelection
         {
-            SelectedOffer = new OfferSnapshot("ProviderA", "OFF-1", 100m, 8m, 1200m, 1000m, 12)
+            SelectedOffer = new OfferSnapshot("ProviderA", "OFF-1", 100m, 8m, 1200m, 1000m, 12, DateTimeOffset.UtcNow.AddDays(30))
         };
         await repository.AddAsync(selection, CancellationToken.None);
 
@@ -67,7 +67,7 @@ public sealed class OfferSelectionServiceTests
         var repository = new InMemoryOfferSelectionRepository();
         var selection = new OfferSelection
         {
-            SelectedOffer = new OfferSnapshot("ProviderA", "OFF-1", 100m, 8m, 1200m, 1000m, 12)
+            SelectedOffer = new OfferSnapshot("ProviderA", "OFF-1", 100m, 8m, 1200m, 1000m, 12, DateTimeOffset.UtcNow.AddDays(30))
         };
         await repository.AddAsync(selection, CancellationToken.None);
 

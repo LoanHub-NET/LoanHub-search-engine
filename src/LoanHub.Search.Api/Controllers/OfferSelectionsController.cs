@@ -26,7 +26,8 @@ public sealed class OfferSelectionsController : ControllerBase
                 request.Apr,
                 request.TotalCost,
                 request.Amount,
-                request.DurationMonths)
+                request.DurationMonths,
+                DateTimeOffset.UtcNow.AddDays(30))
         };
 
         var created = await _service.CreateAsync(selection, ct);
