@@ -30,6 +30,16 @@ public sealed class InMemoryApplicationRepository : IApplicationRepository
         return Task.FromResult(results);
     }
 
+    public Task<IReadOnlyList<LoanApplication>> ListByUserIdAsync(Guid userId, CancellationToken ct)
+    {
+        IReadOnlyList<LoanApplication> results = _storage.Values
+            .Where(application => application.UserId == userId)
+            .OrderByDescending(application => application.CreatedAt)
+            .ToList();
+
+        return Task.FromResult(results);
+    }
+
     public Task<PagedResult<LoanApplication>> ListAdminAsync(ApplicationAdminQuery query, CancellationToken ct)
     {
         var normalized = query.Normalize();

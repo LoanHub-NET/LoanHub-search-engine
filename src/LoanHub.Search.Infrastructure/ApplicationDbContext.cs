@@ -23,6 +23,12 @@ public sealed class ApplicationDbContext : DbContext
         {
             entity.HasKey(application => application.Id);
 
+            entity.HasOne<UserAccount>()
+                .WithMany()
+                .HasForeignKey(application => application.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(application => application.UserId);
+
             entity.Property(application => application.Status)
                 .HasConversion<int>();
             entity.Property(application => application.SignedContractFileName)

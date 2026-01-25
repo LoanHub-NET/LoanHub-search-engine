@@ -1,7 +1,10 @@
 using LoanHub.Search.Core.Models;
 using LoanHub.Search.Core.Models.Applications;
 using LoanHub.Search.Core.Services.Applications;
+using LoanHub.Search.Core.Services.Users;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace LoanHub.Search.Api.Controllers;
 
@@ -10,8 +13,13 @@ namespace LoanHub.Search.Api.Controllers;
 public sealed class ApplicationsController : ControllerBase
 {
     private readonly ApplicationService _service;
+    private readonly UserService _userService;
 
-    public ApplicationsController(ApplicationService service) => _service = service;
+    public ApplicationsController(ApplicationService service, UserService userService)
+    {
+        _service = service;
+        _userService = userService;
+    }
 
     [HttpPost]
     public async Task<ActionResult<ApplicationResponse>> Create([FromBody] CreateApplicationRequest request, CancellationToken ct)
@@ -49,6 +57,43 @@ public sealed class ApplicationsController : ControllerBase
         return Ok(ApplicationResponse.From(created));
     }
 
+    [Authorize]
+    [HttpPost("me")]
+    public async Task<ActionResult<ApplicationResponse>> CreateForCurrentUser(
+        [FromBody] CreateMyApplicationRequest request,
+        CancellationToken ct)
+    {
+        if (OfferValidityPolicy.IsExpired(request.ValidUntil, DateTimeOffset.UtcNow))
+            return BadRequest("Offer has expired.");
+
+        var user = await GetCurrentUserAsync(ct);
+        if (user is null)
+            return Unauthorized();
+
+        if (!TryBuildApplicantDetails(user, out var details, out var validationError))
+            return BadRequest(validationError);
+
+        var application = new LoanApplication
+        {
+            UserId = user.Id,
+            ApplicantEmail = user.Email,
+            ApplicantDetails = details!,
+            OfferSnapshot = new OfferSnapshot(
+                request.Provider,
+                request.ProviderOfferId,
+                request.Installment,
+                request.Apr,
+                request.TotalCost,
+                request.Amount,
+                request.DurationMonths,
+                request.ValidUntil
+            )
+        };
+
+        var created = await _service.CreateAsync(application, ct);
+        return Ok(ApplicationResponse.From(created));
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ApplicationResponse>> Get(Guid id, CancellationToken ct)
     {
@@ -57,6 +102,25 @@ public sealed class ApplicationsController : ControllerBase
             return NotFound();
 
         return Ok(ApplicationResponse.From(application));
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<ActionResult<IReadOnlyList<ApplicationResponse>>> ListForCurrentUser(
+        [FromQuery] ApplicationStatus? status,
+        [FromQuery] int days = 10,
+        CancellationToken ct = default)
+    {
+        var user = await GetCurrentUserAsync(ct);
+        if (user is null)
+            return Unauthorized();
+
+        var applications = await _service.ListRecentByUserIdAsync(user.Id, status, days, ct);
+        var responses = applications
+            .Select(ApplicationResponse.From)
+            .ToList();
+
+        return Ok(responses);
     }
 
     [HttpGet]
@@ -126,10 +190,22 @@ public sealed class ApplicationsController : ControllerBase
         DateTimeOffset ValidUntil
     );
 
+    public sealed record CreateMyApplicationRequest(
+        string Provider,
+        string ProviderOfferId,
+        decimal Installment,
+        decimal Apr,
+        decimal TotalCost,
+        decimal Amount,
+        int DurationMonths,
+        DateTimeOffset ValidUntil
+    );
+
     public sealed record SignedContractRequest(string FileName);
 
     public sealed record ApplicationResponse(
         Guid Id,
+        Guid? UserId,
         string ApplicantEmail,
         ApplicationStatus Status,
         string? RejectReason,
@@ -147,6 +223,7 @@ public sealed class ApplicationsController : ControllerBase
         public static ApplicationResponse From(LoanApplication application)
             => new(
                 application.Id,
+                application.UserId,
                 application.ApplicantEmail,
                 application.Status,
                 application.RejectReason,
@@ -160,5 +237,55 @@ public sealed class ApplicationsController : ControllerBase
                 application.UpdatedAt,
                 application.StatusHistory
             );
+    }
+
+    private async Task<Core.Models.Users.UserAccount?> GetCurrentUserAsync(CancellationToken ct)
+    {
+        var userId = GetUserId();
+        if (userId is null)
+            return null;
+
+        return await _userService.GetAsync(userId.Value, ct);
+    }
+
+    private Guid? GetUserId()
+    {
+        var subject = User.FindFirstValue("sub");
+        return Guid.TryParse(subject, out var userId) ? userId : null;
+    }
+
+    private static bool TryBuildApplicantDetails(
+        Core.Models.Users.UserAccount user,
+        out ApplicantDetails? details,
+        out string? error)
+    {
+        details = null;
+        error = null;
+
+        if (string.IsNullOrWhiteSpace(user.FirstName))
+            error = "FirstName is required for the current user.";
+        else if (string.IsNullOrWhiteSpace(user.LastName))
+            error = "LastName is required for the current user.";
+        else if (!user.Age.HasValue || user.Age <= 0)
+            error = "Age is required for the current user.";
+        else if (string.IsNullOrWhiteSpace(user.JobTitle))
+            error = "JobTitle is required for the current user.";
+        else if (string.IsNullOrWhiteSpace(user.Address))
+            error = "Address is required for the current user.";
+        else if (string.IsNullOrWhiteSpace(user.IdDocumentNumber))
+            error = "IdDocumentNumber is required for the current user.";
+
+        if (error is not null)
+            return false;
+
+        details = new ApplicantDetails(
+            user.FirstName!,
+            user.LastName!,
+            user.Age!.Value,
+            user.JobTitle!,
+            user.Address!,
+            user.IdDocumentNumber!);
+
+        return true;
     }
 }
