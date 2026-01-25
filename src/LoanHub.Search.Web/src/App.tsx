@@ -1,48 +1,63 @@
-import { useState, useEffect } from 'react';
-import { Header, HeroSection, HowItWorks, Footer } from './components';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { LandingPage, SearchPage, SearchResultsPage } from './pages';
 import './App.css';
 
 function App() {
-  // Simulated counter - in production, this would come from an API
-  const [successCount, setSuccessCount] = useState(12847);
-
-  // Simulate counter incrementing occasionally for a dynamic feel
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (Math.random() > 0.7) {
-        setSuccessCount((prev) => prev + 1);
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleQuickSearch = (amount: number, duration: number) => {
-    // TODO: Navigate to search results page with these parameters
-    console.log('Quick search:', { amount, duration });
-    alert(`Searching for loans: $${amount.toLocaleString()} over ${duration} months\n\nThis will navigate to the search results page.`);
-  };
-
-  const handleLoginClick = () => {
-    // TODO: Implement login modal or navigate to login page
-    console.log('Login clicked');
-    alert('Login functionality will open authentication options:\n- Azure AD\n- Google\n- Facebook\n- Custom registration');
-  };
-
-  const handleSearchClick = () => {
-    // TODO: Navigate to full search engine page
-    console.log('Search engine clicked');
-    alert('This will navigate to the full search engine with additional fields:\n- Monthly income\n- Living costs\n- Number of dependents');
-  };
-
   return (
-    <div className="app">
-      <Header onLoginClick={handleLoginClick} onSearchClick={handleSearchClick} />
-      <main>
-        <HeroSection onQuickSearch={handleQuickSearch} successCount={successCount} />
-        <HowItWorks />
-      </main>
-      <Footer />
+    <BrowserRouter>
+      <div className="app">
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/search/results" element={<SearchResultsPage />} />
+          {/* Future routes */}
+          <Route path="/login" element={<LoginPlaceholder />} />
+          <Route path="/apply" element={<ApplyPlaceholder />} />
+          <Route path="/search/refine" element={<RefinePlaceholder />} />
+          <Route path="*" element={<NotFoundPlaceholder />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
+  );
+}
+
+// Placeholder components for future implementation
+function LoginPlaceholder() {
+  return (
+    <div className="placeholder-page">
+      <h1>Login Page</h1>
+      <p>Authentication with Azure AD, Google, Facebook coming soon...</p>
+      <a href="/">← Back to Home</a>
+    </div>
+  );
+}
+
+function ApplyPlaceholder() {
+  return (
+    <div className="placeholder-page">
+      <h1>Application Page</h1>
+      <p>Loan application form coming soon...</p>
+      <a href="/search/results">← Back to Results</a>
+    </div>
+  );
+}
+
+function RefinePlaceholder() {
+  return (
+    <div className="placeholder-page">
+      <h1>Refine Your Search</h1>
+      <p>Add income details for personalized rates coming soon...</p>
+      <a href="/search/results">← Back to Results</a>
+    </div>
+  );
+}
+
+function NotFoundPlaceholder() {
+  return (
+    <div className="placeholder-page">
+      <h1>404 - Page Not Found</h1>
+      <p>The page you're looking for doesn't exist.</p>
+      <a href="/">← Back to Home</a>
     </div>
   );
 }
