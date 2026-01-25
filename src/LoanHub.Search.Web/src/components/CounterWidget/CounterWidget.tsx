@@ -32,6 +32,7 @@ const formatCompact = (value: number): string => {
 };
 
 const ANIMATION_DURATION_MS = 1200;
+const EASING_POWER = 3;
 
 const formatValue = (value: number, stat: Stat): string => {
   const base =
@@ -45,6 +46,10 @@ export function CounterWidget({ successCount }: CounterWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [hasAnimated, setHasAnimated] = useState(false);
   const [displayValues, setDisplayValues] = useState<number[]>([0, 0, 0]);
+
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const stats = useMemo<Stat[]>(
     () => [
@@ -99,17 +104,13 @@ export function CounterWidget({ successCount }: CounterWidgetProps) {
       return;
     }
 
-    const prefersReducedMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
     const targets = stats.map((stat) => stat.value);
     const start = performance.now();
     const duration = prefersReducedMotion ? 0 : ANIMATION_DURATION_MS;
 
     const tick = (now: number) => {
       const progress = Math.min(1, (now - start) / duration);
-      const eased = duration > 0 ? 1 - Math.pow(1 - progress, 3) : 1;
+      const eased = duration > 0 ? 1 - Math.pow(1 - progress, EASING_POWER) : 1;
       setDisplayValues(targets.map((target) => Math.round(target * eased)));
 
       if (progress < 1) {
@@ -118,7 +119,7 @@ export function CounterWidget({ successCount }: CounterWidgetProps) {
     };
 
     requestAnimationFrame(tick);
-  }, [hasAnimated, stats]);
+  }, [hasAnimated, stats, prefersReducedMotion]);
 
   useEffect(() => {
     if (!hasAnimated) {
