@@ -15,8 +15,9 @@ public sealed class ApplicationServiceTests
         {
             ["ProviderA"] = "provider@example.com"
         });
+        var notifier = new CapturingRealtimeNotifier();
 
-        var service = new ApplicationService(repository, emailSender, resolver);
+        var service = new ApplicationService(repository, emailSender, resolver, notifier);
 
         var application = new LoanApplication
         {
@@ -38,7 +39,8 @@ public sealed class ApplicationServiceTests
         var repository = new InMemoryApplicationRepository();
         var emailSender = new CapturingEmailSender();
         var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>());
-        var service = new ApplicationService(repository, emailSender, resolver);
+        var notifier = new CapturingRealtimeNotifier();
+        var service = new ApplicationService(repository, emailSender, resolver, notifier);
 
         var application = new LoanApplication
         {
@@ -61,7 +63,8 @@ public sealed class ApplicationServiceTests
         var repository = new InMemoryApplicationRepository();
         var emailSender = new CapturingEmailSender();
         var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>());
-        var service = new ApplicationService(repository, emailSender, resolver);
+        var notifier = new CapturingRealtimeNotifier();
+        var service = new ApplicationService(repository, emailSender, resolver, notifier);
 
         var recent = new LoanApplication
         {

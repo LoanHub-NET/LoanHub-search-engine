@@ -25,6 +25,8 @@ public sealed class ApplicationDbContext : DbContext
 
             entity.Property(application => application.Status)
                 .HasConversion<int>();
+            entity.Property(application => application.SignedContractFileName)
+                .HasMaxLength(240);
 
             entity.OwnsOne(application => application.ApplicantDetails, details =>
             {

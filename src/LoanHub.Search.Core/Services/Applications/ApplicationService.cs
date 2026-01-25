@@ -10,15 +10,18 @@ public sealed class ApplicationService
     private readonly IApplicationRepository _repo;
     private readonly IEmailSender _emailSender;
     private readonly IProviderContactResolver _providerContactResolver;
+    private readonly IRealtimeNotifier _realtimeNotifier;
 
     public ApplicationService(
         IApplicationRepository repo,
         IEmailSender emailSender,
-        IProviderContactResolver providerContactResolver)
+        IProviderContactResolver providerContactResolver,
+        IRealtimeNotifier realtimeNotifier)
     {
         _repo = repo;
         _emailSender = emailSender;
         _providerContactResolver = providerContactResolver;
+        _realtimeNotifier = realtimeNotifier;
     }
 
     public async Task<LoanApplication> CreateAsync(LoanApplication application, CancellationToken ct)
@@ -68,7 +71,7 @@ public sealed class ApplicationService
 
         application.AddStatus(ApplicationStatus.Accepted, null);
         var updated = await _repo.UpdateAsync(application, ct);
-        await NotifyStatusAsync(updated, "Zaakceptowany - kontrakt gotowy", ct);
+        await NotifyStatusAsync(updated, "Zaakceptowany", ct);
         return updated;
     }
 
@@ -81,6 +84,46 @@ public sealed class ApplicationService
         application.AddStatus(ApplicationStatus.Granted, null);
         var updated = await _repo.UpdateAsync(application, ct);
         await NotifyStatusAsync(updated, "Przyznany", ct);
+        return updated;
+    }
+
+    public async Task<LoanApplication?> MarkContractReadyAsync(Guid id, CancellationToken ct)
+    {
+        var application = await _repo.GetAsync(id, ct);
+        if (application is null)
+            return null;
+
+        application.ContractReadyAt = DateTimeOffset.UtcNow;
+        application.AddStatus(ApplicationStatus.ContractReady, null);
+        var updated = await _repo.UpdateAsync(application, ct);
+        await NotifyStatusAsync(updated, "Kontrakt gotowy do podpisu", ct);
+        return updated;
+    }
+
+    public async Task<LoanApplication?> UploadSignedContractAsync(Guid id, string fileName, CancellationToken ct)
+    {
+        var application = await _repo.GetAsync(id, ct);
+        if (application is null)
+            return null;
+
+        application.SignedContractFileName = fileName;
+        application.SignedContractUploadedAt = DateTimeOffset.UtcNow;
+        application.AddStatus(ApplicationStatus.SignedContractUploaded, null);
+        var updated = await _repo.UpdateAsync(application, ct);
+        await NotifyStatusAsync(updated, "Podpisany kontrakt przesłany", ct);
+        return updated;
+    }
+
+    public async Task<LoanApplication?> FinalApproveAsync(Guid id, CancellationToken ct)
+    {
+        var application = await _repo.GetAsync(id, ct);
+        if (application is null)
+            return null;
+
+        application.FinalApprovedAt = DateTimeOffset.UtcNow;
+        application.AddStatus(ApplicationStatus.FinalApproved, null);
+        var updated = await _repo.UpdateAsync(application, ct);
+        await NotifyStatusAsync(updated, "Finalna akceptacja", ct);
         return updated;
     }
 
@@ -140,6 +183,14 @@ public sealed class ApplicationService
 
         await SendToApplicantAsync(application, subject, body, ct);
         await SendToProviderAsync(application, subject, body, ct);
+        await _realtimeNotifier.NotifyApplicantAsync(
+            new ApplicationNotification(
+                application.Id,
+                application.ApplicantEmail,
+                statusLabel,
+                application.RejectReason,
+                DateTimeOffset.UtcNow),
+            ct);
     }
 
     private Task SendToApplicantAsync(LoanApplication application, string subject, string body, CancellationToken ct)

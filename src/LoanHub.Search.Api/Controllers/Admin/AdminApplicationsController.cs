@@ -65,6 +65,26 @@ public sealed class AdminApplicationsController : ControllerBase
         return Ok(ApplicationsController.ApplicationResponse.From(application));
     }
 
+    [HttpPost("{id:guid}/contract-ready")]
+    public async Task<ActionResult<ApplicationsController.ApplicationResponse>> ContractReady(Guid id, CancellationToken ct)
+    {
+        var application = await _service.MarkContractReadyAsync(id, ct);
+        if (application is null)
+            return NotFound();
+
+        return Ok(ApplicationsController.ApplicationResponse.From(application));
+    }
+
+    [HttpPost("{id:guid}/final-approve")]
+    public async Task<ActionResult<ApplicationsController.ApplicationResponse>> FinalApprove(Guid id, CancellationToken ct)
+    {
+        var application = await _service.FinalApproveAsync(id, ct);
+        if (application is null)
+            return NotFound();
+
+        return Ok(ApplicationsController.ApplicationResponse.From(application));
+    }
+
     [HttpPost("{id:guid}/reject")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> Reject(Guid id, [FromBody] RejectRequest request, CancellationToken ct)
     {
