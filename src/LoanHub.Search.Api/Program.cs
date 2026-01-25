@@ -34,6 +34,7 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<OidcOptions>(builder.Configuration.GetSection("Oidc"));
 builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("SendGrid"));
 builder.Services.Configure<ProviderContactOptions>(builder.Configuration.GetSection("ProviderContacts"));
+builder.Services.Configure<ContractStorageOptions>(builder.Configuration.GetSection("ContractStorage"));
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 builder.Services.AddHttpClient();
 builder.Services
@@ -114,6 +115,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Applications")));
 builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
 builder.Services.AddScoped<ApplicationService>();
+builder.Services.AddSingleton<IContractStorage, AzureBlobContractStorage>();
 builder.Services.AddScoped<IOfferSelectionRepository, OfferSelectionRepository>();
 builder.Services.AddScoped<OfferSelectionService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();

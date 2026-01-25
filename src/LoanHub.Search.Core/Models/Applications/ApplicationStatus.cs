@@ -9,6 +9,6 @@ public enum ApplicationStatus
     Cancelled = 5,
     Granted = 6,
     ContractReady = 7,
-    SignedContractUploaded = 8,
+    SignedContractReceived = 8,
     FinalApproved = 9
 }

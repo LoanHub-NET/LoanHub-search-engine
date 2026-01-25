@@ -188,6 +188,23 @@ internal sealed class CapturingEmailSender : IEmailSender
     }
 }
 
+internal sealed class StubContractStorage : IContractStorage
+{
+    public List<(Guid ApplicationId, string FileName, string? ContentType)> Uploads { get; } = new();
+
+    public Task<StoredContract> UploadSignedContractAsync(
+        Guid applicationId,
+        Stream content,
+        string fileName,
+        string? contentType,
+        CancellationToken ct)
+    {
+        Uploads.Add((applicationId, fileName, contentType));
+        var blobName = $"{applicationId:N}/stub-{Guid.NewGuid():N}";
+        return Task.FromResult(new StoredContract(blobName, Path.GetFileName(fileName), contentType));
+    }
+}
+
 internal sealed class StaticProviderContactResolver : IProviderContactResolver
 {
     private readonly Dictionary<string, string?> _emails;
