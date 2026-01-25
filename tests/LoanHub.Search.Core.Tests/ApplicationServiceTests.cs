@@ -53,8 +53,35 @@ public sealed class ApplicationServiceTests
 
         var result = await service.CancelAsync(application.Id, CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.Equal(ApplicationStatus.Accepted, result!.Status);
+        Assert.Equal(CancellationOutcome.NotAllowed, result.Outcome);
+        Assert.NotNull(result.Application);
+        Assert.Equal(ApplicationStatus.Accepted, result.Application!.Status);
+        Assert.Equal("Nie można zrezygnować po akceptacji wniosku.", result.Message);
+    }
+
+    [Fact]
+    public async Task CancelAsync_CancelsNewApplication()
+    {
+        var repository = new InMemoryApplicationRepository();
+        var emailSender = new CapturingEmailSender();
+        var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>());
+        var notifier = new CapturingRealtimeNotifier();
+        var service = new ApplicationService(repository, emailSender, resolver, notifier);
+
+        var application = new LoanApplication
+        {
+            ApplicantEmail = "applicant@example.com",
+            ApplicantDetails = new ApplicantDetails("Jane", "Doe", 30, "Engineer", "Main St", "123"),
+            OfferSnapshot = new OfferSnapshot("ProviderA", "OFF-1", 100m, 8m, 1200m, 1000m, 12)
+        };
+        await repository.AddAsync(application, CancellationToken.None);
+
+        var result = await service.CancelAsync(application.Id, CancellationToken.None);
+
+        Assert.Equal(CancellationOutcome.Cancelled, result.Outcome);
+        Assert.NotNull(result.Application);
+        Assert.Equal(ApplicationStatus.Cancelled, result.Application!.Status);
+        Assert.Equal("Wniosek został anulowany.", result.Message);
     }
 
     [Fact]

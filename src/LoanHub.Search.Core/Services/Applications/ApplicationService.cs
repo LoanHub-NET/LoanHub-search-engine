@@ -42,17 +42,52 @@ public sealed class ApplicationService
     public Task<PagedResult<LoanApplication>> ListAdminAsync(ApplicationAdminQuery query, CancellationToken ct)
         => _repo.ListAdminAsync(query.Normalize(), ct);
 
-    public async Task<LoanApplication?> CancelAsync(Guid id, CancellationToken ct)
+    public async Task<CancellationResult> CancelAsync(Guid id, CancellationToken ct)
     {
         var application = await _repo.GetAsync(id, ct);
         if (application is null)
-            return null;
+            return new CancellationResult(
+                CancellationOutcome.NotFound,
+                null,
+                "Nie znaleziono wniosku.");
 
-        if (application.Status is ApplicationStatus.Accepted or ApplicationStatus.Granted)
-            return application;
-
-        application.AddStatus(ApplicationStatus.Cancelled, "Cancelled by user");
-        return await _repo.UpdateAsync(application, ct);
+        return application.Status switch
+        {
+            ApplicationStatus.New => await CancelInternalAsync(application, ct),
+            ApplicationStatus.PreliminarilyAccepted => await CancelInternalAsync(application, ct),
+            ApplicationStatus.Cancelled => new CancellationResult(
+                CancellationOutcome.AlreadyCancelled,
+                application,
+                "Wniosek został już anulowany."),
+            ApplicationStatus.Rejected => new CancellationResult(
+                CancellationOutcome.NotAllowed,
+                application,
+                "Nie można zrezygnować po odrzuceniu wniosku."),
+            ApplicationStatus.Accepted => new CancellationResult(
+                CancellationOutcome.NotAllowed,
+                application,
+                "Nie można zrezygnować po akceptacji wniosku."),
+            ApplicationStatus.Granted => new CancellationResult(
+                CancellationOutcome.NotAllowed,
+                application,
+                "Nie można zrezygnować po przyznaniu wniosku."),
+            ApplicationStatus.ContractReady => new CancellationResult(
+                CancellationOutcome.NotAllowed,
+                application,
+                "Nie można zrezygnować po przygotowaniu kontraktu."),
+            ApplicationStatus.SignedContractUploaded => new CancellationResult(
+                CancellationOutcome.NotAllowed,
+                application,
+                "Nie można zrezygnować po przesłaniu podpisanego kontraktu."),
+            ApplicationStatus.FinalApproved => new CancellationResult(
+                CancellationOutcome.NotAllowed,
+                application,
+                "Nie można zrezygnować po finalnej akceptacji."),
+            _ => new CancellationResult(
+                CancellationOutcome.NotAllowed,
+                application,
+                "Nie można zrezygnować w obecnym statusie wniosku.")
+        };
     }
 
     public async Task<LoanApplication?> PreliminarilyAcceptAsync(Guid id, CancellationToken ct)
@@ -211,5 +246,15 @@ public sealed class ApplicationService
 
         var message = new EmailMessage(email, subject, body);
         return _emailSender.SendAsync(message, ct);
+    }
+
+    private async Task<CancellationResult> CancelInternalAsync(LoanApplication application, CancellationToken ct)
+    {
+        application.AddStatus(ApplicationStatus.Cancelled, "Cancelled by user");
+        var updated = await _repo.UpdateAsync(application, ct);
+        return new CancellationResult(
+            CancellationOutcome.Cancelled,
+            updated,
+            "Wniosek został anulowany.");
     }
 }
