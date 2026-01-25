@@ -80,11 +80,16 @@ public sealed class ApplicationsController : ControllerBase
     [HttpPost("{id:guid}/cancel")]
     public async Task<ActionResult<ApplicationResponse>> Cancel(Guid id, CancellationToken ct)
     {
-        var application = await _service.CancelAsync(id, ct);
-        if (application is null)
-            return NotFound();
+        var result = await _service.CancelAsync(id, ct);
 
-        return Ok(ApplicationResponse.From(application));
+        return result.Outcome switch
+        {
+            CancellationOutcome.NotFound => NotFound(),
+            CancellationOutcome.Cancelled => Ok(ApplicationResponse.From(result.Application!)),
+            CancellationOutcome.AlreadyCancelled => Conflict(result.Message),
+            CancellationOutcome.NotAllowed => Conflict(result.Message),
+            _ => BadRequest(result.Message)
+        };
     }
 
     [HttpPost("{id:guid}/signed-contract")]
