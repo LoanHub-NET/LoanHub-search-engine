@@ -25,7 +25,7 @@
   margin-bottom: 2rem;
 }
 
-.user-avatar {
+.welcome-avatar {
   width: 72px;
   height: 72px;
   border-radius: 50%;
@@ -86,10 +86,13 @@
 
 .quick-stat.highlight {
   border-color: #22c55e;
-  background: rgba(34, 197, 94, 0.08);
 }
 
 .quick-stat.highlight .quick-stat-value {
+  color: #22c55e;
+}
+
+.quick-stat.highlight .quick-stat-label {
   color: #22c55e;
 }
 
@@ -415,11 +418,21 @@
    Application Details Panel
 ===================================================== */
 .application-details {
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
+  background: rgba(var(--color-bg-card-rgb, 255, 255, 255), 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(var(--color-border-rgb, 0, 0, 0), 0.1);
   border-radius: 16px;
   overflow: hidden;
   margin-top: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  .application-details {
+    background: rgba(30, 30, 35, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
 }
 
 .details-header {
@@ -427,8 +440,15 @@
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.5rem;
-  background: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border);
+  background: rgba(var(--color-bg-secondary-rgb, 245, 245, 245), 0.5);
+  border-bottom: 1px solid rgba(var(--color-border-rgb, 0, 0, 0), 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  .details-header {
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
 }
 
 .details-header h3 {
