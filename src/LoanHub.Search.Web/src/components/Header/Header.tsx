@@ -13,10 +13,12 @@ export function Header({ onLoginClick, onSearchClick }: HeaderProps) {
   return (
     <header className="header">
       <div className="header-container">
-        <div 
-          className="logo" 
+        <a
+          className="logo"
+          href="/"
+          aria-label="LoanHub home"
+          title="LoanHub home"
           style={{ backgroundImage: `url(${logo})` }}
-          aria-label="LoanHub"
         />
 
         <button 

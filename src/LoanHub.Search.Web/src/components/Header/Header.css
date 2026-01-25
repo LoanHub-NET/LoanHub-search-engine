@@ -25,9 +25,9 @@
   background-size: contain;
   background-repeat: no-repeat;
   background-position: left center;
-  pointer-events: none;
   user-select: none;
   margin: -14px 0;
+  cursor: pointer;
 }
 
 .nav-list {
