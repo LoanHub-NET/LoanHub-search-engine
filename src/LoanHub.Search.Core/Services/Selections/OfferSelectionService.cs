@@ -36,9 +36,83 @@ public sealed class OfferSelectionService
         if (selection is null)
             return (null, "Offer selection not found.");
 
+        if (selection.ApplicationId is not null)
+            return (null, "Offer selection already applied.");
+
         if (selection.SelectedOffer.IsExpired(DateTimeOffset.UtcNow))
             return (null, "Offer has expired.");
 
+        var (recalculated, error) = await RefreshOfferAsync(selection, income, livingCosts, dependents, ct);
+        if (recalculated is null)
+            return (null, error);
+
+        selection.ApplyRecalculation(recalculated, income, livingCosts, dependents);
+        var updated = await _repository.UpdateAsync(selection, ct);
+        return (updated, null);
+    }
+
+    public async Task<(OfferSelection? Selection, OfferSnapshot? Offer, string? Error)> PrepareForApplicationAsync(
+        Guid selectionId,
+        CancellationToken ct)
+    {
+        var selection = await _repository.GetAsync(selectionId, ct);
+        if (selection is null)
+            return (null, null, "Offer selection not found.");
+
+        if (selection.ApplicationId is not null)
+            return (selection, null, "Offer selection already applied.");
+
+        if (selection.Income is null || selection.LivingCosts is null || selection.Dependents is null)
+            return (selection, null, "Detailed offer data missing. Recalculate the offer before applying.");
+
+        var offer = selection.RecalculatedOffer;
+        if (offer is null || offer.IsExpired(DateTimeOffset.UtcNow))
+        {
+            var (recalculated, error) = await RefreshOfferAsync(
+                selection,
+                selection.Income.Value,
+                selection.LivingCosts.Value,
+                selection.Dependents.Value,
+                ct);
+
+            if (recalculated is null)
+                return (selection, null, error);
+
+            selection.ApplyRecalculation(
+                recalculated,
+                selection.Income.Value,
+                selection.LivingCosts.Value,
+                selection.Dependents.Value);
+
+            selection = await _repository.UpdateAsync(selection, ct);
+            offer = selection.RecalculatedOffer;
+        }
+
+        if (offer is null)
+            return (selection, null, "Offer recalculation failed.");
+
+        if (offer.IsExpired(DateTimeOffset.UtcNow))
+            return (selection, null, "Offer has expired.");
+
+        return (selection, offer, null);
+    }
+
+    public async Task<OfferSelection?> MarkAppliedAsync(
+        OfferSelection selection,
+        Guid applicationId,
+        CancellationToken ct)
+    {
+        selection.MarkApplied(applicationId);
+        return await _repository.UpdateAsync(selection, ct);
+    }
+
+    private async Task<(OfferSnapshot? Recalculated, string? Error)> RefreshOfferAsync(
+        OfferSelection selection,
+        decimal income,
+        decimal livingCosts,
+        int dependents,
+        CancellationToken ct)
+    {
         if (!_providers.TryGetValue(selection.SelectedOffer.Provider, out var provider))
             return (null, $"Provider '{selection.SelectedOffer.Provider}' not found.");
 
@@ -70,8 +144,6 @@ public sealed class OfferSelectionService
             selection.SelectedOffer.DurationMonths,
             validUntil);
 
-        selection.ApplyRecalculation(recalculated, income, livingCosts, dependents);
-        var updated = await _repository.UpdateAsync(selection, ct);
-        return (updated, null);
+        return (recalculated, null);
     }
 }

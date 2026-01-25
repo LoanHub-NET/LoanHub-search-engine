@@ -11,6 +11,8 @@ public sealed class OfferSelection
     public decimal? Income { get; set; }
     public decimal? LivingCosts { get; set; }
     public int? Dependents { get; set; }
+    public Guid? ApplicationId { get; set; }
+    public DateTimeOffset? AppliedAt { get; set; }
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
@@ -20,6 +22,21 @@ public sealed class OfferSelection
         Income = income;
         LivingCosts = livingCosts;
         Dependents = dependents;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void CaptureDetailedData(decimal income, decimal livingCosts, int dependents)
+    {
+        Income = income;
+        LivingCosts = livingCosts;
+        Dependents = dependents;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void MarkApplied(Guid applicationId)
+    {
+        ApplicationId = applicationId;
+        AppliedAt = DateTimeOffset.UtcNow;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
 }
