@@ -5,11 +5,15 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{D4A8D00D-EBAD-499C-992C-1C42F3E65EC7}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoanHub.Search.Api", "src\LoanHub.Search.Api\LoanHub.Search.Api.csproj", "{0723A4B8-03F8-4F53-8E2F-9B7148E42FD7}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoanHub.Search.Core", "src\LoanHub.Search.Core\LoanHub.Search.Core.csproj", "{16878920-3A86-4D4F-8D56-E1E577C07B08}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoanHub.Search.Infrastructure", "src\LoanHub.Search.Infrastructure\LoanHub.Search.Infrastructure.csproj", "{0A80EB47-D8EE-4778-AE2B-604B32C7C2F8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoanHub.Search.Core.Tests", "tests\LoanHub.Search.Core.Tests\LoanHub.Search.Core.Tests.csproj", "{539A7206-DF57-4389-AB3D-AB205B43E02E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -57,6 +61,18 @@ Global
 		{0A80EB47-D8EE-4778-AE2B-604B32C7C2F8}.Release|x64.Build.0 = Release|Any CPU
 		{0A80EB47-D8EE-4778-AE2B-604B32C7C2F8}.Release|x86.ActiveCfg = Release|Any CPU
 		{0A80EB47-D8EE-4778-AE2B-604B32C7C2F8}.Release|x86.Build.0 = Release|Any CPU
+		{539A7206-DF57-4389-AB3D-AB205B43E02E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{539A7206-DF57-4389-AB3D-AB205B43E02E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{539A7206-DF57-4389-AB3D-AB205B43E02E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{539A7206-DF57-4389-AB3D-AB205B43E02E}.Debug|x64.Build.0 = Debug|Any CPU
+		{539A7206-DF57-4389-AB3D-AB205B43E02E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{539A7206-DF57-4389-AB3D-AB205B43E02E}.Debug|x86.Build.0 = Debug|Any CPU
+		{539A7206-DF57-4389-AB3D-AB205B43E02E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{539A7206-DF57-4389-AB3D-AB205B43E02E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{539A7206-DF57-4389-AB3D-AB205B43E02E}.Release|x64.ActiveCfg = Release|Any CPU
+		{539A7206-DF57-4389-AB3D-AB205B43E02E}.Release|x64.Build.0 = Release|Any CPU
+		{539A7206-DF57-4389-AB3D-AB205B43E02E}.Release|x86.ActiveCfg = Release|Any CPU
+		{539A7206-DF57-4389-AB3D-AB205B43E02E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -65,5 +81,6 @@ Global
 		{0723A4B8-03F8-4F53-8E2F-9B7148E42FD7} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{16878920-3A86-4D4F-8D56-E1E577C07B08} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{0A80EB47-D8EE-4778-AE2B-604B32C7C2F8} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{539A7206-DF57-4389-AB3D-AB205B43E02E} = {D4A8D00D-EBAD-499C-992C-1C42F3E65EC7}
 	EndGlobalSection
 EndGlobal
