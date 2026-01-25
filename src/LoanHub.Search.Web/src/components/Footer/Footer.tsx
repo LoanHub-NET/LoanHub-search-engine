@@ -9,9 +9,9 @@ export function Footer() {
       <div className="footer-container">
         <div className="footer-main">
           <div className="footer-brand">
-            <a href="/" className="footer-logo">
+            <div className="footer-logo" aria-label="LoanHub">
               <img className="footer-logo-image" src={logo} alt="LoanHub" />
-            </a>
+            </div>
             <p className="footer-tagline">
               Find your perfect loan in seconds. Compare offers from multiple banks 
               and get the best rates for your needs.
