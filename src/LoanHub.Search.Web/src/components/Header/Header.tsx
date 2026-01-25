@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import logo from '../../assets/LoanHub_logo.png';
 import './Header.css';
 
@@ -9,6 +10,18 @@ interface HeaderProps {
 
 export function Header({ onLoginClick, onSearchClick }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleHowItWorksClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    const target = document.getElementById('how-it-works');
+    if (window.location.pathname === '/' && target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
+    navigate('/#how-it-works');
+  };
 
   return (
     <header className="header">
@@ -32,7 +45,13 @@ export function Header({ onLoginClick, onSearchClick }: HeaderProps) {
         <nav className={`nav ${menuOpen ? 'nav-open' : ''}`}>
           <ul className="nav-list">
             <li>
-              <a href="#how-it-works" className="nav-link">How it works</a>
+              <a
+                href="/#how-it-works"
+                className="nav-link"
+                onClick={handleHowItWorksClick}
+              >
+                How it works
+              </a>
             </li>
             <li>
               <button onClick={onSearchClick} className="nav-link nav-button">
