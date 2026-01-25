@@ -7,9 +7,12 @@ using LoanHub.Search.Core.Abstractions.Users;
 using LoanHub.Search.Core.Services;
 using LoanHub.Search.Core.Services.Applications;
 using LoanHub.Search.Core.Services.Auth;
+using LoanHub.Search.Core.Services.Notifications;
 using LoanHub.Search.Core.Services.Selections;
 using LoanHub.Search.Core.Services.Users;
 using LoanHub.Search.Api.Notifications;
+using LoanHub.Search.Api.Options;
+using LoanHub.Search.Api.Services;
 using LoanHub.Search.Infrastructure;
 using LoanHub.Search.Infrastructure.Providers;
 using LoanHub.Search.Infrastructure.Repositories;
@@ -35,6 +38,7 @@ builder.Services.Configure<OidcOptions>(builder.Configuration.GetSection("Oidc")
 builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("SendGrid"));
 builder.Services.Configure<ProviderContactOptions>(builder.Configuration.GetSection("ProviderContacts"));
 builder.Services.Configure<ContractStorageOptions>(builder.Configuration.GetSection("ContractStorage"));
+builder.Services.Configure<ContractLinkOptions>(builder.Configuration.GetSection("ContractLinks"));
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 builder.Services.AddHttpClient();
 builder.Services
@@ -123,6 +127,9 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<IExternalTokenValidator, OidcTokenValidator>();
 builder.Services.AddSingleton<IProviderContactResolver, ProviderContactResolver>();
 builder.Services.AddSingleton<IRealtimeNotifier, SignalRApplicationNotifier>();
+builder.Services.AddSingleton<IEmailTemplateRenderer, EmailTemplateRenderer>();
+builder.Services.AddSingleton<IContractLinkGenerator, ContractLinkGenerator>();
+builder.Services.AddSingleton<IContractDocumentGenerator, ContractDocumentGenerator>();
 
 var sendGridOptions = builder.Configuration.GetSection("SendGrid").Get<SendGridOptions>() ?? new SendGridOptions();
 if (string.IsNullOrWhiteSpace(sendGridOptions.ApiKey))

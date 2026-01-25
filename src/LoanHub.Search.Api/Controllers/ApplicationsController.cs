@@ -179,6 +179,16 @@ public sealed class ApplicationsController : ControllerBase
         return Ok(ApplicationResponse.From(application));
     }
 
+    [HttpGet("{id:guid}/contract")]
+    public async Task<IActionResult> GetContract(Guid id, CancellationToken ct)
+    {
+        var contract = await _service.GetPreliminaryContractDocumentAsync(id, ct);
+        if (contract is null)
+            return NotFound();
+
+        return File(contract.Content, contract.ContentType, contract.FileName);
+    }
+
     public sealed record CreateApplicationRequest(
         string ApplicantEmail,
         string FirstName,

@@ -5,25 +5,35 @@ using LoanHub.Search.Core.Abstractions.Notifications;
 using LoanHub.Search.Core.Models.Applications;
 using LoanHub.Search.Core.Models.Notifications;
 using LoanHub.Search.Core.Models.Pagination;
+using LoanHub.Search.Core.Services.Notifications;
 
 public sealed class ApplicationService
 {
     private readonly IApplicationRepository _repo;
     private readonly IContractStorage _contractStorage;
+    private readonly IContractDocumentGenerator _contractDocumentGenerator;
+    private readonly IContractLinkGenerator _contractLinkGenerator;
     private readonly IEmailSender _emailSender;
+    private readonly IEmailTemplateRenderer _emailTemplateRenderer;
     private readonly IProviderContactResolver _providerContactResolver;
     private readonly IRealtimeNotifier _realtimeNotifier;
 
     public ApplicationService(
         IApplicationRepository repo,
         IContractStorage contractStorage,
+        IContractDocumentGenerator contractDocumentGenerator,
+        IContractLinkGenerator contractLinkGenerator,
         IEmailSender emailSender,
+        IEmailTemplateRenderer emailTemplateRenderer,
         IProviderContactResolver providerContactResolver,
         IRealtimeNotifier realtimeNotifier)
     {
         _repo = repo;
         _contractStorage = contractStorage;
+        _contractDocumentGenerator = contractDocumentGenerator;
+        _contractLinkGenerator = contractLinkGenerator;
         _emailSender = emailSender;
+        _emailTemplateRenderer = emailTemplateRenderer;
         _providerContactResolver = providerContactResolver;
         _realtimeNotifier = realtimeNotifier;
     }
@@ -198,6 +208,18 @@ public sealed class ApplicationService
         return updated;
     }
 
+    public async Task<ContractDocument?> GetPreliminaryContractDocumentAsync(Guid id, CancellationToken ct)
+    {
+        var application = await _repo.GetAsync(id, ct);
+        if (application is null)
+            return null;
+
+        if (application.Status is ApplicationStatus.New or ApplicationStatus.Rejected or ApplicationStatus.Cancelled)
+            return null;
+
+        return _contractDocumentGenerator.GeneratePreliminaryContract(application);
+    }
+
     public async Task<IReadOnlyList<LoanApplication>> ListRecentAsync(
         string applicantEmail,
         ApplicationStatus? status,
@@ -239,28 +261,37 @@ public sealed class ApplicationService
 
     private async Task NotifySubmittedAsync(LoanApplication application, CancellationToken ct)
     {
-        var subject = $"LoanHub: Złożono wniosek {application.Id}";
-        var body =
-            $"Twój wniosek został złożony.\n" +
-            $"Provider: {application.OfferSnapshot.Provider}\n" +
-            $"Kwota: {application.OfferSnapshot.Amount}\n" +
-            $"Okres (mies.): {application.OfferSnapshot.DurationMonths}\n";
+        var tokens = BuildTemplateTokens(application);
+        var subject = _emailTemplateRenderer.Render(ApplicationEmailTemplates.SubmittedSubject, tokens);
+        var body = _emailTemplateRenderer.Render(ApplicationEmailTemplates.SubmittedBody, tokens);
 
-        await SendToApplicantAsync(application, subject, body, ct);
-        await SendToProviderAsync(application, subject, body, ct);
+        await SendToApplicantAsync(application, subject, body, null, ct);
+        await SendToProviderAsync(application, subject, body, null, ct);
     }
 
     private async Task NotifyStatusAsync(LoanApplication application, string statusLabel, CancellationToken ct)
     {
-        var subject = $"LoanHub: Status wniosku {application.Id}";
-        var body =
-            $"Status wniosku: {statusLabel}\n" +
-            $"Provider: {application.OfferSnapshot.Provider}\n" +
-            $"Kwota: {application.OfferSnapshot.Amount}\n" +
-            $"Okres (mies.): {application.OfferSnapshot.DurationMonths}\n";
+        var tokens = BuildTemplateTokens(application);
+        tokens["StatusLabel"] = statusLabel;
+        tokens["RejectReasonLine"] = string.IsNullOrWhiteSpace(application.RejectReason)
+            ? string.Empty
+            : $"Powód odrzucenia: {application.RejectReason}\n";
 
-        await SendToApplicantAsync(application, subject, body, ct);
-        await SendToProviderAsync(application, subject, body, ct);
+        if (application.Status == ApplicationStatus.PreliminarilyAccepted)
+        {
+            var preliminaryTokens = new Dictionary<string, string>(tokens, StringComparer.OrdinalIgnoreCase)
+            {
+                ["ContractLink"] = _contractLinkGenerator.GetContractLink(application.Id)
+            };
+            await NotifyPreliminaryAcceptedAsync(application, preliminaryTokens, ct);
+            await NotifyStatusForProviderAsync(application, tokens, ct);
+        }
+        else
+        {
+            await NotifyStatusForApplicantAsync(application, tokens, ct);
+            await NotifyStatusForProviderAsync(application, tokens, ct);
+        }
+
         await _realtimeNotifier.NotifyApplicantAsync(
             new ApplicationNotification(
                 application.Id,
@@ -271,20 +302,85 @@ public sealed class ApplicationService
             ct);
     }
 
-    private Task SendToApplicantAsync(LoanApplication application, string subject, string body, CancellationToken ct)
+    private Task SendToApplicantAsync(
+        LoanApplication application,
+        string subject,
+        string body,
+        IReadOnlyList<EmailAttachment>? attachments,
+        CancellationToken ct)
     {
-        var message = new EmailMessage(application.ApplicantEmail, subject, body);
+        var message = new EmailMessage(application.ApplicantEmail, subject, body, attachments);
         return _emailSender.SendAsync(message, ct);
     }
 
-    private Task SendToProviderAsync(LoanApplication application, string subject, string body, CancellationToken ct)
+    private Task SendToProviderAsync(
+        LoanApplication application,
+        string subject,
+        string body,
+        IReadOnlyList<EmailAttachment>? attachments,
+        CancellationToken ct)
     {
         var email = _providerContactResolver.GetContactEmail(application.OfferSnapshot.Provider);
         if (string.IsNullOrWhiteSpace(email))
             return Task.CompletedTask;
 
-        var message = new EmailMessage(email, subject, body);
+        var message = new EmailMessage(email, subject, body, attachments);
         return _emailSender.SendAsync(message, ct);
+    }
+
+    private Task NotifyStatusForApplicantAsync(
+        LoanApplication application,
+        IReadOnlyDictionary<string, string> tokens,
+        CancellationToken ct)
+    {
+        var subject = _emailTemplateRenderer.Render(ApplicationEmailTemplates.StatusSubject, tokens);
+        var body = _emailTemplateRenderer.Render(ApplicationEmailTemplates.StatusBody, tokens);
+        return SendToApplicantAsync(application, subject, body, null, ct);
+    }
+
+    private Task NotifyStatusForProviderAsync(
+        LoanApplication application,
+        IReadOnlyDictionary<string, string> tokens,
+        CancellationToken ct)
+    {
+        var subject = _emailTemplateRenderer.Render(ApplicationEmailTemplates.StatusSubject, tokens);
+        var body = _emailTemplateRenderer.Render(ApplicationEmailTemplates.StatusBody, tokens);
+        return SendToProviderAsync(application, subject, body, null, ct);
+    }
+
+    private Task NotifyPreliminaryAcceptedAsync(
+        LoanApplication application,
+        IReadOnlyDictionary<string, string> tokens,
+        CancellationToken ct)
+    {
+        var subject = _emailTemplateRenderer.Render(ApplicationEmailTemplates.PreliminaryAcceptedSubject, tokens);
+        var body = _emailTemplateRenderer.Render(ApplicationEmailTemplates.PreliminaryAcceptedBody, tokens);
+        var contract = _contractDocumentGenerator.GeneratePreliminaryContract(application);
+        var attachments = new List<EmailAttachment>
+        {
+            new(contract.FileName, contract.ContentType, contract.Content)
+        };
+        return SendToApplicantAsync(application, subject, body, attachments, ct);
+    }
+
+    private Dictionary<string, string> BuildTemplateTokens(LoanApplication application)
+    {
+        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ApplicationId"] = application.Id.ToString(),
+            ["FirstName"] = application.ApplicantDetails.FirstName,
+            ["LastName"] = application.ApplicantDetails.LastName,
+            ["ApplicantEmail"] = application.ApplicantEmail,
+            ["Provider"] = application.OfferSnapshot.Provider,
+            ["Amount"] = application.OfferSnapshot.Amount.ToString("N2"),
+            ["DurationMonths"] = application.OfferSnapshot.DurationMonths.ToString(),
+            ["Installment"] = application.OfferSnapshot.Installment.ToString("N2"),
+            ["Apr"] = application.OfferSnapshot.Apr.ToString("N2"),
+            ["TotalCost"] = application.OfferSnapshot.TotalCost.ToString("N2"),
+            ["RejectReasonLine"] = string.Empty,
+            ["ContractLink"] = string.Empty,
+            ["StatusLabel"] = string.Empty
+        };
     }
 
     private async Task<CancellationResult> CancelInternalAsync(LoanApplication application, CancellationToken ct)

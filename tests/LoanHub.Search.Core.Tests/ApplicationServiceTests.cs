@@ -11,14 +11,25 @@ public sealed class ApplicationServiceTests
     {
         var repository = new InMemoryApplicationRepository();
         var contractStorage = new StubContractStorage();
+        var contractDocumentGenerator = new StubContractDocumentGenerator();
+        var contractLinkGenerator = new StubContractLinkGenerator();
         var emailSender = new CapturingEmailSender();
+        var emailTemplateRenderer = new StubEmailTemplateRenderer();
         var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>
         {
             ["ProviderA"] = "provider@example.com"
         });
         var notifier = new CapturingRealtimeNotifier();
 
-        var service = new ApplicationService(repository, contractStorage, emailSender, resolver, notifier);
+        var service = new ApplicationService(
+            repository,
+            contractStorage,
+            contractDocumentGenerator,
+            contractLinkGenerator,
+            emailSender,
+            emailTemplateRenderer,
+            resolver,
+            notifier);
         var validUntil = DateTimeOffset.UtcNow.AddDays(10);
 
         var application = new LoanApplication
@@ -40,10 +51,21 @@ public sealed class ApplicationServiceTests
     {
         var repository = new InMemoryApplicationRepository();
         var contractStorage = new StubContractStorage();
+        var contractDocumentGenerator = new StubContractDocumentGenerator();
+        var contractLinkGenerator = new StubContractLinkGenerator();
         var emailSender = new CapturingEmailSender();
+        var emailTemplateRenderer = new StubEmailTemplateRenderer();
         var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>());
         var notifier = new CapturingRealtimeNotifier();
-        var service = new ApplicationService(repository, contractStorage, emailSender, resolver, notifier);
+        var service = new ApplicationService(
+            repository,
+            contractStorage,
+            contractDocumentGenerator,
+            contractLinkGenerator,
+            emailSender,
+            emailTemplateRenderer,
+            resolver,
+            notifier);
         var validUntil = DateTimeOffset.UtcNow.AddDays(10);
 
         var application = new LoanApplication
@@ -68,10 +90,21 @@ public sealed class ApplicationServiceTests
     {
         var repository = new InMemoryApplicationRepository();
         var contractStorage = new StubContractStorage();
+        var contractDocumentGenerator = new StubContractDocumentGenerator();
+        var contractLinkGenerator = new StubContractLinkGenerator();
         var emailSender = new CapturingEmailSender();
+        var emailTemplateRenderer = new StubEmailTemplateRenderer();
         var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>());
         var notifier = new CapturingRealtimeNotifier();
-        var service = new ApplicationService(repository, contractStorage, emailSender, resolver, notifier);
+        var service = new ApplicationService(
+            repository,
+            contractStorage,
+            contractDocumentGenerator,
+            contractLinkGenerator,
+            emailSender,
+            emailTemplateRenderer,
+            resolver,
+            notifier);
 
         var application = new LoanApplication
         {
@@ -94,10 +127,21 @@ public sealed class ApplicationServiceTests
     {
         var repository = new InMemoryApplicationRepository();
         var contractStorage = new StubContractStorage();
+        var contractDocumentGenerator = new StubContractDocumentGenerator();
+        var contractLinkGenerator = new StubContractLinkGenerator();
         var emailSender = new CapturingEmailSender();
+        var emailTemplateRenderer = new StubEmailTemplateRenderer();
         var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>());
         var notifier = new CapturingRealtimeNotifier();
-        var service = new ApplicationService(repository, contractStorage, emailSender, resolver, notifier);
+        var service = new ApplicationService(
+            repository,
+            contractStorage,
+            contractDocumentGenerator,
+            contractLinkGenerator,
+            emailSender,
+            emailTemplateRenderer,
+            resolver,
+            notifier);
         var validUntil = DateTimeOffset.UtcNow.AddDays(10);
 
         var recent = new LoanApplication

@@ -205,6 +205,24 @@ internal sealed class StubContractStorage : IContractStorage
     }
 }
 
+internal sealed class StubContractDocumentGenerator : IContractDocumentGenerator
+{
+    public ContractDocument GeneratePreliminaryContract(LoanApplication application)
+        => new($"contract-{application.Id}.txt", "text/plain", "stub"u8.ToArray());
+}
+
+internal sealed class StubContractLinkGenerator : IContractLinkGenerator
+{
+    public string GetContractLink(Guid applicationId)
+        => $"https://example.test/contracts/{applicationId}";
+}
+
+internal sealed class StubEmailTemplateRenderer : IEmailTemplateRenderer
+{
+    public string Render(string template, IReadOnlyDictionary<string, string> tokens)
+        => template;
+}
+
 internal sealed class StaticProviderContactResolver : IProviderContactResolver
 {
     private readonly Dictionary<string, string?> _emails;
