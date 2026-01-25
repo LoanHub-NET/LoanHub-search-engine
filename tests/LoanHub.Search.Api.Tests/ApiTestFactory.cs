@@ -42,7 +42,12 @@ public sealed class ApiTestFactory : WebApplicationFactory<Program>, IAsyncLifet
         });
     }
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public async Task InitializeAsync()
+    {
+        using var scope = Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await dbContext.Database.EnsureCreatedAsync();
+    }
 
     public async Task DisposeAsync()
     {
