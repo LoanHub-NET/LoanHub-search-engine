@@ -84,6 +84,9 @@ export type OfferStatus =
   | 'new'
   | 'preliminarily_accepted'
   | 'accepted'
+  | 'contract_ready'
+  | 'signed_contract_uploaded'
+  | 'final_approved'
   | 'granted'
   | 'rejected'
   | 'expired'
@@ -116,6 +119,21 @@ export const OFFER_STATUS_INFO: Record<OfferStatus, StatusInfo> = {
     label: 'Accepted',
     color: '#10b981',
     description: 'Your loan has been approved',
+  },
+  contract_ready: {
+    label: 'Contract Ready',
+    color: '#0ea5e9',
+    description: 'Your contract is ready for signature',
+  },
+  signed_contract_uploaded: {
+    label: 'Signed Contract Uploaded',
+    color: '#6366f1',
+    description: 'We have received your signed contract',
+  },
+  final_approved: {
+    label: 'Final Approved',
+    color: '#16a34a',
+    description: 'Your application has passed final approval',
   },
   granted: {
     label: 'Granted',

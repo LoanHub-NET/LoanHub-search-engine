@@ -8,6 +8,10 @@ public sealed class LoanApplication
     public OfferSnapshot OfferSnapshot { get; set; } = default!;
     public ApplicationStatus Status { get; set; } = ApplicationStatus.New;
     public string? RejectReason { get; set; }
+    public DateTimeOffset? ContractReadyAt { get; set; }
+    public string? SignedContractFileName { get; set; }
+    public DateTimeOffset? SignedContractUploadedAt { get; set; }
+    public DateTimeOffset? FinalApprovedAt { get; set; }
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     public List<StatusHistoryEntry> StatusHistory { get; } = new();

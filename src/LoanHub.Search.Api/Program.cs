@@ -9,6 +9,7 @@ using LoanHub.Search.Core.Services.Applications;
 using LoanHub.Search.Core.Services.Auth;
 using LoanHub.Search.Core.Services.Selections;
 using LoanHub.Search.Core.Services.Users;
+using LoanHub.Search.Api.Notifications;
 using LoanHub.Search.Infrastructure;
 using LoanHub.Search.Infrastructure.Providers;
 using LoanHub.Search.Infrastructure.Repositories;
@@ -25,6 +26,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddSignalR();
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("SendGrid"));
@@ -61,6 +63,7 @@ builder.Services.AddScoped<OfferSelectionService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddSingleton<IProviderContactResolver, ProviderContactResolver>();
+builder.Services.AddSingleton<IRealtimeNotifier, SignalRApplicationNotifier>();
 
 var sendGridOptions = builder.Configuration.GetSection("SendGrid").Get<SendGridOptions>() ?? new SendGridOptions();
 if (string.IsNullOrWhiteSpace(sendGridOptions.ApiKey))
@@ -93,5 +96,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ApplicationsHub>("/hubs/applications");
 
 app.Run();

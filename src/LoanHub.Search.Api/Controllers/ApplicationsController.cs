@@ -82,6 +82,22 @@ public sealed class ApplicationsController : ControllerBase
         return Ok(ApplicationResponse.From(application));
     }
 
+    [HttpPost("{id:guid}/signed-contract")]
+    public async Task<ActionResult<ApplicationResponse>> UploadSignedContract(
+        Guid id,
+        [FromBody] SignedContractRequest request,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.FileName))
+            return BadRequest("FileName is required.");
+
+        var application = await _service.UploadSignedContractAsync(id, request.FileName, ct);
+        if (application is null)
+            return NotFound();
+
+        return Ok(ApplicationResponse.From(application));
+    }
+
     public sealed record CreateApplicationRequest(
         string ApplicantEmail,
         string FirstName,
@@ -99,11 +115,17 @@ public sealed class ApplicationsController : ControllerBase
         int DurationMonths
     );
 
+    public sealed record SignedContractRequest(string FileName);
+
     public sealed record ApplicationResponse(
         Guid Id,
         string ApplicantEmail,
         ApplicationStatus Status,
         string? RejectReason,
+        DateTimeOffset? ContractReadyAt,
+        string? SignedContractFileName,
+        DateTimeOffset? SignedContractUploadedAt,
+        DateTimeOffset? FinalApprovedAt,
         ApplicantDetails ApplicantDetails,
         OfferSnapshot OfferSnapshot,
         DateTimeOffset CreatedAt,
@@ -117,6 +139,10 @@ public sealed class ApplicationsController : ControllerBase
                 application.ApplicantEmail,
                 application.Status,
                 application.RejectReason,
+                application.ContractReadyAt,
+                application.SignedContractFileName,
+                application.SignedContractUploadedAt,
+                application.FinalApprovedAt,
                 application.ApplicantDetails,
                 application.OfferSnapshot,
                 application.CreatedAt,

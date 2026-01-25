@@ -7,5 +7,8 @@ public enum ApplicationStatus
     Accepted = 3,
     Rejected = 4,
     Cancelled = 5,
-    Granted = 6
+    Granted = 6,
+    ContractReady = 7,
+    SignedContractUploaded = 8,
+    FinalApproved = 9
 }
