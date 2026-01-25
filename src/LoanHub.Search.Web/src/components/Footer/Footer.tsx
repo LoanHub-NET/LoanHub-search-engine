@@ -1,3 +1,4 @@
+import logo from '../../assets/LoanHub_logo.png';
 import './Footer.css';
 
 export function Footer() {
@@ -9,8 +10,7 @@ export function Footer() {
         <div className="footer-main">
           <div className="footer-brand">
             <a href="/" className="footer-logo">
-              <span className="logo-icon">💰</span>
-              <span className="logo-text">LoanHub</span>
+              <img className="footer-logo-image" src={logo} alt="LoanHub" />
             </a>
             <p className="footer-tagline">
               Find your perfect loan in seconds. Compare offers from multiple banks 

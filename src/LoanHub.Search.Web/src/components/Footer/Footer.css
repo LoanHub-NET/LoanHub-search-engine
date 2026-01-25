@@ -22,14 +22,14 @@
   align-items: center;
   gap: 0.5rem;
   text-decoration: none;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: white;
-  margin-bottom: 1rem;
+  margin-bottom: 0.25rem;
 }
 
-.footer-logo .logo-icon {
-  font-size: 1.8rem;
+.footer-logo-image {
+  height: 192px;
+  width: auto;
+  display: block;
+  margin: -50px;
 }
 
 .footer-tagline {

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import logo from '../../assets/LoanHub_logo.png';
 import './Header.css';
 
 interface HeaderProps {
@@ -12,10 +13,11 @@ export function Header({ onLoginClick, onSearchClick }: HeaderProps) {
   return (
     <header className="header">
       <div className="header-container">
-        <a href="/" className="logo">
-          <span className="logo-icon">💰</span>
-          <span className="logo-text">LoanHub</span>
-        </a>
+        <div 
+          className="logo" 
+          style={{ backgroundImage: `url(${logo})` }}
+          aria-label="LoanHub"
+        />
 
         <button 
           className="menu-toggle"
