@@ -31,6 +31,8 @@ const formatCompact = (value: number): string => {
   return value.toString();
 };
 
+const ANIMATION_DURATION_MS = 1200;
+
 const formatValue = (value: number, stat: Stat): string => {
   const base =
     stat.format === 'compact'
@@ -97,13 +99,13 @@ export function CounterWidget({ successCount }: CounterWidgetProps) {
       return;
     }
 
-    const prefersReducedMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)',
-    ).matches;
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     const targets = stats.map((stat) => stat.value);
     const start = performance.now();
-    const duration = prefersReducedMotion ? 0 : 1200;
+    const duration = prefersReducedMotion ? 0 : ANIMATION_DURATION_MS;
 
     const tick = (now: number) => {
       const progress = Math.min(1, (now - start) / duration);
