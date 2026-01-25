@@ -157,15 +157,22 @@ public sealed class ApplicationsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/signed-contract")]
+    [Consumes("multipart/form-data")]
     public async Task<ActionResult<ApplicationResponse>> UploadSignedContract(
         Guid id,
-        [FromBody] SignedContractRequest request,
+        [FromForm] SignedContractUploadRequest request,
         CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.FileName))
-            return BadRequest("FileName is required.");
+        if (request.File is null || request.File.Length == 0)
+            return BadRequest("File is required.");
 
-        var application = await _service.UploadSignedContractAsync(id, request.FileName, ct);
+        await using var stream = request.File.OpenReadStream();
+        var application = await _service.UploadSignedContractAsync(
+            id,
+            stream,
+            request.File.FileName,
+            request.File.ContentType,
+            ct);
         if (application is null)
             return NotFound();
 
@@ -201,7 +208,7 @@ public sealed class ApplicationsController : ControllerBase
         DateTimeOffset ValidUntil
     );
 
-    public sealed record SignedContractRequest(string FileName);
+    public sealed record SignedContractUploadRequest(IFormFile File);
 
     public sealed record ApplicationResponse(
         Guid Id,
@@ -211,7 +218,9 @@ public sealed class ApplicationsController : ControllerBase
         string? RejectReason,
         DateTimeOffset? ContractReadyAt,
         string? SignedContractFileName,
-        DateTimeOffset? SignedContractUploadedAt,
+        string? SignedContractBlobName,
+        string? SignedContractContentType,
+        DateTimeOffset? SignedContractReceivedAt,
         DateTimeOffset? FinalApprovedAt,
         ApplicantDetails ApplicantDetails,
         OfferSnapshot OfferSnapshot,
@@ -229,7 +238,9 @@ public sealed class ApplicationsController : ControllerBase
                 application.RejectReason,
                 application.ContractReadyAt,
                 application.SignedContractFileName,
-                application.SignedContractUploadedAt,
+                application.SignedContractBlobName,
+                application.SignedContractContentType,
+                application.SignedContractReceivedAt,
                 application.FinalApprovedAt,
                 application.ApplicantDetails,
                 application.OfferSnapshot,

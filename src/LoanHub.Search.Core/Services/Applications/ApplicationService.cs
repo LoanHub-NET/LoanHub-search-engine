@@ -9,17 +9,20 @@ using LoanHub.Search.Core.Models.Pagination;
 public sealed class ApplicationService
 {
     private readonly IApplicationRepository _repo;
+    private readonly IContractStorage _contractStorage;
     private readonly IEmailSender _emailSender;
     private readonly IProviderContactResolver _providerContactResolver;
     private readonly IRealtimeNotifier _realtimeNotifier;
 
     public ApplicationService(
         IApplicationRepository repo,
+        IContractStorage contractStorage,
         IEmailSender emailSender,
         IProviderContactResolver providerContactResolver,
         IRealtimeNotifier realtimeNotifier)
     {
         _repo = repo;
+        _contractStorage = contractStorage;
         _emailSender = emailSender;
         _providerContactResolver = providerContactResolver;
         _realtimeNotifier = realtimeNotifier;
@@ -78,7 +81,7 @@ public sealed class ApplicationService
                 CancellationOutcome.NotAllowed,
                 application,
                 "Nie można zrezygnować po przygotowaniu kontraktu."),
-            ApplicationStatus.SignedContractUploaded => new CancellationResult(
+            ApplicationStatus.SignedContractReceived => new CancellationResult(
                 CancellationOutcome.NotAllowed,
                 application,
                 "Nie można zrezygnować po przesłaniu podpisanego kontraktu."),
@@ -142,15 +145,29 @@ public sealed class ApplicationService
         return updated;
     }
 
-    public async Task<LoanApplication?> UploadSignedContractAsync(Guid id, string fileName, CancellationToken ct)
+    public async Task<LoanApplication?> UploadSignedContractAsync(
+        Guid id,
+        Stream content,
+        string fileName,
+        string? contentType,
+        CancellationToken ct)
     {
         var application = await _repo.GetAsync(id, ct);
         if (application is null)
             return null;
 
-        application.SignedContractFileName = fileName;
-        application.SignedContractUploadedAt = DateTimeOffset.UtcNow;
-        application.AddStatus(ApplicationStatus.SignedContractUploaded, null);
+        var stored = await _contractStorage.UploadSignedContractAsync(
+            application.Id,
+            content,
+            fileName,
+            contentType,
+            ct);
+
+        application.SignedContractFileName = stored.FileName;
+        application.SignedContractBlobName = stored.BlobName;
+        application.SignedContractContentType = stored.ContentType;
+        application.SignedContractReceivedAt = DateTimeOffset.UtcNow;
+        application.AddStatus(ApplicationStatus.SignedContractReceived, null);
         var updated = await _repo.UpdateAsync(application, ct);
         await NotifyStatusAsync(updated, "Podpisany kontrakt przesłany", ct);
         return updated;

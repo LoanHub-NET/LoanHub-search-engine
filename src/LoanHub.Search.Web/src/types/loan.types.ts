@@ -85,7 +85,7 @@ export type OfferStatus =
   | 'preliminarily_accepted'
   | 'accepted'
   | 'contract_ready'
-  | 'signed_contract_uploaded'
+  | 'signed_contract_received'
   | 'final_approved'
   | 'granted'
   | 'rejected'
@@ -125,8 +125,8 @@ export const OFFER_STATUS_INFO: Record<OfferStatus, StatusInfo> = {
     color: '#0ea5e9',
     description: 'Your contract is ready for signature',
   },
-  signed_contract_uploaded: {
-    label: 'Signed Contract Uploaded',
+  signed_contract_received: {
+    label: 'Signed Contract Received',
     color: '#6366f1',
     description: 'We have received your signed contract',
   },

@@ -33,6 +33,10 @@ public sealed class ApplicationDbContext : DbContext
                 .HasConversion<int>();
             entity.Property(application => application.SignedContractFileName)
                 .HasMaxLength(240);
+            entity.Property(application => application.SignedContractBlobName)
+                .HasMaxLength(320);
+            entity.Property(application => application.SignedContractContentType)
+                .HasMaxLength(160);
 
             entity.OwnsOne(application => application.ApplicantDetails, details =>
             {
