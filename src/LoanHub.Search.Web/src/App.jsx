@@ -236,9 +236,23 @@ function App() {
           <a href="#api" className="nav-link">
             Endpointy API
           </a>
-          <button className="ghost-button">Zaloguj się</button>
         </nav>
       </header>
+      <div className="api-config">
+        <div>
+          <strong>Adres API</strong>
+          <p className="helper">
+            Jeśli widzisz „Failed to fetch”, upewnij się, że backend działa oraz
+            wpisz poprawny adres (np. http://localhost:5000).
+          </p>
+        </div>
+        <input
+          type="text"
+          value={apiBaseUrl}
+          onChange={(event) => setApiBaseUrl(event.target.value)}
+          placeholder="http://localhost:5000"
+        />
+      </div>
 
       <main>
         <section className="hero" id="top">

@@ -33,6 +33,20 @@ body {
   z-index: 10;
 }
 
+.api-config {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+  padding: 20px 64px;
+  background: #eff6ff;
+  border-bottom: 1px solid #dbeafe;
+}
+
+.api-config input {
+  min-width: 280px;
+}
+
 .logo {
   font-weight: 700;
   font-size: 22px;
@@ -416,6 +430,12 @@ input {
   .topbar {
     flex-direction: column;
     gap: 16px;
+    padding: 20px 24px;
+  }
+
+  .api-config {
+    flex-direction: column;
+    align-items: stretch;
     padding: 20px 24px;
   }
 
