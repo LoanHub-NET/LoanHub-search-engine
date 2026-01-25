@@ -130,7 +130,7 @@ export function CounterWidget({ successCount }: CounterWidgetProps) {
       setDisplayValues(targets.map((target) => Math.round(target * eased)));
 
       if (progress < 1) {
-        requestAnimationFrame(tick);
+        animationFrameId = requestAnimationFrame(tick);
       }
     };
 
