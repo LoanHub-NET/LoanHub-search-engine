@@ -11,6 +11,7 @@ import {
   TermsPage,
   CookiesPage,
   GdprPage,
+  LoginPage,
 } from './pages';
 import './App.css';
 
@@ -30,25 +31,13 @@ function App() {
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/cookies" element={<CookiesPage />} />
           <Route path="/gdpr" element={<GdprPage />} />
-          {/* Future routes */}
-          <Route path="/login" element={<LoginPlaceholder />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/apply" element={<ApplyPlaceholder />} />
           <Route path="/search/refine" element={<RefinePlaceholder />} />
           <Route path="*" element={<NotFoundPlaceholder />} />
         </Routes>
       </div>
     </BrowserRouter>
-  );
-}
-
-// Placeholder components for future implementation
-function LoginPlaceholder() {
-  return (
-    <div className="placeholder-page">
-      <h1>Login Page</h1>
-      <p>Authentication with Azure AD, Google, Facebook coming soon...</p>
-      <a href="/">← Back to Home</a>
-    </div>
   );
 }
 
