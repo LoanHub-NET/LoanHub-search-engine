@@ -148,3 +148,14 @@ internal sealed class StaticProviderContactResolver : IProviderContactResolver
     public string? GetContactEmail(string provider)
         => _emails.TryGetValue(provider, out var email) ? email : null;
 }
+
+internal sealed class CapturingRealtimeNotifier : IRealtimeNotifier
+{
+    public List<ApplicationNotification> Notifications { get; } = new();
+
+    public Task NotifyApplicantAsync(ApplicationNotification notification, CancellationToken ct)
+    {
+        Notifications.Add(notification);
+        return Task.CompletedTask;
+    }
+}
