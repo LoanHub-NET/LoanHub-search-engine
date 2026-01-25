@@ -24,9 +24,10 @@ public sealed class OfferSelectionServiceTests
     public async Task RecalculateAsync_ReturnsErrorWhenProviderMissing()
     {
         var repository = new InMemoryOfferSelectionRepository();
+        var validUntil = DateTimeOffset.UtcNow.AddDays(10);
         var selection = new OfferSelection
         {
-            SelectedOffer = new OfferSnapshot("Unknown", "OFF-1", 100m, 8m, 1200m, 1000m, 12)
+            SelectedOffer = new OfferSnapshot("Unknown", "OFF-1", 100m, 8m, 1200m, 1000m, 12, validUntil)
         };
         await repository.AddAsync(selection, CancellationToken.None);
 
@@ -42,9 +43,10 @@ public sealed class OfferSelectionServiceTests
     public async Task RecalculateAsync_ReturnsErrorWhenProviderHasNoOffers()
     {
         var repository = new InMemoryOfferSelectionRepository();
+        var validUntil = DateTimeOffset.UtcNow.AddDays(10);
         var selection = new OfferSelection
         {
-            SelectedOffer = new OfferSnapshot("ProviderA", "OFF-1", 100m, 8m, 1200m, 1000m, 12)
+            SelectedOffer = new OfferSnapshot("ProviderA", "OFF-1", 100m, 8m, 1200m, 1000m, 12, validUntil)
         };
         await repository.AddAsync(selection, CancellationToken.None);
 
@@ -65,9 +67,10 @@ public sealed class OfferSelectionServiceTests
     public async Task RecalculateAsync_UpdatesSelectionWithRecalculatedOffer()
     {
         var repository = new InMemoryOfferSelectionRepository();
+        var validUntil = DateTimeOffset.UtcNow.AddDays(10);
         var selection = new OfferSelection
         {
-            SelectedOffer = new OfferSnapshot("ProviderA", "OFF-1", 100m, 8m, 1200m, 1000m, 12)
+            SelectedOffer = new OfferSnapshot("ProviderA", "OFF-1", 100m, 8m, 1200m, 1000m, 12, validUntil)
         };
         await repository.AddAsync(selection, CancellationToken.None);
 
@@ -75,8 +78,8 @@ public sealed class OfferSelectionServiceTests
         {
             new StubLoanOfferProvider("ProviderA", (_, _) => Task.FromResult<IReadOnlyList<OfferDto>>(new List<OfferDto>
             {
-                new("ProviderA", "OFF-1", 90m, 7.5m, 1100m),
-                new("ProviderA", "OFF-2", 95m, 7.9m, 1150m)
+                new("ProviderA", "OFF-1", 90m, 7.5m, 1100m, validUntil),
+                new("ProviderA", "OFF-2", 95m, 7.9m, 1150m, validUntil)
             }))
         };
 
@@ -91,5 +94,39 @@ public sealed class OfferSelectionServiceTests
         Assert.Equal(6000m, updated.Income);
         Assert.Equal(1800m, updated.LivingCosts);
         Assert.Equal(2, updated.Dependents);
+    }
+
+    [Fact]
+    public async Task RecalculateAsync_ReturnsErrorWhenOfferExpired()
+    {
+        var repository = new InMemoryOfferSelectionRepository();
+        var selection = new OfferSelection
+        {
+            SelectedOffer = new OfferSnapshot(
+                "ProviderA",
+                "OFF-1",
+                100m,
+                8m,
+                1200m,
+                1000m,
+                12,
+                DateTimeOffset.UtcNow.AddMinutes(-1))
+        };
+        await repository.AddAsync(selection, CancellationToken.None);
+
+        var providers = new[]
+        {
+            new StubLoanOfferProvider("ProviderA", (_, _) => Task.FromResult<IReadOnlyList<OfferDto>>(new List<OfferDto>
+            {
+                new("ProviderA", "OFF-1", 90m, 7.5m, 1100m, DateTimeOffset.UtcNow.AddDays(10))
+            }))
+        };
+
+        var service = new OfferSelectionService(repository, providers);
+
+        var (result, error) = await service.RecalculateAsync(selection.Id, 6000m, 1800m, 2, CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.Equal("Offer has expired.", error);
     }
 }

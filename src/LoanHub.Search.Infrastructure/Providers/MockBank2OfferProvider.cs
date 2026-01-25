@@ -21,6 +21,7 @@ public sealed class MockBank2OfferProvider : ILoanOfferProvider
 
         var installment = CalculateInstallment(query.Amount, apr, query.DurationMonths);
         var totalCost = installment * query.DurationMonths;
+        var validUntil = OfferValidityPolicy.CalculateValidUntil(DateTimeOffset.UtcNow);
 
         return new[]
         {
@@ -29,7 +30,8 @@ public sealed class MockBank2OfferProvider : ILoanOfferProvider
                 ProviderOfferId: $"MB2-STANDARD-{query.Amount}-{query.DurationMonths}",
                 Installment: decimal.Round(installment, 2),
                 Apr: decimal.Round(apr, 4),
-                TotalCost: decimal.Round(totalCost, 2)
+                TotalCost: decimal.Round(totalCost, 2),
+                ValidUntil: validUntil
             )
         };
     }

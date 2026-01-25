@@ -1,3 +1,4 @@
+using LoanHub.Search.Core.Models;
 using LoanHub.Search.Core.Models.Applications;
 using LoanHub.Search.Core.Services.Applications;
 using Microsoft.AspNetCore.Mvc;
@@ -18,6 +19,9 @@ public sealed class ApplicationsController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.ApplicantEmail))
             return BadRequest("ApplicantEmail is required.");
 
+        if (OfferValidityPolicy.IsExpired(request.ValidUntil, DateTimeOffset.UtcNow))
+            return BadRequest("Offer has expired.");
+
         var application = new LoanApplication
         {
             ApplicantEmail = request.ApplicantEmail,
@@ -36,7 +40,8 @@ public sealed class ApplicationsController : ControllerBase
                 request.Apr,
                 request.TotalCost,
                 request.Amount,
-                request.DurationMonths
+                request.DurationMonths,
+                request.ValidUntil
             )
         };
 
@@ -112,7 +117,8 @@ public sealed class ApplicationsController : ControllerBase
         decimal Apr,
         decimal TotalCost,
         decimal Amount,
-        int DurationMonths
+        int DurationMonths,
+        DateTimeOffset ValidUntil
     );
 
     public sealed record SignedContractRequest(string FileName);

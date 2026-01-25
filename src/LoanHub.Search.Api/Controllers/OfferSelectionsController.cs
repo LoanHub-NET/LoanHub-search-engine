@@ -1,3 +1,4 @@
+using LoanHub.Search.Core.Models;
 using LoanHub.Search.Core.Models.Applications;
 using LoanHub.Search.Core.Models.Selections;
 using LoanHub.Search.Core.Services.Selections;
@@ -16,6 +17,9 @@ public sealed class OfferSelectionsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<OfferSelectionResponse>> Create([FromBody] CreateOfferSelectionRequest request, CancellationToken ct)
     {
+        if (OfferValidityPolicy.IsExpired(request.ValidUntil, DateTimeOffset.UtcNow))
+            return BadRequest("Offer has expired.");
+
         var selection = new OfferSelection
         {
             InquiryId = request.InquiryId,
@@ -26,7 +30,8 @@ public sealed class OfferSelectionsController : ControllerBase
                 request.Apr,
                 request.TotalCost,
                 request.Amount,
-                request.DurationMonths)
+                request.DurationMonths,
+                request.ValidUntil)
         };
 
         var created = await _service.CreateAsync(selection, ct);
@@ -79,7 +84,8 @@ public sealed class OfferSelectionsController : ControllerBase
         decimal Apr,
         decimal TotalCost,
         decimal Amount,
-        int DurationMonths);
+        int DurationMonths,
+        DateTimeOffset ValidUntil);
 
     public sealed record RecalculateOfferRequest(
         decimal Income,

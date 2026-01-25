@@ -36,6 +36,9 @@ public sealed class OfferSelectionService
         if (selection is null)
             return (null, "Offer selection not found.");
 
+        if (selection.SelectedOffer.IsExpired(DateTimeOffset.UtcNow))
+            return (null, "Offer has expired.");
+
         if (!_providers.TryGetValue(selection.SelectedOffer.Provider, out var provider))
             return (null, $"Provider '{selection.SelectedOffer.Provider}' not found.");
 
@@ -54,6 +57,9 @@ public sealed class OfferSelectionService
             offer.ProviderOfferId.Equals(selection.SelectedOffer.ProviderOfferId, StringComparison.OrdinalIgnoreCase));
 
         var selected = matched ?? offers.First();
+        var validUntil = selection.SelectedOffer.ValidUntil <= selected.ValidUntil
+            ? selection.SelectedOffer.ValidUntil
+            : selected.ValidUntil;
         var recalculated = new OfferSnapshot(
             selected.Provider,
             selected.ProviderOfferId,
@@ -61,7 +67,8 @@ public sealed class OfferSelectionService
             selected.Apr,
             selected.TotalCost,
             selection.SelectedOffer.Amount,
-            selection.SelectedOffer.DurationMonths);
+            selection.SelectedOffer.DurationMonths,
+            validUntil);
 
         selection.ApplyRecalculation(recalculated, income, livingCosts, dependents);
         var updated = await _repository.UpdateAsync(selection, ct);
