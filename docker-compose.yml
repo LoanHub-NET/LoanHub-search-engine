@@ -7,6 +7,9 @@ services:
       - "8080:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Applications: Host=db;Port=5432;Database=loanhub;Username=loanhub;Password=loanhub
+    depends_on:
+      - db
 
   web:
     build:
@@ -16,3 +19,17 @@ services:
       - "5173:80"
     depends_on:
       - api
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: loanhub
+      POSTGRES_USER: loanhub
+      POSTGRES_PASSWORD: loanhub
+    ports:
+      - "5432:5432"
+    volumes:
+      - loanhub-postgres:/var/lib/postgresql/data
+
+volumes:
+  loanhub-postgres:

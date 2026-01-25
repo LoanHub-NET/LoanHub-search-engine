@@ -15,6 +15,8 @@ using LoanHub.Search.Infrastructure.Repositories;
 using LoanHub.Search.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
@@ -51,7 +53,7 @@ builder.Services.AddSingleton<ILoanOfferProvider, MockBankOfferProvider>();
 builder.Services.AddSingleton<ILoanOfferProvider, MockBank2OfferProvider>();
 builder.Services.AddSingleton<OffersAggregator>();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("Applications")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Applications")));
 builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
 builder.Services.AddScoped<ApplicationService>();
 builder.Services.AddScoped<IOfferSelectionRepository, OfferSelectionRepository>();
@@ -76,15 +78,8 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     dbContext.Database.EnsureCreated();
-    bool usersTableExists;
-    using (var connection = dbContext.Database.GetDbConnection())
-    {
-        connection.Open();
-        using var command = connection.CreateCommand();
-        command.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='Users';";
-        usersTableExists = command.ExecuteScalar() != null;
-    }
-    if (!usersTableExists)
+    var databaseCreator = dbContext.Database.GetService<IRelationalDatabaseCreator>();
+    if (!databaseCreator.HasTables())
     {
         dbContext.Database.EnsureDeleted();
         dbContext.Database.EnsureCreated();
