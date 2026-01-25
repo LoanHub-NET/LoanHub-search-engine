@@ -10,6 +10,7 @@ public sealed class ApplicationServiceTests
     public async Task CreateAsync_AddsStatusAndSendsEmails()
     {
         var repository = new InMemoryApplicationRepository();
+        var contractStorage = new StubContractStorage();
         var emailSender = new CapturingEmailSender();
         var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>
         {
@@ -17,7 +18,7 @@ public sealed class ApplicationServiceTests
         });
         var notifier = new CapturingRealtimeNotifier();
 
-        var service = new ApplicationService(repository, emailSender, resolver, notifier);
+        var service = new ApplicationService(repository, contractStorage, emailSender, resolver, notifier);
         var validUntil = DateTimeOffset.UtcNow.AddDays(10);
 
         var application = new LoanApplication
@@ -38,10 +39,11 @@ public sealed class ApplicationServiceTests
     public async Task CancelAsync_DoesNotCancelAcceptedApplication()
     {
         var repository = new InMemoryApplicationRepository();
+        var contractStorage = new StubContractStorage();
         var emailSender = new CapturingEmailSender();
         var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>());
         var notifier = new CapturingRealtimeNotifier();
-        var service = new ApplicationService(repository, emailSender, resolver, notifier);
+        var service = new ApplicationService(repository, contractStorage, emailSender, resolver, notifier);
         var validUntil = DateTimeOffset.UtcNow.AddDays(10);
 
         var application = new LoanApplication
@@ -65,10 +67,11 @@ public sealed class ApplicationServiceTests
     public async Task CancelAsync_CancelsNewApplication()
     {
         var repository = new InMemoryApplicationRepository();
+        var contractStorage = new StubContractStorage();
         var emailSender = new CapturingEmailSender();
         var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>());
         var notifier = new CapturingRealtimeNotifier();
-        var service = new ApplicationService(repository, emailSender, resolver, notifier);
+        var service = new ApplicationService(repository, contractStorage, emailSender, resolver, notifier);
 
         var application = new LoanApplication
         {
@@ -90,10 +93,11 @@ public sealed class ApplicationServiceTests
     public async Task ListRecentAsync_FiltersByApplicantAndStatus()
     {
         var repository = new InMemoryApplicationRepository();
+        var contractStorage = new StubContractStorage();
         var emailSender = new CapturingEmailSender();
         var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>());
         var notifier = new CapturingRealtimeNotifier();
-        var service = new ApplicationService(repository, emailSender, resolver, notifier);
+        var service = new ApplicationService(repository, contractStorage, emailSender, resolver, notifier);
         var validUntil = DateTimeOffset.UtcNow.AddDays(10);
 
         var recent = new LoanApplication
