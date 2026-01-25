@@ -1,6 +1,7 @@
 namespace LoanHub.Search.Infrastructure;
 
 using LoanHub.Search.Core.Models.Applications;
+using LoanHub.Search.Core.Models.Selections;
 using LoanHub.Search.Core.Models.Users;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,6 +15,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<LoanApplication> Applications => Set<LoanApplication>();
     public DbSet<UserAccount> Users => Set<UserAccount>();
     public DbSet<ExternalIdentity> ExternalIdentities => Set<ExternalIdentity>();
+    public DbSet<OfferSelection> OfferSelections => Set<OfferSelection>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -74,6 +76,21 @@ public sealed class ApplicationDbContext : DbContext
             entity.Property(identity => identity.Provider).HasMaxLength(120).IsRequired();
             entity.Property(identity => identity.Subject).HasMaxLength(200).IsRequired();
             entity.HasIndex(identity => new { identity.Provider, identity.Subject }).IsUnique();
+        });
+
+        modelBuilder.Entity<OfferSelection>(entity =>
+        {
+            entity.HasKey(selection => selection.Id);
+            entity.OwnsOne(selection => selection.SelectedOffer, snapshot =>
+            {
+                snapshot.Property(s => s.Provider).HasMaxLength(120);
+                snapshot.Property(s => s.ProviderOfferId).HasMaxLength(120);
+            });
+            entity.OwnsOne(selection => selection.RecalculatedOffer, snapshot =>
+            {
+                snapshot.Property(s => s.Provider).HasMaxLength(120);
+                snapshot.Property(s => s.ProviderOfferId).HasMaxLength(120);
+            });
         });
     }
 }

@@ -1,10 +1,13 @@
 using LoanHub.Search.Core.Abstractions;
 using LoanHub.Search.Core.Abstractions.Applications;
 using LoanHub.Search.Core.Abstractions.Auth;
+using LoanHub.Search.Core.Abstractions.Notifications;
+using LoanHub.Search.Core.Abstractions.Selections;
 using LoanHub.Search.Core.Abstractions.Users;
 using LoanHub.Search.Core.Services;
 using LoanHub.Search.Core.Services.Applications;
 using LoanHub.Search.Core.Services.Auth;
+using LoanHub.Search.Core.Services.Selections;
 using LoanHub.Search.Core.Services.Users;
 using LoanHub.Search.Infrastructure;
 using LoanHub.Search.Infrastructure.Providers;
@@ -22,6 +25,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("SendGrid"));
+builder.Services.Configure<ProviderContactOptions>(builder.Configuration.GetSection("ProviderContacts"));
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -49,8 +54,21 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Applications")));
 builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
 builder.Services.AddScoped<ApplicationService>();
+builder.Services.AddScoped<IOfferSelectionRepository, OfferSelectionRepository>();
+builder.Services.AddScoped<OfferSelectionService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddSingleton<IProviderContactResolver, ProviderContactResolver>();
+
+var sendGridOptions = builder.Configuration.GetSection("SendGrid").Get<SendGridOptions>() ?? new SendGridOptions();
+if (string.IsNullOrWhiteSpace(sendGridOptions.ApiKey))
+{
+    builder.Services.AddSingleton<IEmailSender, NullEmailSender>();
+}
+else
+{
+    builder.Services.AddSingleton<IEmailSender, SendGridEmailSender>();
+}
 
 var app = builder.Build();
 
