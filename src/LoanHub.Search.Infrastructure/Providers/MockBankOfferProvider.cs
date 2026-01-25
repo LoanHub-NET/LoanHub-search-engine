@@ -2,7 +2,6 @@ namespace LoanHub.Search.Infrastructure.Providers;
 
 using LoanHub.Search.Core.Abstractions;
 using LoanHub.Search.Core.Models;
-using System.Security.AccessControl;
 
 public sealed class MockBankOfferProvider : ILoanOfferProvider
 {
@@ -19,6 +18,7 @@ public sealed class MockBankOfferProvider : ILoanOfferProvider
         var apr2 = query.Amount > 30_000 ? 0.10m : 0.07m;
         var installment2 = CalculateInstallment(query.Amount, apr2, query.DurationMonths);
         var totalCost2 = installment2 * query.DurationMonths;
+        var validUntil = OfferValidityPolicy.CalculateValidUntil(DateTimeOffset.UtcNow);
 
 
         return new[]
@@ -28,14 +28,16 @@ public sealed class MockBankOfferProvider : ILoanOfferProvider
                 ProviderOfferId: $"MOCK-{query.Amount}-{query.DurationMonths}",
                 Installment: decimal.Round(installment, 2),
                 Apr: apr,
-                TotalCost: decimal.Round(totalCost, 2)
+                TotalCost: decimal.Round(totalCost, 2),
+                ValidUntil: validUntil
             ),
             new OfferDto(
                 Provider:Name,
                 ProviderOfferId: $"Mock premium-{query.Amount}-{query.DurationMonths}",
                 Installment: decimal.Round(installment2,2),
                 Apr: apr2,
-                TotalCost: decimal.Round(totalCost2,2)
+                TotalCost: decimal.Round(totalCost2,2),
+                ValidUntil: validUntil
                 )
         };
     }

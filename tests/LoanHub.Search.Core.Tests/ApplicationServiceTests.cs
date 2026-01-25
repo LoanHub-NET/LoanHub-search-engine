@@ -18,12 +18,13 @@ public sealed class ApplicationServiceTests
         var notifier = new CapturingRealtimeNotifier();
 
         var service = new ApplicationService(repository, emailSender, resolver, notifier);
+        var validUntil = DateTimeOffset.UtcNow.AddDays(10);
 
         var application = new LoanApplication
         {
             ApplicantEmail = "applicant@example.com",
             ApplicantDetails = new ApplicantDetails("Jane", "Doe", 30, "Engineer", "Main St", "123"),
-            OfferSnapshot = new OfferSnapshot("ProviderA", "OFF-1", 100m, 8m, 1200m, 1000m, 12, DateTimeOffset.UtcNow.AddDays(30))
+            OfferSnapshot = new OfferSnapshot("ProviderA", "OFF-1", 100m, 8m, 1200m, 1000m, 12, validUntil)
         };
 
         var created = await service.CreateAsync(application, CancellationToken.None);
@@ -41,12 +42,13 @@ public sealed class ApplicationServiceTests
         var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>());
         var notifier = new CapturingRealtimeNotifier();
         var service = new ApplicationService(repository, emailSender, resolver, notifier);
+        var validUntil = DateTimeOffset.UtcNow.AddDays(10);
 
         var application = new LoanApplication
         {
             ApplicantEmail = "applicant@example.com",
             ApplicantDetails = new ApplicantDetails("Jane", "Doe", 30, "Engineer", "Main St", "123"),
-            OfferSnapshot = new OfferSnapshot("ProviderA", "OFF-1", 100m, 8m, 1200m, 1000m, 12, DateTimeOffset.UtcNow.AddDays(30))
+            OfferSnapshot = new OfferSnapshot("ProviderA", "OFF-1", 100m, 8m, 1200m, 1000m, 12, validUntil)
         };
         application.AddStatus(ApplicationStatus.Accepted, null);
         await repository.AddAsync(application, CancellationToken.None);
@@ -92,12 +94,13 @@ public sealed class ApplicationServiceTests
         var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>());
         var notifier = new CapturingRealtimeNotifier();
         var service = new ApplicationService(repository, emailSender, resolver, notifier);
+        var validUntil = DateTimeOffset.UtcNow.AddDays(10);
 
         var recent = new LoanApplication
         {
             ApplicantEmail = "applicant@example.com",
             ApplicantDetails = new ApplicantDetails("Jane", "Doe", 30, "Engineer", "Main St", "123"),
-            OfferSnapshot = new OfferSnapshot("ProviderA", "OFF-1", 100m, 8m, 1200m, 1000m, 12, DateTimeOffset.UtcNow.AddDays(30)),
+            OfferSnapshot = new OfferSnapshot("ProviderA", "OFF-1", 100m, 8m, 1200m, 1000m, 12, validUntil),
             CreatedAt = DateTimeOffset.UtcNow.AddDays(-1)
         };
         recent.AddStatus(ApplicationStatus.New, null);
@@ -106,7 +109,7 @@ public sealed class ApplicationServiceTests
         {
             ApplicantEmail = "applicant@example.com",
             ApplicantDetails = new ApplicantDetails("Jane", "Doe", 30, "Engineer", "Main St", "123"),
-            OfferSnapshot = new OfferSnapshot("ProviderA", "OFF-2", 100m, 8m, 1200m, 1000m, 12, DateTimeOffset.UtcNow.AddDays(30)),
+            OfferSnapshot = new OfferSnapshot("ProviderA", "OFF-2", 100m, 8m, 1200m, 1000m, 12, validUntil),
             CreatedAt = DateTimeOffset.UtcNow.AddDays(-10)
         };
         old.AddStatus(ApplicationStatus.Rejected, "Nope");

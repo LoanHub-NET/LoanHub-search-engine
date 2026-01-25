@@ -1,3 +1,5 @@
+using LoanHub.Search.Core.Models;
+
 namespace LoanHub.Search.Core.Models.Applications;
 
 public sealed record OfferSnapshot(
@@ -9,4 +11,8 @@ public sealed record OfferSnapshot(
     decimal Amount,
     int DurationMonths,
     DateTimeOffset ValidUntil
-);
+)
+{
+    public bool IsExpired(DateTimeOffset now)
+        => OfferValidityPolicy.IsExpired(ValidUntil, now);
+}
