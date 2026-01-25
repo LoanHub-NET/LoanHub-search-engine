@@ -35,12 +35,15 @@ public sealed class JwtTokenService : ITokenService
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var isAdmin = user.Role == UserRole.Admin;
 
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email),
-            new(ClaimTypes.Role, user.Role.ToString())
+            new(ClaimTypes.Role, user.Role.ToString()),
+            new("role", user.Role.ToString()),
+            new("is_admin", isAdmin ? "true" : "false")
         };
 
         var token = new JwtSecurityToken(

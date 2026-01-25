@@ -20,6 +20,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using LoanHub.Search.Core.Models.Users;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,11 +46,17 @@ builder.Services
             ValidIssuer = jwtOptions.Issuer,
             ValidAudience = jwtOptions.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
-            ClockSkew = TimeSpan.FromMinutes(1)
+            ClockSkew = TimeSpan.FromMinutes(1),
+            RoleClaimType = "role"
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy =>
+        policy.RequireRole(UserRole.Admin.ToString())
+            .RequireClaim("is_admin", "true"));
+});
 
 builder.Services.AddSingleton<ILoanOfferProvider, MockBankOfferProvider>();
 builder.Services.AddSingleton<ILoanOfferProvider, MockBank2OfferProvider>();
