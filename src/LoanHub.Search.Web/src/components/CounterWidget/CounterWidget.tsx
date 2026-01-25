@@ -12,6 +12,7 @@ type Stat = {
   prefix?: string;
   suffix?: string;
   format?: 'number' | 'compact';
+  icon: string;
 };
 
 const formatCompact = (value: number): string => {
@@ -50,12 +51,14 @@ export function CounterWidget({ successCount }: CounterWidgetProps) {
         label: 'people found their best loan',
         value: successCount,
         format: 'number',
+        icon: '🎯',
       },
       {
         id: 'partners',
         label: 'bank partners',
         value: 28,
         format: 'number',
+        icon: '🏦',
       },
       {
         id: 'loans',
@@ -64,6 +67,7 @@ export function CounterWidget({ successCount }: CounterWidgetProps) {
         prefix: '$',
         suffix: '+',
         format: 'compact',
+        icon: '💸',
       },
     ],
     [successCount],
@@ -127,6 +131,9 @@ export function CounterWidget({ successCount }: CounterWidgetProps) {
       <div className="counter-widget-inner">
         {stats.map((stat, index) => (
           <div key={stat.id} className="counter-card">
+            <div className="counter-icon" aria-hidden="true">
+              {stat.icon}
+            </div>
             <div className="counter-value">
               {formatValue(displayValues[index] ?? 0, stat)}
             </div>
