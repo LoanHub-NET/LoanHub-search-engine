@@ -7,6 +7,10 @@ import {
   AboutPage,
   ContactPage,
   PartnersPage,
+  PrivacyPage,
+  TermsPage,
+  CookiesPage,
+  GdprPage,
 } from './pages';
 import './App.css';
 
@@ -22,6 +26,10 @@ function App() {
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/partners" element={<PartnersPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/cookies" element={<CookiesPage />} />
+          <Route path="/gdpr" element={<GdprPage />} />
           {/* Future routes */}
           <Route path="/login" element={<LoginPlaceholder />} />
           <Route path="/apply" element={<ApplyPlaceholder />} />
