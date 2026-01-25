@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
@@ -15,6 +16,18 @@ public sealed class ApiTestFactory : WebApplicationFactory<Program>, IAsyncLifet
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.ConfigureAppConfiguration((_, config) =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Jwt:Issuer"] = "LoanHub-Test",
+                ["Jwt:Audience"] = "LoanHub-Test-Clients",
+                ["Jwt:SigningKey"] = "TestSigningKey-1234567890-Test",
+                ["Jwt:ExpirationMinutes"] = "60",
+                ["ProviderContacts:Contacts:MockBank1"] = "applications@mockbank1.test"
+            });
+        });
+
         builder.ConfigureServices(services =>
         {
             services.RemoveAll(typeof(DbContextOptions<ApplicationDbContext>));
