@@ -19,6 +19,9 @@ This repository contains the **Search Engine** backend service responsible for:
 - normalizing responses into a common format,
 - returning results to the web UI.
 
+It also now includes a lightweight **frontend shell** under `src/LoanHub.Search.Web` to
+demonstrate the LoanHub user flows (anonymous search, extended search, offers, statuses).
+
 ---
 
 ## Repository Structure
@@ -29,6 +32,7 @@ Example structure:
 LoanHub.Search.Api
 LoanHub.Search.Core
 LoanHub.Search.Infrastructure
+LoanHub.Search.Web
 /tests
 LoanHub.Search.UnitTests
 LoanHub.Search.IntegrationTests
@@ -98,3 +102,11 @@ Examples:
 
 ## Getting Started
 (placeholder – will be filled once the first API skeleton is added)
+
+### Frontend (React + Vite)
+The frontend lives in `src/LoanHub.Search.Web` and is kept alongside backend services so
+the team can iterate on UI and API integration in one repo.
+
+Common scripts (run inside `src/LoanHub.Search.Web`):
+- `npm install`
+- `npm run dev`
