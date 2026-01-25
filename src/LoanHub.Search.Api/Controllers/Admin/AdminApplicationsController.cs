@@ -15,14 +15,42 @@ public sealed class AdminApplicationsController : ControllerBase
     public AdminApplicationsController(ApplicationService service) => _service = service;
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ApplicationSummary>>> List(CancellationToken ct)
+    public async Task<ActionResult<AdminApplicationsResponse>> List(
+        [FromQuery] string? applicantEmail,
+        [FromQuery] ApplicationStatus? status,
+        [FromQuery] string? provider,
+        [FromQuery] DateTimeOffset? createdFrom,
+        [FromQuery] DateTimeOffset? createdTo,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        CancellationToken ct = default)
     {
-        var applications = await _service.ListAsync(ct);
-        var summaries = applications
+        if (page < 1)
+            return BadRequest("Page must be >= 1.");
+
+        if (pageSize < 1 || pageSize > 200)
+            return BadRequest("PageSize must be between 1 and 200.");
+
+        var query = new ApplicationAdminQuery(
+            applicantEmail,
+            status,
+            provider,
+            createdFrom,
+            createdTo,
+            page,
+            pageSize);
+
+        var applications = await _service.ListAdminAsync(query, ct);
+        var summaries = applications.Items
             .Select(ApplicationSummary.From)
             .ToList();
 
-        return Ok(summaries);
+        return Ok(new AdminApplicationsResponse(
+            summaries,
+            applications.TotalCount,
+            applications.Page,
+            applications.PageSize
+        ));
     }
 
     [HttpGet("{id:guid}")]
@@ -107,7 +135,8 @@ public sealed class AdminApplicationsController : ControllerBase
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,
         string Provider,
-        decimal Amount
+        decimal Amount,
+        string? RejectReason
     )
     {
         public static ApplicationSummary From(LoanApplication application)
@@ -118,7 +147,15 @@ public sealed class AdminApplicationsController : ControllerBase
                 application.CreatedAt,
                 application.UpdatedAt,
                 application.OfferSnapshot.Provider,
-                application.OfferSnapshot.Amount
+                application.OfferSnapshot.Amount,
+                application.RejectReason
             );
     }
+
+    public sealed record AdminApplicationsResponse(
+        IReadOnlyList<ApplicationSummary> Items,
+        int TotalCount,
+        int Page,
+        int PageSize
+    );
 }

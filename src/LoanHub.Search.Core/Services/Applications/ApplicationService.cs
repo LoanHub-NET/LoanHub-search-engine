@@ -4,6 +4,7 @@ using LoanHub.Search.Core.Abstractions.Applications;
 using LoanHub.Search.Core.Abstractions.Notifications;
 using LoanHub.Search.Core.Models.Applications;
 using LoanHub.Search.Core.Models.Notifications;
+using LoanHub.Search.Core.Models.Pagination;
 
 public sealed class ApplicationService
 {
@@ -37,6 +38,9 @@ public sealed class ApplicationService
 
     public Task<IReadOnlyList<LoanApplication>> ListAsync(CancellationToken ct)
         => _repo.ListAsync(ct);
+
+    public Task<PagedResult<LoanApplication>> ListAdminAsync(ApplicationAdminQuery query, CancellationToken ct)
+        => _repo.ListAdminAsync(query, ct);
 
     public async Task<LoanApplication?> CancelAsync(Guid id, CancellationToken ct)
     {
