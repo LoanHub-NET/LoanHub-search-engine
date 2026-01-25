@@ -20,6 +20,7 @@ export function ContactPage() {
               Have a question about offers, partnerships, or the platform?
               Reach out and we will get back to you soon.
             </p>
+            <a className="page-back-link" href="/">← Back to Home</a>
           </div>
         </section>
 

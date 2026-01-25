@@ -21,6 +21,7 @@ export function AboutPage() {
               multiple providers and show clear, comparable terms so people can
               choose with confidence.
             </p>
+            <a className="page-back-link" href="/">← Back to Home</a>
             <div className="about-actions">
               <button
                 type="button"

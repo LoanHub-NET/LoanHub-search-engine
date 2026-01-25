@@ -38,6 +38,7 @@ export function PartnersPage() {
               We aggregate offers from verified lenders and normalize responses
               so you can compare apples to apples.
             </p>
+            <a className="page-back-link" href="/">← Back to Home</a>
           </div>
         </section>
 

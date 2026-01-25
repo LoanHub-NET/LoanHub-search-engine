@@ -36,8 +36,12 @@
   font-size: 1.1rem;
   line-height: 1.7;
   color: var(--color-text-secondary);
-  margin-bottom: 0;
+  margin-bottom: 0rem;
   max-width: 640px;
+}
+
+.contact-hero .page-back-link {
+  margin-top: 0.6rem;
 }
 
 .contact-content {
