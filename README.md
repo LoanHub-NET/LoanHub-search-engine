@@ -120,3 +120,4 @@ docker compose up --build
 Services:
 - API: http://localhost:8080
 - Web: http://localhost:5173
+- Postgres: localhost:5432 (database: `loanhub`, user: `loanhub`)
