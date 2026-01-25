@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { CounterWidget } from '../CounterWidget';
 import './HeroSection.css';
 
 interface HeroSectionProps {
@@ -9,6 +10,7 @@ interface HeroSectionProps {
 export function HeroSection({ onQuickSearch, successCount }: HeroSectionProps) {
   const [amount, setAmount] = useState<string>('10000');
   const [duration, setDuration] = useState<string>('12');
+  const formatNumber = (value: number): string => value.toLocaleString('en-US');
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -18,10 +20,6 @@ export function HeroSection({ onQuickSearch, successCount }: HeroSectionProps) {
     if (parsedAmount > 0 && parsedDuration > 0) {
       onQuickSearch(parsedAmount, parsedDuration);
     }
-  };
-
-  const formatNumber = (num: number): string => {
-    return num.toLocaleString('en-US');
   };
 
   return (
@@ -42,20 +40,13 @@ export function HeroSection({ onQuickSearch, successCount }: HeroSectionProps) {
             quick search – just enter the amount you need and see your options.
           </p>
           
-          <div className="success-counter">
-            <div className="counter-icon">🎉</div>
-            <div className="counter-text">
-              <span className="counter-number">{formatNumber(successCount)}</span>
-              <span className="counter-label">people have already found their best loan</span>
-            </div>
-          </div>
         </div>
 
         <div className="hero-form-container">
           <div className="quick-search-card">
             <h2 className="form-title">Quick Anonymous Search</h2>
             <p className="form-subtitle">See offers in seconds – no account required</p>
-            
+
             <form onSubmit={handleSubmit} className="quick-search-form">
               <div className="form-group">
                 <label htmlFor="amount" className="form-label">
@@ -143,6 +134,8 @@ export function HeroSection({ onQuickSearch, successCount }: HeroSectionProps) {
               🔒 Your search is anonymous. We don't store any personal data.
             </p>
           </div>
+
+          <CounterWidget successCount={successCount} />
         </div>
       </div>
     </section>
