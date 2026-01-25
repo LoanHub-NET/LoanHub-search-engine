@@ -61,6 +61,11 @@ export function GdprPage() {
             </div>
 
             <p className="legal-meta">Last updated: 2025-02-01</p>
+            <div className="legal-actions">
+              <a className="legal-action-link" href="/">
+                Back to Home
+              </a>
+            </div>
           </div>
         </section>
       </main>

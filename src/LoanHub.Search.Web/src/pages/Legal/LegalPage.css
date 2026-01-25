@@ -84,6 +84,22 @@
   margin-top: 1.5rem;
 }
 
+.legal-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.legal-action-link {
+  padding: 0.7rem 1.4rem;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-decoration: none;
+  background: var(--color-bg-card);
+}
+
 @media (max-width: 600px) {
   .legal-title {
     font-size: 2.1rem;
