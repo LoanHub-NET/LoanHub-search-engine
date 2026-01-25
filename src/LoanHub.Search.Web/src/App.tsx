@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { LandingPage, SearchPage, SearchResultsPage, CareersPage } from './pages';
+import { LandingPage, SearchPage, SearchResultsPage, CareersPage, AboutPage, ContactPage } from './pages';
 import './App.css';
 
 function App() {
@@ -11,6 +11,8 @@ function App() {
           <Route path="/search" element={<SearchPage />} />
           <Route path="/search/results" element={<SearchResultsPage />} />
           <Route path="/careers" element={<CareersPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/contact" element={<ContactPage />} />
           {/* Future routes */}
           <Route path="/login" element={<LoginPlaceholder />} />
           <Route path="/apply" element={<ApplyPlaceholder />} />
