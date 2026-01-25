@@ -60,8 +60,8 @@ public sealed class OfferSelectionService
             selected.Installment,
             selected.Apr,
             selected.TotalCost,
-            selected.Amount,
-            selected.DurationMonths);
+            selection.SelectedOffer.Amount,
+            selection.SelectedOffer.DurationMonths);
 
         selection.ApplyRecalculation(recalculated, income, livingCosts, dependents);
         var updated = await _repository.UpdateAsync(selection, ct);
