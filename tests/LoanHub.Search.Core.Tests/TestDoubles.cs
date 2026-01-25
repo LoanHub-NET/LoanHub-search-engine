@@ -119,6 +119,15 @@ internal sealed class InMemoryApplicationRepository : IApplicationRepository
     public Task<IReadOnlyList<LoanApplication>> ListAsync(CancellationToken ct)
         => Task.FromResult<IReadOnlyList<LoanApplication>>(_storage.Values.ToList());
 
+    public Task<IReadOnlyList<LoanApplication>> ListByUserIdAsync(Guid userId, CancellationToken ct)
+    {
+        IReadOnlyList<LoanApplication> results = _storage.Values
+            .Where(application => application.UserId == userId)
+            .ToList();
+
+        return Task.FromResult(results);
+    }
+
     public Task<PagedResult<LoanApplication>> ListAdminAsync(ApplicationAdminQuery query, CancellationToken ct)
     {
         var normalized = query.Normalize();
