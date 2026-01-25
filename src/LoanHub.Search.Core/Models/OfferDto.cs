@@ -5,5 +5,6 @@ public sealed record OfferDto(
     string ProviderOfferId,
     decimal Installment,
     decimal Apr,
-    decimal TotalCost
+    decimal TotalCost,
+    DateTimeOffset ValidUntil
 );

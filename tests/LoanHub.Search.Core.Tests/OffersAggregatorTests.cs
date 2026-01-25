@@ -9,15 +9,16 @@ public sealed class OffersAggregatorTests
     [Fact]
     public async Task GetOffersAsync_AggregatesOffersFromProviders()
     {
+        var validUntil = DateTimeOffset.UtcNow.AddDays(10);
         var providers = new List<StubLoanOfferProvider>
         {
             new("FastOne", (_, _) => Task.FromResult<IReadOnlyList<OfferDto>>(new List<OfferDto>
             {
-                new("FastOne", "FAST-1", 120m, 9.5m, 1500m)
+                new("FastOne", "FAST-1", 120m, 9.5m, 1500m, validUntil)
             })),
             new("FastTwo", (_, _) => Task.FromResult<IReadOnlyList<OfferDto>>(new List<OfferDto>
             {
-                new("FastTwo", "FAST-2", 110m, 8.1m, 1400m)
+                new("FastTwo", "FAST-2", 110m, 8.1m, 1400m, validUntil)
             }))
         };
 
