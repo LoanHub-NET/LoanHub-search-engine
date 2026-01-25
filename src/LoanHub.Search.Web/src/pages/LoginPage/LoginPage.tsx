@@ -70,7 +70,6 @@ export function LoginPage() {
             apiEndpoint: '',
           };
 
-    setMode('login');
     setFormData((prev) => ({
       ...prev,
       email: mock.email,
