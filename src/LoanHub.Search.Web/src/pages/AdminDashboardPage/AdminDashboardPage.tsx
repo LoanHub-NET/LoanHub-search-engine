@@ -11,10 +11,18 @@ import { ADMIN_STATUS_CONFIG, calculateSlaInfo } from '../../types/admin.types';
 import { mockApplications, calculateDashboardStats, mockProviders } from '../../data/mockAdminData';
 import { ApplicationDetailModal, DecisionModal } from '../../components/admin';
 import { Header, Footer } from '../../components';
+import type { AdminUser } from '../../components/Header/Header';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import './AdminDashboardPage.css';
 
 type SortKey = 'date' | 'amount' | 'status';
+
+// Mock admin user (in real app, this would come from auth context)
+const mockAdminUser: AdminUser = {
+  name: 'Admin User',
+  email: 'admin@loanhub.com',
+  role: 'Administrator',
+};
 
 export function AdminDashboardPage() {
   const navigate = useNavigate();
@@ -173,11 +181,19 @@ export function AdminDashboardPage() {
     { value: 'rejected', label: 'Rejected', count: stats.rejected },
   ];
 
+  const handleLogout = () => {
+    // In a real app, this would clear auth state and redirect
+    console.log('Logging out...');
+    navigate('/');
+  };
+
   return (
     <>
       <Header
         onLoginClick={() => navigate('/login')}
         onSearchClick={() => navigate('/search')}
+        adminUser={mockAdminUser}
+        onLogout={handleLogout}
       />
       <main className="admin-page">
         {/* Header */}

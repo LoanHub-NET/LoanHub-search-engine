@@ -1,16 +1,38 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../../assets/LoanHub_logo.png';
 import './Header.css';
 
+export interface AdminUser {
+  name: string;
+  email: string;
+  role: string;
+  avatar?: string;
+}
+
 interface HeaderProps {
   onLoginClick: () => void;
   onSearchClick: () => void;
+  adminUser?: AdminUser;
+  onLogout?: () => void;
 }
 
-export function Header({ onLoginClick, onSearchClick }: HeaderProps) {
+export function Header({ onLoginClick, onSearchClick, adminUser, onLogout }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLLIElement>(null);
   const navigate = useNavigate();
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleHowItWorksClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
@@ -58,11 +80,74 @@ export function Header({ onLoginClick, onSearchClick }: HeaderProps) {
                 Search Engine
               </button>
             </li>
-            <li>
-              <button onClick={onLoginClick} className="nav-link nav-button login-btn">
-                Login
-              </button>
-            </li>
+            {adminUser ? (
+              <li className="user-menu-container" ref={userMenuRef}>
+                <button 
+                  className="user-menu-trigger"
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  aria-expanded={userMenuOpen}
+                >
+                  <div className="user-avatar">
+                    {adminUser.avatar ? (
+                      <img src={adminUser.avatar} alt={adminUser.name} />
+                    ) : (
+                      <span>{adminUser.name.charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="user-info">
+                    <span className="user-name">{adminUser.name}</span>
+                    <span className="user-role">{adminUser.role}</span>
+                  </div>
+                  <span className={`dropdown-arrow ${userMenuOpen ? 'open' : ''}`}>▼</span>
+                </button>
+                
+                {userMenuOpen && (
+                  <div className="user-dropdown">
+                    <div className="dropdown-header">
+                      <div className="dropdown-avatar">
+                        {adminUser.avatar ? (
+                          <img src={adminUser.avatar} alt={adminUser.name} />
+                        ) : (
+                          <span>{adminUser.name.charAt(0).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div className="dropdown-user-info">
+                        <span className="dropdown-name">{adminUser.name}</span>
+                        <span className="dropdown-email">{adminUser.email}</span>
+                      </div>
+                    </div>
+                    <div className="dropdown-divider"></div>
+                    <ul className="dropdown-menu">
+                      <li>
+                        <button onClick={() => { setUserMenuOpen(false); navigate('/admin'); }}>
+                          📋 Dashboard
+                        </button>
+                      </li>
+                      <li>
+                        <button onClick={() => { setUserMenuOpen(false); navigate('/admin/settings'); }}>
+                          ⚙️ Settings
+                        </button>
+                      </li>
+                      <li>
+                        <button onClick={() => { setUserMenuOpen(false); navigate('/admin/profile'); }}>
+                          👤 My Profile
+                        </button>
+                      </li>
+                    </ul>
+                    <div className="dropdown-divider"></div>
+                    <button className="logout-btn" onClick={() => { setUserMenuOpen(false); onLogout?.(); }}>
+                      🚪 Logout
+                    </button>
+                  </div>
+                )}
+              </li>
+            ) : (
+              <li>
+                <button onClick={onLoginClick} className="nav-link nav-button login-btn">
+                  Login
+                </button>
+              </li>
+            )}
           </ul>
         </nav>
       </div>
