@@ -44,6 +44,10 @@ export function LoginPage() {
           : 'Registration submitted (mock). Redirecting...',
       );
       setTimeout(() => {
+        if (role === 'admin') {
+          navigate('/admin');
+          return;
+        }
         navigate('/');
       }, 900);
     }, 900);

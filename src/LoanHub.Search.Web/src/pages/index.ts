@@ -7,3 +7,4 @@ export { ContactPage } from './ContactPage';
 export { PartnersPage } from './PartnersPage';
 export { PrivacyPage, TermsPage, CookiesPage, GdprPage } from './Legal';
 export { LoginPage } from './LoginPage';
+export { AdminDashboardPage } from './AdminDashboardPage';
