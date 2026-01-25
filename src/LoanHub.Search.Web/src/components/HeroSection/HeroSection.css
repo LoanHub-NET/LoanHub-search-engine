@@ -107,36 +107,6 @@
   margin: 0 0 2rem;
 }
 
-.success-counter {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  background: var(--color-bg-card);
-  padding: 1rem 1.5rem;
-  border-radius: 15px;
-  box-shadow: 0 4px 20px var(--color-shadow);
-  max-width: fit-content;
-}
-
-.counter-icon {
-  font-size: 2rem;
-}
-
-.counter-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.counter-number {
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: var(--color-accent-primary);
-}
-
-.counter-label {
-  font-size: 0.9rem;
-  color: var(--color-text-muted);
-}
 
 .hero-form-container {
   display: flex;
@@ -328,9 +298,6 @@
     font-size: 1.1rem;
   }
 
-  .success-counter {
-    margin: 0 auto;
-  }
 }
 
 @media (max-width: 480px) {

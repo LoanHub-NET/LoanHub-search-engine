@@ -3,12 +3,12 @@ import './HeroSection.css';
 
 interface HeroSectionProps {
   onQuickSearch: (amount: number, duration: number) => void;
-  successCount: number;
 }
 
-export function HeroSection({ onQuickSearch, successCount }: HeroSectionProps) {
+export function HeroSection({ onQuickSearch }: HeroSectionProps) {
   const [amount, setAmount] = useState<string>('10000');
   const [duration, setDuration] = useState<string>('12');
+  const formatNumber = (value: number): string => value.toLocaleString('en-US');
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -18,10 +18,6 @@ export function HeroSection({ onQuickSearch, successCount }: HeroSectionProps) {
     if (parsedAmount > 0 && parsedDuration > 0) {
       onQuickSearch(parsedAmount, parsedDuration);
     }
-  };
-
-  const formatNumber = (num: number): string => {
-    return num.toLocaleString('en-US');
   };
 
   return (
@@ -42,13 +38,6 @@ export function HeroSection({ onQuickSearch, successCount }: HeroSectionProps) {
             quick search – just enter the amount you need and see your options.
           </p>
           
-          <div className="success-counter">
-            <div className="counter-icon">🎉</div>
-            <div className="counter-text">
-              <span className="counter-number">{formatNumber(successCount)}</span>
-              <span className="counter-label">people have already found their best loan</span>
-            </div>
-          </div>
         </div>
 
         <div className="hero-form-container">
