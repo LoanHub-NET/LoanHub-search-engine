@@ -3,6 +3,7 @@ namespace LoanHub.Search.Core.Models.Applications;
 public sealed class LoanApplication
 {
     public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid? UserId { get; set; }
     public string ApplicantEmail { get; set; } = string.Empty;
     public ApplicantDetails ApplicantDetails { get; set; } = default!;
     public OfferSnapshot OfferSnapshot { get; set; } = default!;

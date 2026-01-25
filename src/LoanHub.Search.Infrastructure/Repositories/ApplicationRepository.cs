@@ -31,6 +31,14 @@ public sealed class ApplicationRepository : IApplicationRepository
             .OrderByDescending(application => application.CreatedAt)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<LoanApplication>> ListByUserIdAsync(Guid userId, CancellationToken ct)
+        => await _dbContext.Applications
+            .AsNoTracking()
+            .Include(application => application.StatusHistory)
+            .Where(application => application.UserId == userId)
+            .OrderByDescending(application => application.CreatedAt)
+            .ToListAsync(ct);
+
     public async Task<PagedResult<LoanApplication>> ListAdminAsync(ApplicationAdminQuery query, CancellationToken ct)
     {
         var applications = _dbContext.Applications.AsNoTracking();

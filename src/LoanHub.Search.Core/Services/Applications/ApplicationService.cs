@@ -39,6 +39,9 @@ public sealed class ApplicationService
     public Task<IReadOnlyList<LoanApplication>> ListAsync(CancellationToken ct)
         => _repo.ListAsync(ct);
 
+    public Task<IReadOnlyList<LoanApplication>> ListByUserIdAsync(Guid userId, CancellationToken ct)
+        => _repo.ListByUserIdAsync(userId, ct);
+
     public Task<PagedResult<LoanApplication>> ListAdminAsync(ApplicationAdminQuery query, CancellationToken ct)
         => _repo.ListAdminAsync(query.Normalize(), ct);
 
@@ -189,6 +192,25 @@ public sealed class ApplicationService
         var filtered = applications
             .Where(application => application.CreatedAt >= cutoff)
             .Where(application => application.ApplicantEmail.Equals(applicantEmail, StringComparison.OrdinalIgnoreCase));
+
+        if (status is not null)
+            filtered = filtered.Where(application => application.Status == status);
+
+        return filtered
+            .OrderByDescending(application => application.CreatedAt)
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<LoanApplication>> ListRecentByUserIdAsync(
+        Guid userId,
+        ApplicationStatus? status,
+        int days,
+        CancellationToken ct)
+    {
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-days);
+        var applications = await _repo.ListByUserIdAsync(userId, ct);
+        var filtered = applications
+            .Where(application => application.CreatedAt >= cutoff);
 
         if (status is not null)
             filtered = filtered.Where(application => application.Status == status);
