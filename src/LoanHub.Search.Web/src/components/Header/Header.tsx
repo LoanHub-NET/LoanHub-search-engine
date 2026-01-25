@@ -119,18 +119,8 @@ export function Header({ onLoginClick, onSearchClick, adminUser, onLogout }: Hea
                     <div className="dropdown-divider"></div>
                     <ul className="dropdown-menu">
                       <li>
-                        <button onClick={() => { setUserMenuOpen(false); navigate('/admin'); }}>
+                        <button onClick={() => { setUserMenuOpen(false); navigate(adminUser.role === 'Administrator' ? '/admin' : '/dashboard'); }}>
                           📋 Dashboard
-                        </button>
-                      </li>
-                      <li>
-                        <button onClick={() => { setUserMenuOpen(false); navigate('/admin/settings'); }}>
-                          ⚙️ Settings
-                        </button>
-                      </li>
-                      <li>
-                        <button onClick={() => { setUserMenuOpen(false); navigate('/admin/profile'); }}>
-                          👤 My Profile
                         </button>
                       </li>
                     </ul>
