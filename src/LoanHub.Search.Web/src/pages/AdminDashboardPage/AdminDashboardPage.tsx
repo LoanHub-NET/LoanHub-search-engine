@@ -211,7 +211,7 @@ export function AdminDashboardPage() {
           <div className="admin-content-container">
             {/* Stats Cards */}
             <div className="admin-stats">
-              <div className="stat-card highlight">
+              <div className="stat-card pending">
                 <div className="stat-icon-wrapper">📬</div>
                 <div className="stat-info">
                   <span className="stat-value">{stats.pendingReview}</span>

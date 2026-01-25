@@ -76,9 +76,8 @@
   box-shadow: 0 16px 36px var(--color-shadow);
 }
 
-.stat-card.highlight {
-  border-color: var(--color-accent-primary);
-  background: linear-gradient(135deg, rgba(45, 90, 135, 0.08), transparent);
+.stat-card.pending {
+  border-color: #3b82f6;
 }
 
 .stat-card.success {
