@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoanHub.Search.Infrastructu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoanHub.Search.Core.Tests", "tests\LoanHub.Search.Core.Tests\LoanHub.Search.Core.Tests.csproj", "{539A7206-DF57-4389-AB3D-AB205B43E02E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoanHub.Search.Api.Tests", "tests\LoanHub.Search.Api.Tests\LoanHub.Search.Api.Tests.csproj", "{33DF83A7-0A97-434E-BBD5-3F428BA70B88}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -73,6 +75,18 @@ Global
 		{539A7206-DF57-4389-AB3D-AB205B43E02E}.Release|x64.Build.0 = Release|Any CPU
 		{539A7206-DF57-4389-AB3D-AB205B43E02E}.Release|x86.ActiveCfg = Release|Any CPU
 		{539A7206-DF57-4389-AB3D-AB205B43E02E}.Release|x86.Build.0 = Release|Any CPU
+		{33DF83A7-0A97-434E-BBD5-3F428BA70B88}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{33DF83A7-0A97-434E-BBD5-3F428BA70B88}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{33DF83A7-0A97-434E-BBD5-3F428BA70B88}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{33DF83A7-0A97-434E-BBD5-3F428BA70B88}.Debug|x64.Build.0 = Debug|Any CPU
+		{33DF83A7-0A97-434E-BBD5-3F428BA70B88}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{33DF83A7-0A97-434E-BBD5-3F428BA70B88}.Debug|x86.Build.0 = Debug|Any CPU
+		{33DF83A7-0A97-434E-BBD5-3F428BA70B88}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{33DF83A7-0A97-434E-BBD5-3F428BA70B88}.Release|Any CPU.Build.0 = Release|Any CPU
+		{33DF83A7-0A97-434E-BBD5-3F428BA70B88}.Release|x64.ActiveCfg = Release|Any CPU
+		{33DF83A7-0A97-434E-BBD5-3F428BA70B88}.Release|x64.Build.0 = Release|Any CPU
+		{33DF83A7-0A97-434E-BBD5-3F428BA70B88}.Release|x86.ActiveCfg = Release|Any CPU
+		{33DF83A7-0A97-434E-BBD5-3F428BA70B88}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -82,5 +96,6 @@ Global
 		{16878920-3A86-4D4F-8D56-E1E577C07B08} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{0A80EB47-D8EE-4778-AE2B-604B32C7C2F8} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{539A7206-DF57-4389-AB3D-AB205B43E02E} = {D4A8D00D-EBAD-499C-992C-1C42F3E65EC7}
+		{33DF83A7-0A97-434E-BBD5-3F428BA70B88} = {D4A8D00D-EBAD-499C-992C-1C42F3E65EC7}
 	EndGlobalSection
 EndGlobal
