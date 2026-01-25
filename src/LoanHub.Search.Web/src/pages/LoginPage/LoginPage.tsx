@@ -49,6 +49,18 @@ export function LoginPage() {
     }, 900);
   };
 
+  const handleOAuth = (provider: string) => {
+    setIsSubmitting(true);
+    setMessage(null);
+    setTimeout(() => {
+      setIsSubmitting(false);
+      setMessage(`OAuth login via ${provider} (mock). Redirecting...`);
+      setTimeout(() => {
+        navigate('/');
+      }, 900);
+    }, 900);
+  };
+
   const handleChange =
     (field: keyof typeof formData) => (event: React.ChangeEvent<HTMLInputElement>) => {
       setFormData((prev) => ({ ...prev, [field]: event.target.value }));
@@ -125,6 +137,59 @@ export function LoginPage() {
                 </span>
               </button>
             </div>
+
+            {role === 'user' && (
+              <div className="oauth-section">
+                <p className="oauth-title">Or continue with</p>
+                <div className="oauth-buttons">
+                  <button
+                    type="button"
+                    className="oauth-btn"
+                    onClick={() => handleOAuth('Google')}
+                    disabled={isSubmitting}
+                  >
+                    <span className="oauth-icon">
+                      <svg viewBox="0 0 48 48" aria-hidden="true">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.74 1.22 9.24 3.22l6.9-6.9C35.9 2.08 30.3 0 24 0 14.6 0 6.52 5.38 2.55 13.2l8.45 6.57C13 13.24 18.08 9.5 24 9.5Z"/>
+                        <path fill="#4285F4" d="M46.5 24c0-1.6-.14-3.13-.4-4.6H24v9.3h12.65c-.55 2.9-2.2 5.36-4.67 7.04l7.2 5.58C43.9 37.02 46.5 31 46.5 24Z"/>
+                        <path fill="#FBBC05" d="M10.99 28.77A14.5 14.5 0 0 1 10.2 24c0-1.66.28-3.27.79-4.77l-8.45-6.57A23.98 23.98 0 0 0 0 24c0 3.88.93 7.55 2.54 10.82l8.45-6.05Z"/>
+                        <path fill="#34A853" d="M24 48c6.3 0 11.6-2.08 15.47-5.68l-7.2-5.58C30.1 38.9 27.24 40 24 40c-5.9 0-11-3.72-12.99-8.94l-8.45 6.05C6.52 42.62 14.6 48 24 48Z"/>
+                      </svg>
+                    </span>
+                    Google
+                  </button>
+                  <button
+                    type="button"
+                    className="oauth-btn"
+                    onClick={() => handleOAuth('Microsoft')}
+                    disabled={isSubmitting}
+                  >
+                    <span className="oauth-icon">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path fill="#F25022" d="M1 1h10v10H1z"/>
+                        <path fill="#7FBA00" d="M13 1h10v10H13z"/>
+                        <path fill="#00A4EF" d="M1 13h10v10H1z"/>
+                        <path fill="#FFB900" d="M13 13h10v10H13z"/>
+                      </svg>
+                    </span>
+                    Microsoft
+                  </button>
+                  <button
+                    type="button"
+                    className="oauth-btn"
+                    onClick={() => handleOAuth('Facebook')}
+                    disabled={isSubmitting}
+                  >
+                    <span className="oauth-icon">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path fill="#1877F2" d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.43H7.08V12.1h3.05V9.43c0-3.03 1.8-4.7 4.55-4.7 1.32 0 2.7.23 2.7.23v2.98H16.1c-1.5 0-1.96.94-1.96 1.9v2.28h3.33l-.53 3.47h-2.8V24C19.61 23.1 24 18.1 24 12.07Z"/>
+                      </svg>
+                    </span>
+                    Facebook
+                  </button>
+                </div>
+              </div>
+            )}
 
             <form className="login-form" onSubmit={handleSubmit}>
               {mode === 'register' && (
