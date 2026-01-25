@@ -12,11 +12,16 @@ public sealed class UsersController : ControllerBase
 {
     private readonly UserService _service;
     private readonly ITokenService _tokenService;
+    private readonly IExternalTokenValidator _externalTokenValidator;
 
-    public UsersController(UserService service, ITokenService tokenService)
+    public UsersController(
+        UserService service,
+        ITokenService tokenService,
+        IExternalTokenValidator externalTokenValidator)
     {
         _service = service;
         _tokenService = tokenService;
+        _externalTokenValidator = externalTokenValidator;
     }
 
     [HttpPost("register")]
@@ -105,6 +110,45 @@ public sealed class UsersController : ControllerBase
         return Ok(AuthResponse.From(user, _tokenService.CreateToken(user)));
     }
 
+    [HttpPost("external/oidc/login")]
+    public async Task<ActionResult<AuthResponse>> LoginOidc([FromBody] OidcLoginRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Token))
+            return BadRequest("Token is required.");
+
+        var result = await _externalTokenValidator.ValidateAsync(request.Token, ct);
+        if (result is null)
+            return Unauthorized();
+
+        var user = await _service.LoginExternalAsync(result.Provider, result.Subject, ct);
+        if (user is null)
+        {
+            if (!request.AutoRegister)
+                return Unauthorized();
+
+            var email = result.Email ?? request.Email;
+            if (string.IsNullOrWhiteSpace(email))
+                return BadRequest("Email is required for external registration.");
+
+            var profile = request.Profile ?? new UserService.UserProfile(
+                result.GivenName,
+                result.FamilyName,
+                null,
+                null,
+                null,
+                null);
+
+            user = await _service.RegisterExternalAsync(
+                result.Provider,
+                result.Subject,
+                email,
+                profile,
+                ct);
+        }
+
+        return Ok(AuthResponse.From(user, _tokenService.CreateToken(user)));
+    }
+
     [Authorize]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<AuthResponse>> Get(Guid id, CancellationToken ct)
@@ -143,6 +187,12 @@ public sealed class UsersController : ControllerBase
     );
 
     public sealed record ExternalLoginRequest(string Provider, string Subject);
+
+    public sealed record OidcLoginRequest(
+        string Token,
+        string? Email,
+        UserService.UserProfile? Profile,
+        bool AutoRegister = true);
 
     public sealed record AuthResponse(
         Guid Id,
