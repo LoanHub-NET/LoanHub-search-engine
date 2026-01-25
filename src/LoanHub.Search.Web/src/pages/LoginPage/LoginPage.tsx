@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header, Footer } from '../../components';
 import './LoginPage.css';
@@ -12,6 +12,16 @@ export function LoginPage() {
   const [role, setRole] = useState<Role>('user');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    password: '',
+    confirmPassword: '',
+    bankName: '',
+    apiEndpoint: '',
+  });
 
   const title = useMemo(() => {
     if (mode === 'login') {
@@ -37,6 +47,38 @@ export function LoginPage() {
       }, 900);
     }, 900);
   };
+
+  const handleChange =
+    (field: keyof typeof formData) => (event: React.ChangeEvent<HTMLInputElement>) => {
+      setFormData((prev) => ({ ...prev, [field]: event.target.value }));
+    };
+
+  useEffect(() => {
+    const mock =
+      role === 'admin'
+        ? {
+            email: 'admin@loanhub.test',
+            password: 'AdminDemo123!',
+            bankName: 'Summit Trust',
+            apiEndpoint: 'https://api.summittrust.test/loans',
+          }
+        : {
+            email: 'user@loanhub.test',
+            password: 'UserDemo123!',
+            bankName: '',
+            apiEndpoint: '',
+          };
+
+    setMode('login');
+    setFormData((prev) => ({
+      ...prev,
+      email: mock.email,
+      password: mock.password,
+      confirmPassword: mock.password,
+      bankName: mock.bankName,
+      apiEndpoint: mock.apiEndpoint,
+    }));
+  }, [role]);
 
   return (
     <>
@@ -89,30 +131,65 @@ export function LoginPage() {
                 <div className="form-grid">
                   <div className="form-group">
                     <label htmlFor="firstName">First name</label>
-                    <input id="firstName" name="firstName" type="text" required />
+                    <input
+                      id="firstName"
+                      name="firstName"
+                      type="text"
+                      value={formData.firstName}
+                      onChange={handleChange('firstName')}
+                      required
+                    />
                   </div>
                   <div className="form-group">
                     <label htmlFor="lastName">Last name</label>
-                    <input id="lastName" name="lastName" type="text" required />
+                    <input
+                      id="lastName"
+                      name="lastName"
+                      type="text"
+                      value={formData.lastName}
+                      onChange={handleChange('lastName')}
+                      required
+                    />
                   </div>
                 </div>
               )}
 
               <div className="form-group">
                 <label htmlFor="email">Email</label>
-                <input id="email" name="email" type="email" required />
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange('email')}
+                  required
+                />
               </div>
 
               {mode === 'register' && (
                 <div className="form-group">
                   <label htmlFor="phone">Phone</label>
-                  <input id="phone" name="phone" type="tel" required />
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={handleChange('phone')}
+                    required
+                  />
                 </div>
               )}
 
               <div className="form-group">
                 <label htmlFor="password">Password</label>
-                <input id="password" name="password" type="password" required />
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={handleChange('password')}
+                  required
+                />
               </div>
 
               {mode === 'register' && (
@@ -122,6 +199,8 @@ export function LoginPage() {
                     id="confirmPassword"
                     name="confirmPassword"
                     type="password"
+                    value={formData.confirmPassword}
+                    onChange={handleChange('confirmPassword')}
                     required
                   />
                 </div>
@@ -131,7 +210,14 @@ export function LoginPage() {
                 <>
                   <div className="form-group">
                     <label htmlFor="bankName">Bank name</label>
-                    <input id="bankName" name="bankName" type="text" required />
+                    <input
+                      id="bankName"
+                      name="bankName"
+                      type="text"
+                      value={formData.bankName}
+                      onChange={handleChange('bankName')}
+                      required
+                    />
                   </div>
                   <div className="form-group">
                     <label htmlFor="apiEndpoint">Bank API endpoint</label>
@@ -140,6 +226,8 @@ export function LoginPage() {
                       name="apiEndpoint"
                       type="url"
                       placeholder="https://api.bank.com/loans"
+                      value={formData.apiEndpoint}
+                      onChange={handleChange('apiEndpoint')}
                       required
                     />
                   </div>
