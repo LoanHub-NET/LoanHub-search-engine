@@ -7,7 +7,7 @@ namespace LoanHub.Search.Api.Controllers.Admin;
 
 [ApiController]
 [Route("api/admin/applications")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "AdminOnly")]
 public sealed class AdminApplicationsController : ControllerBase
 {
     private readonly ApplicationService _service;
@@ -15,14 +15,40 @@ public sealed class AdminApplicationsController : ControllerBase
     public AdminApplicationsController(ApplicationService service) => _service = service;
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ApplicationSummary>>> List(CancellationToken ct)
+    public async Task<ActionResult<PagedResponse<ApplicationSummary>>> List(
+        [FromQuery] string? applicantEmail,
+        [FromQuery] ApplicationStatus? status,
+        [FromQuery] string? provider,
+        [FromQuery] DateTimeOffset? createdFrom,
+        [FromQuery] DateTimeOffset? createdTo,
+        [FromQuery] DateTimeOffset? updatedFrom,
+        [FromQuery] DateTimeOffset? updatedTo,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken ct = default)
     {
-        var applications = await _service.ListAsync(ct);
-        var summaries = applications
+        var query = new ApplicationAdminQuery(
+            applicantEmail,
+            status,
+            provider,
+            createdFrom,
+            createdTo,
+            updatedFrom,
+            updatedTo,
+            page,
+            pageSize);
+
+        var applications = await _service.ListAdminAsync(query, ct);
+        var summaries = applications.Items
             .Select(ApplicationSummary.From)
             .ToList();
 
-        return Ok(summaries);
+        return Ok(new PagedResponse<ApplicationSummary>(
+            summaries,
+            applications.Page,
+            applications.PageSize,
+            applications.TotalCount,
+            applications.TotalPages));
     }
 
     [HttpGet("{id:guid}")]
@@ -107,7 +133,8 @@ public sealed class AdminApplicationsController : ControllerBase
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,
         string Provider,
-        decimal Amount
+        decimal Amount,
+        string? RejectReason
     )
     {
         public static ApplicationSummary From(LoanApplication application)
@@ -118,7 +145,15 @@ public sealed class AdminApplicationsController : ControllerBase
                 application.CreatedAt,
                 application.UpdatedAt,
                 application.OfferSnapshot.Provider,
-                application.OfferSnapshot.Amount
+                application.OfferSnapshot.Amount,
+                application.RejectReason
             );
     }
+
+    public sealed record PagedResponse<T>(
+        IReadOnlyList<T> Items,
+        int Page,
+        int PageSize,
+        int TotalCount,
+        int TotalPages);
 }
