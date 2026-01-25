@@ -100,6 +100,7 @@ export function CounterWidget({ successCount }: CounterWidgetProps) {
     const start = performance.now();
     const duration = 1200;
     const targets = stats.map((stat) => stat.value);
+    let animationFrameId: number | null = null;
 
     const tick = (now: number) => {
       const progress = Math.min(1, (now - start) / duration);
@@ -107,11 +108,17 @@ export function CounterWidget({ successCount }: CounterWidgetProps) {
       setDisplayValues(targets.map((target) => Math.round(target * eased)));
 
       if (progress < 1) {
-        requestAnimationFrame(tick);
+        animationFrameId = requestAnimationFrame(tick);
       }
     };
 
-    requestAnimationFrame(tick);
+    animationFrameId = requestAnimationFrame(tick);
+
+    return () => {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
   }, [hasAnimated, stats]);
 
   useEffect(() => {
