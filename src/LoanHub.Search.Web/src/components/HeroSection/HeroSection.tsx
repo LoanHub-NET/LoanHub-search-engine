@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from 'react';
+import { CounterWidget } from '../CounterWidget';
 import './HeroSection.css';
 
 interface HeroSectionProps {
   onQuickSearch: (amount: number, duration: number) => void;
+  successCount: number;
 }
 
-export function HeroSection({ onQuickSearch }: HeroSectionProps) {
+export function HeroSection({ onQuickSearch, successCount }: HeroSectionProps) {
   const [amount, setAmount] = useState<string>('10000');
   const [duration, setDuration] = useState<string>('12');
   const formatNumber = (value: number): string => value.toLocaleString('en-US');
@@ -44,7 +46,7 @@ export function HeroSection({ onQuickSearch }: HeroSectionProps) {
           <div className="quick-search-card">
             <h2 className="form-title">Quick Anonymous Search</h2>
             <p className="form-subtitle">See offers in seconds – no account required</p>
-            
+
             <form onSubmit={handleSubmit} className="quick-search-form">
               <div className="form-group">
                 <label htmlFor="amount" className="form-label">
@@ -132,6 +134,8 @@ export function HeroSection({ onQuickSearch }: HeroSectionProps) {
               🔒 Your search is anonymous. We don't store any personal data.
             </p>
           </div>
+
+          <CounterWidget successCount={successCount} />
         </div>
       </div>
     </section>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Header, HeroSection, CounterWidget, HowItWorks, Footer } from '../../components';
+import { Header, HeroSection, HowItWorks, Footer } from '../../components';
 
 export function LandingPage() {
   const navigate = useNavigate();
@@ -38,8 +38,7 @@ export function LandingPage() {
     <>
       <Header onLoginClick={handleLoginClick} onSearchClick={handleSearchClick} />
       <main>
-        <HeroSection onQuickSearch={handleQuickSearch} />
-        <CounterWidget successCount={successCount} />
+        <HeroSection onQuickSearch={handleQuickSearch} successCount={successCount} />
         <HowItWorks />
       </main>
       <Footer />
