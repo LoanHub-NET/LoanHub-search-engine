@@ -282,10 +282,14 @@ public sealed class ApplicationsController : ControllerBase
     private async Task<Core.Models.Users.UserAccount?> GetCurrentUserAsync(CancellationToken ct)
     {
         var userId = GetUserId();
-        if (userId is null)
+        if (userId is not null)
+            return await _userService.GetAsync(userId.Value, ct);
+
+        var email = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue("email");
+        if (string.IsNullOrWhiteSpace(email))
             return null;
 
-        return await _userService.GetAsync(userId.Value, ct);
+        return await _userService.GetByEmailAsync(email, ct);
     }
 
     private Guid? GetUserId()
