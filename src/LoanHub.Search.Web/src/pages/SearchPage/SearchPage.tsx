@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
 import { useForm } from '../../hooks';
+import { clearAuthSession, getAuthSession } from '../../api/apiConfig';
+import type { UserProfile } from '../../types/dashboard.types';
 import { 
   validateQuickSearch, 
   validateExtendedSearch,
@@ -24,10 +26,23 @@ interface SearchFormValues {
 
 const AMOUNT_PRESETS = [5000, 10000, 25000, 50000, 100000];
 const DURATION_PRESETS = [6, 12, 24, 36, 60, 120];
+const storedProfileKeyPrefix = 'loanhub_user_profile_';
+
+const getStoredProfile = (userId?: string | null): Partial<UserProfile> | null => {
+  if (!userId || typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(`${storedProfileKeyPrefix}${userId}`);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as Partial<UserProfile>;
+  } catch {
+    return null;
+  }
+};
 
 export function SearchPage() {
   const navigate = useNavigate();
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [authSession, setAuthSession] = useState(getAuthSession());
 
   const validateForm = (values: SearchFormValues): FieldError[] => {
     if (showAdvanced) {
@@ -81,8 +96,52 @@ export function SearchPage() {
     },
   });
 
+  useEffect(() => {
+    const session = getAuthSession();
+    setAuthSession(session);
+    if (!session) return;
+    const storedProfile = getStoredProfile(session.id);
+
+    const monthlyIncome = storedProfile?.monthlyIncome ?? session.monthlyIncome ?? null;
+    const livingCosts = storedProfile?.livingCosts ?? session.livingCosts ?? null;
+    const dependents = storedProfile?.dependents ?? session.dependents ?? null;
+
+    const hasAdvancedData =
+      monthlyIncome !== null || livingCosts !== null || dependents !== null;
+
+    if (hasAdvancedData && !showAdvanced) {
+      setShowAdvanced(true);
+    }
+
+    if (!values.monthlyIncome && monthlyIncome !== null) {
+      setValue('monthlyIncome', String(monthlyIncome));
+    }
+    if (!values.livingCosts && livingCosts !== null) {
+      setValue('livingCosts', String(livingCosts));
+    }
+    if (!values.dependents && dependents !== null) {
+      setValue('dependents', String(dependents));
+    }
+  }, [setValue, showAdvanced, values.dependents, values.livingCosts, values.monthlyIncome]);
+
+  const adminUser = useMemo(() => {
+    if (!authSession) return undefined;
+    const displayName =
+      `${authSession.firstName ?? ''} ${authSession.lastName ?? ''}`.trim() || authSession.email;
+    return {
+      name: displayName,
+      email: authSession.email,
+      role: authSession.role,
+    };
+  }, [authSession]);
+
   const handleLoginClick = () => navigate('/login');
   const handleSearchClick = () => {}; // Already on search page
+  const handleLogout = () => {
+    clearAuthSession();
+    setAuthSession(null);
+    navigate('/login');
+  };
 
   const getFieldError = (field: keyof SearchFormValues) => {
     return touched[field] && errors[field] ? errors[field] : null;
@@ -90,7 +149,12 @@ export function SearchPage() {
 
   return (
     <div className="search-page">
-      <Header onLoginClick={handleLoginClick} onSearchClick={handleSearchClick} />
+      <Header
+        onLoginClick={handleLoginClick}
+        onSearchClick={handleSearchClick}
+        adminUser={adminUser}
+        onLogout={handleLogout}
+      />
       
       <main className="search-main">
         <div className="search-container">

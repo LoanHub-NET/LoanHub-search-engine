@@ -144,6 +144,55 @@
   margin: 0;
 }
 
+/* Error State */
+.error-state {
+  display: flex;
+  justify-content: center;
+  padding: 3rem 0;
+}
+
+.error-card {
+  background: var(--color-bg-card);
+  border-radius: 20px;
+  padding: 3rem;
+  text-align: center;
+  box-shadow: 0 10px 40px var(--color-shadow);
+  max-width: 500px;
+  width: 100%;
+}
+
+.error-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.error-card h2 {
+  font-size: 1.5rem;
+  color: var(--color-text-primary);
+  margin: 0 0 0.5rem;
+}
+
+.error-card p {
+  color: var(--color-text-muted);
+  margin: 0 0 1.5rem;
+}
+
+.retry-btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--color-accent-primary);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.retry-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+}
+
 /* Results Info */
 .results-info {
   margin-bottom: 1.5rem;

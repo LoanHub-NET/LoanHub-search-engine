@@ -11,6 +11,11 @@ public sealed class UserAccount
     public int? Age { get; set; }
     public string? JobTitle { get; set; }
     public string? Address { get; set; }
+    public string? Phone { get; set; }
+    public DateTime? DateOfBirth { get; set; }
+    public decimal? MonthlyIncome { get; set; }
+    public decimal? LivingCosts { get; set; }
+    public int? Dependents { get; set; }
     public string? IdDocumentNumber { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

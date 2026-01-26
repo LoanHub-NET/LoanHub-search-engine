@@ -935,6 +935,15 @@
   }
 }
 
+.form-error {
+  margin-top: 1.5rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+  font-weight: 600;
+}
+
 .consent-checkbox {
   display: flex;
   align-items: flex-start;

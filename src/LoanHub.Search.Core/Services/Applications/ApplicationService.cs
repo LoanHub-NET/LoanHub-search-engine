@@ -67,6 +67,11 @@ public sealed class ApplicationService
                 null,
                 "Nie znaleziono wniosku.");
 
+        return await CancelAsync(application, ct);
+    }
+
+    public async Task<CancellationResult> CancelAsync(LoanApplication application, CancellationToken ct)
+    {
         return application.Status switch
         {
             ApplicationStatus.New => await CancelInternalAsync(application, ct),
@@ -385,8 +390,9 @@ public sealed class ApplicationService
 
     private async Task<CancellationResult> CancelInternalAsync(LoanApplication application, CancellationToken ct)
     {
-        application.AddStatus(ApplicationStatus.Cancelled, "Cancelled by user");
+        application.AddStatus(ApplicationStatus.Cancelled, "Anulowany przez klienta");
         var updated = await _repo.UpdateAsync(application, ct);
+        await NotifyStatusAsync(updated, "Anulowany przez klienta", ct);
         return new CancellationResult(
             CancellationOutcome.Cancelled,
             updated,

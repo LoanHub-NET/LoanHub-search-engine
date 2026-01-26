@@ -12,7 +12,7 @@ export type UserApplicationStatus =
   | 'granted'
   | 'rejected'
   | 'expired'
-  | 'resigned';
+  | 'cancelled';
 
 /**
  * Status filter for user dashboard
@@ -265,12 +265,12 @@ export const USER_STATUS_CONFIG: Record<UserApplicationStatus, {
     icon: '⏰',
     description: 'Offer validity period has ended',
   },
-  resigned: {
-    label: 'Resigned',
+  cancelled: {
+    label: 'Cancelled',
     color: '#9ca3af',
     bgColor: 'rgba(156, 163, 175, 0.1)',
     icon: '🚫',
-    description: 'You withdrew this application',
+    description: 'You cancelled this application',
   },
 };
 
