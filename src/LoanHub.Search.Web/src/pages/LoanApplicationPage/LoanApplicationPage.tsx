@@ -3,7 +3,12 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
 import { createApplication, createApplicationForCurrentUser } from '../../api/applicationsApi';
-import { ApiError, clearAuthSession, getAuthSession } from '../../api/apiConfig';
+import {
+  ApiError,
+  clearAuthSession,
+  getAuthSession,
+  storePendingProfile,
+} from '../../api/apiConfig';
 import { updateUserProfile } from '../../api/userApi';
 import type { 
   ApplicationStep, 
@@ -319,6 +324,20 @@ export function LoanApplicationPage() {
         amount: offer.amount,
         durationMonths: offer.duration,
         validUntil: validUntil.toISOString(),
+      });
+
+      storePendingProfile({
+        email: personalInfo.email,
+        firstName: personalInfo.firstName,
+        lastName: personalInfo.lastName,
+        phone: personalInfo.phone,
+        dateOfBirth: personalInfo.dateOfBirth,
+        address,
+        jobTitle: employment.position || employment.employerName || undefined,
+        monthlyIncome: employment.monthlyIncome ? Number(employment.monthlyIncome) : undefined,
+        livingCosts: employment.livingCosts ? Number(employment.livingCosts) : undefined,
+        dependents: employment.dependents ? Number(employment.dependents) : undefined,
+        idDocumentNumber: documents.idNumber || undefined,
       });
 
       return response.id;

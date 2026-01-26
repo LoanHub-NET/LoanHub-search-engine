@@ -9,6 +9,11 @@ export interface AuthResponse {
   age?: number | null;
   jobTitle?: string | null;
   address?: string | null;
+  phone?: string | null;
+  dateOfBirth?: string | null;
+  monthlyIncome?: number | null;
+  livingCosts?: number | null;
+  dependents?: number | null;
   idDocumentNumber?: string | null;
   externalIdentities: Array<{ id: string; provider: string; subject: string }>;
   createdAt: string;
@@ -25,6 +30,11 @@ export interface RegisterPayload {
     age?: number | null;
     jobTitle?: string | null;
     address?: string | null;
+    phone?: string | null;
+    dateOfBirth?: string | null;
+    monthlyIncome?: number | null;
+    livingCosts?: number | null;
+    dependents?: number | null;
     idDocumentNumber?: string | null;
   };
 }

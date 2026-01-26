@@ -7,7 +7,22 @@ export interface AuthSession {
   token: string;
 }
 
+export interface PendingProfile {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  dateOfBirth?: string;
+  address?: string;
+  jobTitle?: string;
+  monthlyIncome?: number;
+  livingCosts?: number;
+  dependents?: number;
+  idDocumentNumber?: string;
+}
+
 const AUTH_STORAGE_KEY = 'loanhub_auth';
+const PENDING_PROFILE_KEY = 'loanhub_pending_profile';
 
 export const getApiBaseUrl = () => {
   const configured = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
@@ -58,3 +73,24 @@ export class ApiError extends Error {
     this.status = status;
   }
 }
+
+export const storePendingProfile = (profile: PendingProfile) => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(PENDING_PROFILE_KEY, JSON.stringify(profile));
+};
+
+export const getPendingProfile = (): PendingProfile | null => {
+  if (typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(PENDING_PROFILE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as PendingProfile;
+  } catch {
+    return null;
+  }
+};
+
+export const clearPendingProfile = () => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(PENDING_PROFILE_KEY);
+};

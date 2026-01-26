@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Header, Footer } from '../../components';
 import { loginUser, registerUser } from '../../api/userApi';
+import { clearPendingProfile, getPendingProfile } from '../../api/apiConfig';
 import './LoginPage.css';
 
 type Mode = 'login' | 'register';
@@ -18,6 +19,7 @@ export function LoginPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [pendingProfile] = useState(getPendingProfile());
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -44,6 +46,9 @@ export function LoginPage() {
 
     try {
       if (mode === 'register') {
+        const pendingProfileForEmail =
+          pendingProfile && pendingProfile.email === formData.email ? pendingProfile : null;
+
         await registerUser({
           email: formData.email,
           password: formData.password,
@@ -51,11 +56,17 @@ export function LoginPage() {
             firstName: formData.firstName || null,
             lastName: formData.lastName || null,
             age: null,
-            jobTitle: null,
-            address: null,
-            idDocumentNumber: null,
+            jobTitle: pendingProfileForEmail?.jobTitle || null,
+            address: pendingProfileForEmail?.address || null,
+            phone: pendingProfileForEmail?.phone || null,
+            dateOfBirth: pendingProfileForEmail?.dateOfBirth || null,
+            monthlyIncome: pendingProfileForEmail?.monthlyIncome ?? null,
+            livingCosts: pendingProfileForEmail?.livingCosts ?? null,
+            dependents: pendingProfileForEmail?.dependents ?? null,
+            idDocumentNumber: pendingProfileForEmail?.idDocumentNumber || null,
           },
         });
+        clearPendingProfile();
         setMessage('Registration successful. Redirecting...');
       } else {
         await loginUser({

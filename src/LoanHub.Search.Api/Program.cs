@@ -204,6 +204,13 @@ using (var scope = app.Services.CreateScope())
         SET "OfferSnapshot_ValidUntil" = COALESCE("OfferSnapshot_ValidUntil", "CreatedAt", NOW()) + INTERVAL '7 days'
         WHERE "OfferSnapshot_ValidUntil" IS NULL;
         """);
+    dbContext.Database.ExecuteSqlRaw("""
+        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "Phone" varchar(40);
+        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "DateOfBirth" timestamptz;
+        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "MonthlyIncome" numeric;
+        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "LivingCosts" numeric;
+        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "Dependents" integer;
+        """);
 }
 
 app.UseSwagger();
