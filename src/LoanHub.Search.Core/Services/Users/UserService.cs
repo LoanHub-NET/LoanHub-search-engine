@@ -30,7 +30,7 @@ public sealed class UserService
             JobTitle = profile.JobTitle,
             Address = profile.Address,
             Phone = profile.Phone,
-            DateOfBirth = profile.DateOfBirth,
+            DateOfBirth = NormalizeDateTime(profile.DateOfBirth),
             MonthlyIncome = profile.MonthlyIncome,
             LivingCosts = profile.LivingCosts,
             Dependents = profile.Dependents,
@@ -74,7 +74,7 @@ public sealed class UserService
                 JobTitle = profile.JobTitle,
                 Address = profile.Address,
                 Phone = profile.Phone,
-                DateOfBirth = profile.DateOfBirth,
+                DateOfBirth = NormalizeDateTime(profile.DateOfBirth),
                 MonthlyIncome = profile.MonthlyIncome,
                 LivingCosts = profile.LivingCosts,
                 Dependents = profile.Dependents,
@@ -113,7 +113,7 @@ public sealed class UserService
         user.JobTitle = profile.JobTitle;
         user.Address = profile.Address;
         user.Phone = profile.Phone;
-        user.DateOfBirth = profile.DateOfBirth;
+        user.DateOfBirth = NormalizeDateTime(profile.DateOfBirth);
         user.MonthlyIncome = profile.MonthlyIncome;
         user.LivingCosts = profile.LivingCosts;
         user.Dependents = profile.Dependents;
@@ -121,6 +121,20 @@ public sealed class UserService
         user.UpdatedAt = DateTimeOffset.UtcNow;
 
         return await _repository.UpdateAsync(user, ct);
+    }
+
+    private static DateTime? NormalizeDateTime(DateTime? value)
+    {
+        if (!value.HasValue)
+            return null;
+
+        var date = value.Value;
+        return date.Kind switch
+        {
+            DateTimeKind.Utc => date,
+            DateTimeKind.Local => date.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(date, DateTimeKind.Utc)
+        };
     }
 
     public sealed record UserProfile(
