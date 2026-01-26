@@ -1,34 +1,110 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { 
-  LoanApplication, 
-  StatusFilter, 
+import type {
+  LoanApplication,
+  StatusFilter,
   ApplicationFilters,
   DecisionPayload,
   DashboardStats,
+  StatusHistoryEntry,
 } from '../../types/admin.types';
 import { ADMIN_STATUS_CONFIG, calculateSlaInfo } from '../../types/admin.types';
-import { mockApplications, calculateDashboardStats, mockProviders } from '../../data/mockAdminData';
 import { ApplicationDetailModal, DecisionModal } from '../../components/admin';
 import { Header, Footer } from '../../components';
 import type { AdminUser } from '../../components/Header/Header';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+import { calculateDashboardStats } from '../../utils/adminDashboard';
+import {
+  getAdminApplication,
+  listAdminApplications,
+  preliminarilyAcceptApplication,
+  rejectApplication,
+} from '../../api/adminApplicationsApi';
+import { clearAuthSession, getAuthSession } from '../../api/apiConfig';
 import './AdminDashboardPage.css';
 
 type SortKey = 'date' | 'amount' | 'status';
 
-// Mock admin user (in real app, this would come from auth context)
-const mockAdminUser: AdminUser = {
-  name: 'Admin User',
-  email: 'admin@loanhub.com',
-  role: 'Administrator',
+const buildReferenceNumber = (id: string) => `APP-${id.slice(0, 8).toUpperCase()}`;
+
+const mapStatusHistory = (entries: Array<{ status: string; changedAt: string; reason?: string | null }>) => {
+  const sorted = [...entries].sort((a, b) => new Date(a.changedAt).getTime() - new Date(b.changedAt).getTime());
+  return sorted.reduce<StatusHistoryEntry[]>((acc, entry, index) => {
+    const previousStatus = index > 0 ? acc[index - 1]?.newStatus ?? null : null;
+    acc.push({
+      id: `history-${entry.status}-${entry.changedAt}-${index}`,
+      previousStatus,
+      newStatus: entry.status as LoanApplication['status'],
+      changedAt: new Date(entry.changedAt),
+      changedBy: 'system',
+      reason: entry.reason ?? undefined,
+    });
+    return acc;
+  }, []);
+};
+
+const mapAdminApplication = (data: Awaited<ReturnType<typeof getAdminApplication>>): LoanApplication => {
+  return {
+    id: data.id,
+    referenceNumber: buildReferenceNumber(data.id),
+    applicant: {
+      email: data.applicantEmail,
+      firstName: data.applicantDetails.firstName,
+      lastName: data.applicantDetails.lastName,
+      monthlyIncome: undefined,
+      livingCosts: undefined,
+      dependents: undefined,
+      isRegistered: Boolean(data.userId),
+      employment: data.applicantDetails.jobTitle
+        ? {
+            status: 'employed',
+            jobTitle: data.applicantDetails.jobTitle,
+          }
+        : undefined,
+      address: data.applicantDetails.address
+        ? {
+            street: data.applicantDetails.address,
+            city: '',
+            postalCode: '',
+            country: '',
+          }
+        : undefined,
+    },
+    offer: {
+      offerId: data.offerSnapshot.providerOfferId,
+      amount: data.offerSnapshot.amount,
+      duration: data.offerSnapshot.durationMonths,
+      monthlyInstallment: data.offerSnapshot.installment,
+      interestRate: data.offerSnapshot.apr,
+      apr: data.offerSnapshot.apr,
+      totalRepayment: data.offerSnapshot.totalCost,
+    },
+    provider: {
+      id: data.offerSnapshot.provider,
+      name: data.offerSnapshot.provider,
+    },
+    status: data.status as LoanApplication['status'],
+    statusHistory: mapStatusHistory(data.statusHistory),
+    documents: [],
+    createdAt: new Date(data.createdAt),
+    updatedAt: new Date(data.updatedAt),
+    expiresAt: new Date(data.offerSnapshot.validUntil),
+    internalNotes: [],
+    providerResponse: data.rejectReason
+      ? {
+          status: 'rejected',
+          respondedAt: data.updatedAt ? new Date(data.updatedAt) : undefined,
+          message: data.rejectReason ?? undefined,
+        }
+      : undefined,
+  };
 };
 
 export function AdminDashboardPage() {
   const navigate = useNavigate();
-  
-  // State
-  const [applications, setApplications] = useState<LoanApplication[]>(mockApplications);
+  const [applications, setApplications] = useState<LoanApplication[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filters, setFilters] = useState<ApplicationFilters>({
     status: 'all',
     searchTerm: '',
@@ -40,6 +116,37 @@ export function AdminDashboardPage() {
     application: LoanApplication;
     type: 'accept' | 'reject';
   } | null>(null);
+
+  const adminUser = useMemo<AdminUser | undefined>(() => {
+    const session = getAuthSession();
+    if (!session) return undefined;
+    const displayName = [session.firstName, session.lastName].filter(Boolean).join(' ').trim();
+    return {
+      name: displayName || session.email,
+      email: session.email,
+      role: session.role === 'Admin' ? 'Administrator' : session.role,
+    };
+  }, []);
+
+  const fetchApplications = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setLoadError(null);
+      const page = await listAdminApplications({ pageSize: 200 });
+      const details = await Promise.all(page.items.map(item => getAdminApplication(item.id)));
+      const mapped = details.map(mapAdminApplication);
+      setApplications(mapped);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to load applications.';
+      setLoadError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchApplications();
+  }, [fetchApplications]);
 
   // Calculate stats
   const stats: DashboardStats = useMemo(() => {
@@ -99,6 +206,16 @@ export function AdminDashboardPage() {
     return result;
   }, [applications, filters]);
 
+  const providerOptions = useMemo(() => {
+    const unique = new Map<string, string>();
+    applications.forEach(app => {
+      if (!unique.has(app.provider.id)) {
+        unique.set(app.provider.id, app.provider.name);
+      }
+    });
+    return Array.from(unique.entries()).map(([id, name]) => ({ id, name }));
+  }, [applications]);
+
   // Handlers
   const handleStatusFilter = (status: StatusFilter) => {
     setFilters(prev => ({ ...prev, status }));
@@ -123,44 +240,20 @@ export function AdminDashboardPage() {
     }));
   };
 
-  const handleDecisionSubmit = (decision: DecisionPayload) => {
-    // Update application status
-    setApplications(prev => prev.map(app => {
-      if (app.id !== decision.applicationId) return app;
-      
-      const newStatus = decision.decision === 'accept' ? 'preliminarily_accepted' : 'rejected';
-      const newHistoryEntry = {
-        id: `hist-${Date.now()}`,
-        previousStatus: app.status,
-        newStatus,
-        changedAt: new Date(),
-        changedBy: 'current-admin@loanhub.com',
-        reason: decision.reason,
-        notes: decision.notes,
-      };
-
-      return {
-        ...app,
-        status: newStatus,
-        statusHistory: [...app.statusHistory, newHistoryEntry],
-        updatedAt: new Date(),
-        internalNotes: decision.notes 
-          ? [...app.internalNotes, {
-              id: `note-${Date.now()}`,
-              content: decision.notes,
-              createdAt: new Date(),
-              createdBy: 'current-admin@loanhub.com',
-            }]
-          : app.internalNotes,
-      } as LoanApplication;
-    }));
-
-    // Close modals
-    setDecisionModal(null);
-    setSelectedApplication(null);
-
-    // Show success message (in real app, this would be a toast notification)
-    console.log(`Application ${decision.applicationId} ${decision.decision}ed. Email sent: ${decision.sendEmail}`);
+  const handleDecisionSubmit = async (decision: DecisionPayload) => {
+    try {
+      const response =
+        decision.decision === 'accept'
+          ? await preliminarilyAcceptApplication(decision.applicationId)
+          : await rejectApplication(decision.applicationId, decision.reason);
+      const updated = mapAdminApplication(response);
+      setApplications(prev => prev.map(app => (app.id === updated.id ? updated : app)));
+      setDecisionModal(null);
+      setSelectedApplication(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to update application.';
+      setLoadError(message);
+    }
   };
 
   const openAcceptModal = (app: LoanApplication) => {
@@ -182,8 +275,7 @@ export function AdminDashboardPage() {
   ];
 
   const handleLogout = () => {
-    // In a real app, this would clear auth state and redirect
-    console.log('Logging out...');
+    clearAuthSession();
     navigate('/');
   };
 
@@ -192,7 +284,7 @@ export function AdminDashboardPage() {
       <Header
         onLoginClick={() => navigate('/login')}
         onSearchClick={() => navigate('/search')}
-        adminUser={mockAdminUser}
+        adminUser={adminUser}
         onLogout={handleLogout}
       />
       <main className="admin-page">
@@ -276,13 +368,13 @@ export function AdminDashboardPage() {
                   />
                 </div>
 
-                <select 
+                <select
                   className="filter-select"
                   value={filters.providerId || ''}
                   onChange={handleProviderFilter}
                 >
                   <option value="">All Providers</option>
-                  {mockProviders.map(provider => (
+                  {providerOptions.map(provider => (
                     <option key={provider.id} value={provider.id}>
                       {provider.name}
                     </option>
@@ -308,7 +400,22 @@ export function AdminDashboardPage() {
             </div>
 
             {/* Applications Table */}
-            {filteredApplications.length === 0 ? (
+            {isLoading ? (
+              <div className="empty-state">
+                <span className="empty-icon">⏳</span>
+                <h3>Loading applications...</h3>
+                <p>Fetching the latest submissions from the database.</p>
+              </div>
+            ) : loadError ? (
+              <div className="empty-state">
+                <span className="empty-icon">⚠️</span>
+                <h3>Unable to load applications</h3>
+                <p>{loadError}</p>
+                <button className="btn btn-secondary" onClick={fetchApplications}>
+                  Retry
+                </button>
+              </div>
+            ) : filteredApplications.length === 0 ? (
               <div className="empty-state">
                 <span className="empty-icon">📭</span>
                 <h3>No applications found</h3>
