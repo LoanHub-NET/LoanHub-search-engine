@@ -1,47 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
+import { fetchSearchResults, type SearchApiSource } from '../../api/searchApi';
 import { formatCurrency, formatPercent, formatDuration } from '../../utils/formatters';
-import type { LoanOffer } from '../../types';
+import type { LoanOffer, LoanSearchQuery } from '../../types';
 import './SearchResultsPage.css';
 
-const providers = [
-  { id: 'bank1', name: 'First National Bank', logo: '🏦' },
-  { id: 'bank2', name: 'Metro Credit Union', logo: '🏢' },
-  { id: 'bank3', name: 'Digital Finance Co.', logo: '💳' },
-  { id: 'bank4', name: 'Summit Trust', logo: '🏛️' },
-  { id: 'bank5', name: 'Harborline Bank', logo: '💼' },
-];
-const minProvidersForResults = 3;
+const providerIcons = ['🏦', '🏢', '💳', '🏛️', '💼', '🏤'];
 
-const generateMockOffer = (
-  amount: number,
-  duration: number,
-  provider: typeof providers[number],
-  index: number,
-): LoanOffer => {
-  const baseRate = 5 + index * 1.5 + Math.random() * 2;
-  const rate = Math.round(baseRate * 100) / 100;
-  const monthlyRate = rate / 100 / 12;
-  const installment =
-    amount * (monthlyRate * Math.pow(1 + monthlyRate, duration)) /
-    (Math.pow(1 + monthlyRate, duration) - 1);
+const getProviderLogo = (providerName: string) => {
+  const hash = providerName
+    .split('')
+    .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return providerIcons[hash % providerIcons.length];
+};
 
-  return {
-    id: `offer-${provider.id}-${Date.now()}`,
-    providerId: provider.id,
-    providerName: provider.name,
-    providerLogo: provider.logo,
-    amount,
-    duration,
-    monthlyInstallment: Math.round(installment * 100) / 100,
-    interestRate: rate,
-    apr: rate + 0.5,
-    totalRepayment: Math.round(installment * duration * 100) / 100,
-    isPersonalized: false,
-    validUntil: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
-  };
+const parseOptionalNumber = (value: string | null) => {
+  if (value === null || value.trim() === '') {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 };
 
 export function SearchResultsPage() {
@@ -49,83 +29,97 @@ export function SearchResultsPage() {
   const navigate = useNavigate();
   
   const [offers, setOffers] = useState<LoanOffer[]>([]);
-  const [showBlockingLoad, setShowBlockingLoad] = useState(true);
+  const [sources, setSources] = useState<SearchApiSource[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [respondedProviders, setRespondedProviders] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [retrySeed, setRetrySeed] = useState(0);
 
   const amount = Number(searchParams.get('amount')) || 10000;
   const duration = Number(searchParams.get('duration')) || 12;
-  const hasIncome = searchParams.has('income');
+  const income = parseOptionalNumber(searchParams.get('income'));
+  const livingCosts = parseOptionalNumber(searchParams.get('costs'));
+  const dependents = parseOptionalNumber(searchParams.get('dependents'));
+  const hasIncome = income !== undefined || livingCosts !== undefined || dependents !== undefined;
+
+  const searchQuery = useMemo<LoanSearchQuery>(() => {
+    const query: LoanSearchQuery = {
+      amount,
+      duration,
+    };
+
+    if (income !== undefined) {
+      query.monthlyIncome = income;
+    }
+    if (livingCosts !== undefined) {
+      query.livingCosts = livingCosts;
+    }
+    if (dependents !== undefined) {
+      query.dependents = dependents;
+    }
+
+    return query;
+  }, [amount, duration, income, livingCosts, dependents]);
 
   useEffect(() => {
-    // Simulate API call with progress
-    setShowBlockingLoad(true);
+    let isActive = true;
+    setIsLoading(true);
     setLoadingProgress(0);
-    setRespondedProviders([]);
+    setError(null);
+    setSources([]);
     setOffers([]);
 
     const progressInterval = setInterval(() => {
       setLoadingProgress((prev) => {
-        if (prev >= 100) return 100;
-        if (prev >= 95) return 95;
-        return prev + Math.random() * 12;
+        if (prev >= 90) return 90;
+        return prev + Math.random() * 8;
       });
     }, 250);
 
-    const blockingTimeout = setTimeout(() => {
-      setShowBlockingLoad(false);
-    }, 5000);
-    const completionTimeouts: Array<ReturnType<typeof setTimeout>> = [];
+    fetchSearchResults(searchQuery)
+      .then((response) => {
+        if (!isActive) return;
+        const mappedOffers = response.offers
+          .map((offer) => ({
+            id: offer.providerOfferId,
+            providerId: offer.provider.toLowerCase().replace(/\s+/g, '-'),
+            providerName: offer.provider,
+            providerLogo: getProviderLogo(offer.provider),
+            amount,
+            duration,
+            monthlyInstallment: offer.installment,
+            interestRate: offer.apr,
+            apr: offer.apr,
+            totalRepayment: offer.totalCost,
+            isPersonalized: hasIncome,
+            validUntil: new Date(offer.validUntil),
+          }))
+          .sort((a, b) => a.monthlyInstallment - b.monthlyInstallment);
 
-    const timeouts: Array<ReturnType<typeof setTimeout>> = [];
-
-    const providerDelays = [800, 1400, 2000, 9000, 12000];
-    providers.forEach((provider, index) => {
-      const delay = providerDelays[index] ?? (1500 + index * 1000);
-      const timeout = setTimeout(() => {
-        setRespondedProviders((prev) => {
-          const next = [...prev, provider.id];
-          if (next.length >= providers.length) {
-            setLoadingProgress(100);
-          } else {
-            setLoadingProgress((progress) => Math.min(95, progress + 20));
-          }
-
-          if (next.length >= minProvidersForResults) {
-            clearTimeout(blockingTimeout);
-            completionTimeouts.forEach(clearTimeout);
-            completionTimeouts.push(
-              setTimeout(() => {
-                setShowBlockingLoad(false);
-              }, 600),
-            );
-          }
-          return next;
-        });
-        setOffers((prev) => {
-          const next = [
-            ...prev,
-            generateMockOffer(amount, duration, provider, index),
-          ];
-          return next.sort((a, b) => a.monthlyInstallment - b.monthlyInstallment);
-        });
-      }, delay);
-      timeouts.push(timeout);
-    });
-
-    const maxTimeout = setTimeout(() => {
-      setLoadingProgress(100);
-      setShowBlockingLoad(false);
-    }, 15000);
+        setSources(response.sources);
+        setOffers(mappedOffers);
+        setLoadingProgress(100);
+      })
+      .catch((err: unknown) => {
+        if (!isActive) return;
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'We could not retrieve offers at the moment.';
+        setError(message);
+        setLoadingProgress(100);
+      })
+      .finally(() => {
+        if (!isActive) return;
+        setIsLoading(false);
+        clearInterval(progressInterval);
+      });
 
     return () => {
-      clearTimeout(maxTimeout);
-      clearTimeout(blockingTimeout);
-      completionTimeouts.forEach(clearTimeout);
       clearInterval(progressInterval);
-      timeouts.forEach(clearTimeout);
+      isActive = false;
     };
-  }, [amount, duration]);
+  }, [amount, duration, hasIncome, searchQuery, retrySeed]);
 
   const handleLoginClick = () => navigate('/login');
   const handleSearchClick = () => navigate('/search');
@@ -151,9 +145,8 @@ export function SearchResultsPage() {
     navigate('/apply', { state: { offer: applicationOffer } });
   };
 
-  const pendingProviders = providers.filter(
-    (provider) => !respondedProviders.includes(provider.id),
-  );
+  const successfulSources = sources.filter((source) => source.status === 'Ok');
+  const failedSources = sources.filter((source) => source.status !== 'Ok');
 
   return (
     <div className="results-page">
@@ -170,7 +163,7 @@ export function SearchResultsPage() {
             </Link>
             
             <h1 className="results-title">
-              {showBlockingLoad ? 'Finding Best Offers...' : 'Your Loan Options'}
+              {isLoading ? 'Finding Best Offers...' : 'Your Loan Options'}
             </h1>
             
             <div className="search-summary">
@@ -184,7 +177,7 @@ export function SearchResultsPage() {
             </div>
           </div>
 
-          {showBlockingLoad ? (
+          {isLoading ? (
             <div className="loading-state">
               <div className="loading-card">
                 <div className="loading-icon">🔍</div>
@@ -199,16 +192,16 @@ export function SearchResultsPage() {
                 </div>
                 
                 <div className="providers-status">
-                  {providers.map((provider) => (
+                  {Array.from({ length: 5 }).map((_, index) => (
                     <span
-                      key={provider.id}
+                      key={`loading-dot-${index}`}
                       className={`provider-dot ${
-                        respondedProviders.includes(provider.id) ? 'active' : ''
+                        loadingProgress > (index + 1) * 20 ? 'active' : ''
                       }`}
                     ></span>
                   ))}
                   <span className="status-text">
-                    {respondedProviders.length} providers responded
+                    {loadingProgress > 0 ? 'Waiting for provider responses' : 'Starting search'}
                   </span>
                 </div>
                 
@@ -217,25 +210,38 @@ export function SearchResultsPage() {
                 </p>
               </div>
             </div>
+          ) : error ? (
+            <div className="error-state">
+              <div className="error-card">
+                <div className="error-icon">⚠️</div>
+                <h2>We couldn't fetch offers</h2>
+                <p>{error}</p>
+                <button
+                  type="button"
+                  className="retry-btn"
+                  onClick={() => setRetrySeed((prev) => prev + 1)}
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
           ) : (
             <>
               <div className="results-info">
-                {respondedProviders.length < providers.length ? (
-                  <div className="info-partial">
-                    <div className="partial-text">
-                      Available results: {respondedProviders.length}/{providers.length}.{' '}
-                      Waiting for {providers.length - respondedProviders.length} providers.
-                    </div>
-                    <div className="partial-loader">
-                      <span className="pulse-dot"></span>
-                      <span className="pulse-dot"></span>
-                      <span className="pulse-dot"></span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="info-complete">
-                    <span className="badge-icon">✓</span>
-                    <span>All providers responded. Results are complete.</span>
+                <div className="info-complete">
+                  <span className="badge-icon">✓</span>
+                  <span>
+                    {successfulSources.length} providers responded successfully.
+                  </span>
+                </div>
+
+                {failedSources.length > 0 && (
+                  <div className="info-notice">
+                    <span className="notice-icon">⏱️</span>
+                    <span>
+                      {failedSources.length} providers timed out or returned errors.
+                      Showing available results.
+                    </span>
                   </div>
                 )}
                 
@@ -311,45 +317,6 @@ export function SearchResultsPage() {
                   </div>
                 ))}
 
-                {pendingProviders.map((provider) => (
-                  <div key={provider.id} className="offer-card pending-offer">
-                    <div className="offer-header">
-                      <div className="provider-info">
-                        <span className="provider-logo">{provider.logo}</span>
-                        <span className="provider-name">{provider.name}</span>
-                      </div>
-                      <span className="pending-tag">Pending</span>
-                    </div>
-
-                    <div className="offer-details">
-                      <div className="detail-item main">
-                        <span className="detail-label">Monthly Payment</span>
-                        <span className="detail-value skeleton-line wide"></span>
-                      </div>
-
-                      <div className="detail-grid">
-                        <div className="detail-item">
-                          <span className="detail-label">Interest Rate</span>
-                          <span className="detail-value skeleton-line"></span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">APR</span>
-                          <span className="detail-value skeleton-line"></span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Total Repayment</span>
-                          <span className="detail-value skeleton-line"></span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="offer-actions">
-                      <button className="select-btn pending-btn" type="button" disabled>
-                        Waiting for response...
-                      </button>
-                    </div>
-                  </div>
-                ))}
               </div>
 
               <div className="results-footer">

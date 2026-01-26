@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Header, Footer } from '../../components';
+import { loginUser, registerUser } from '../../api/userApi';
 import './LoginPage.css';
 
 type Mode = 'login' | 'register';
@@ -9,10 +10,13 @@ type Role = 'user' | 'admin';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<Mode>('login');
   const [role, setRole] = useState<Role>('user');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -32,18 +36,35 @@ export function LoginPage() {
     return role === 'admin' ? 'Register bank admin' : 'Create your account';
   }, [mode, role]);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
     setMessage(null);
+    setError(null);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setMessage(
-        mode === 'login'
-          ? 'Login successful (mock). Redirecting...'
-          : 'Registration submitted (mock). Redirecting...',
-      );
+    try {
+      if (mode === 'register') {
+        await registerUser({
+          email: formData.email,
+          password: formData.password,
+          profile: {
+            firstName: formData.firstName || null,
+            lastName: formData.lastName || null,
+            age: null,
+            jobTitle: null,
+            address: null,
+            idDocumentNumber: null,
+          },
+        });
+        setMessage('Registration successful. Redirecting...');
+      } else {
+        await loginUser({
+          email: formData.email,
+          password: formData.password,
+        });
+        setMessage('Login successful. Redirecting...');
+      }
+
       setTimeout(() => {
         if (role === 'admin') {
           navigate('/admin');
@@ -51,7 +72,15 @@ export function LoginPage() {
         }
         navigate('/dashboard');
       }, 900);
-    }, 900);
+    } catch (err: unknown) {
+      const messageText =
+        err instanceof Error ? err.message : 'We could not complete the request.';
+      setError(messageText);
+      setIsSubmitting(false);
+      return;
+    }
+
+    setIsSubmitting(false);
   };
 
   const handleOAuth = (provider: string) => {
@@ -72,6 +101,14 @@ export function LoginPage() {
     };
 
   useEffect(() => {
+    const requestedMode = searchParams.get('mode');
+    if (requestedMode === 'register' || requestedMode === 'login') {
+      setMode(requestedMode);
+    }
+
+    const state = location.state as { prefill?: Partial<typeof formData> } | null;
+    const prefill = state?.prefill;
+
     const mock =
       role === 'admin'
         ? {
@@ -89,13 +126,14 @@ export function LoginPage() {
 
     setFormData((prev) => ({
       ...prev,
-      email: mock.email,
-      password: mock.password,
-      confirmPassword: mock.password,
-      bankName: mock.bankName,
-      apiEndpoint: mock.apiEndpoint,
+      ...prefill,
+      email: prefill?.email ?? mock.email,
+      password: prefill?.password ?? mock.password,
+      confirmPassword: prefill?.confirmPassword ?? mock.password,
+      bankName: prefill?.bankName ?? mock.bankName,
+      apiEndpoint: prefill?.apiEndpoint ?? mock.apiEndpoint,
     }));
-  }, [role]);
+  }, [location.state, role, searchParams]);
 
   return (
     <>
@@ -319,6 +357,7 @@ export function LoginPage() {
             </form>
 
             {message && <div className="form-message">{message}</div>}
+            {error && <div className="form-message error">{error}</div>}
 
             <div className="login-footer">
               <p>
