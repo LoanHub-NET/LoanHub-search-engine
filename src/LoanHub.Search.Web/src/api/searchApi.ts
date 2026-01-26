@@ -25,8 +25,20 @@ export interface SearchApiResponse {
 const DEFAULT_TIMEOUT_MS = 15000;
 
 const getApiBaseUrl = () => {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
-  return baseUrl?.trim() ?? '';
+  const configured = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname, port } = window.location;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      const apiPort = port === '8080' ? port : '8080';
+      return `${protocol}//${hostname}:${apiPort}`;
+    }
+  }
+
+  return '';
 };
 
 export const fetchSearchResults = async (query: LoanSearchQuery): Promise<SearchApiResponse> => {
