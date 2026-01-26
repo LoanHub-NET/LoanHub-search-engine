@@ -246,7 +246,9 @@ export const listAdminApplications = async (
 ) => {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
-    if (value) search.set(key, value);
+    if (value !== undefined && value !== null && value !== '') {
+      search.set(key, String(value));
+    }
   });
 
   const response = await fetch(`${API_BASE_URL}/api/admin/applications?${search.toString()}`, {

@@ -1,4 +1,4 @@
-import type { LoanOffer } from '../types/loan.types';
+import type { LoanOffer, OfferStatus } from '../types/loan.types';
 import type { ApplicationOffer } from '../types/application.types';
 import type { LoanApplication } from '../types/admin.types';
 import type { UserApplication, UserProfile } from '../types/dashboard.types';
@@ -10,7 +10,7 @@ import type {
 } from './loanhubApi';
 import { getProviderId, getProviderLogo } from '../utils/providers';
 
-const STATUS_MAP: Record<string, string> = {
+const STATUS_MAP: Record<string, OfferStatus> = {
   '1': 'new',
   '2': 'preliminarily_accepted',
   '3': 'accepted',
@@ -22,15 +22,28 @@ const STATUS_MAP: Record<string, string> = {
   '9': 'final_approved',
 };
 
-export const normalizeStatus = (status: number | string) => {
+export const normalizeStatus = (status: number | string): OfferStatus => {
   if (typeof status === 'number') return STATUS_MAP[String(status)] ?? 'new';
   const trimmed = status.toString().trim();
   const numeric = STATUS_MAP[trimmed];
   if (numeric) return numeric;
-  return trimmed
+  const normalized = trimmed
     .replace(/\s+/g, '_')
     .replace(/([a-z])([A-Z])/g, '$1_$2')
     .toLowerCase();
+  const allowed: OfferStatus[] = [
+    'new',
+    'preliminarily_accepted',
+    'accepted',
+    'contract_ready',
+    'signed_contract_received',
+    'final_approved',
+    'granted',
+    'rejected',
+    'expired',
+    'cancelled',
+  ];
+  return allowed.includes(normalized as OfferStatus) ? (normalized as OfferStatus) : 'new';
 };
 
 export const mapOfferDtoToLoanOffer = (
