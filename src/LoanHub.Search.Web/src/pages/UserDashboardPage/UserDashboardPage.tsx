@@ -311,6 +311,7 @@ export function UserDashboardPage() {
                   onSelectApplication={setSelectedApplication}
                   onResign={handleResign}
                   onContinue={(app) => navigate(`/apply?ref=${app.referenceNumber}`)}
+                  onStartSearch={() => navigate('/search')}
                 />
               )}
               
@@ -394,6 +395,7 @@ interface ApplicationsSectionProps {
   onSelectApplication: (app: UserApplication | null) => void;
   onResign: (app: UserApplication) => void;
   onContinue: (app: UserApplication) => void;
+  onStartSearch: () => void;
 }
 
 function ApplicationsSection({
@@ -406,6 +408,7 @@ function ApplicationsSection({
   onSelectApplication,
   onResign,
   onContinue,
+  onStartSearch,
 }: ApplicationsSectionProps) {
   const statusFilters: { value: UserStatusFilter; label: string; count: number }[] = [
     { value: 'all', label: 'All', count: stats.total },
@@ -450,7 +453,7 @@ function ApplicationsSection({
             <button
               type="button"
               className="btn btn-primary"
-              onClick={() => navigate('/search')}
+              onClick={onStartSearch}
             >
               Start New Search
             </button>
