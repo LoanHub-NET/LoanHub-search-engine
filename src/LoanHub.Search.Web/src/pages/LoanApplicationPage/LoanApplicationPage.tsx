@@ -155,7 +155,6 @@ export function LoanApplicationPage() {
       const monthlyIncome = authSession?.monthlyIncome ?? null;
       const livingCosts = authSession?.livingCosts ?? null;
       const dependents = authSession?.dependents ?? null;
-      const address = parseAddress(authSession?.address ?? null);
       setFormData(prev => ({
         ...prev,
         authMode: 'logged-in',
@@ -166,7 +165,6 @@ export function LoanApplicationPage() {
           email,
           phone: authSession?.phone ?? prev.personalInfo.phone,
           dateOfBirth: authSession?.dateOfBirth ?? prev.personalInfo.dateOfBirth,
-          address: address ?? prev.personalInfo.address,
         },
         employment: {
           ...prev.employment,

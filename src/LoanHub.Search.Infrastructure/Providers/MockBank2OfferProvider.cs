@@ -10,7 +10,7 @@ public sealed class MockBank2OfferProvider : ILoanOfferProvider
     public async Task<IReadOnlyList<OfferDto>> GetOffersAsync(OfferQuery query, CancellationToken ct)
     {
         // inny czas odpowiedzi, żeby było widać równoległość
-        await Task.Delay(18, ct);
+        await Task.Delay(100, ct);
 
         // trochę inna "logika" niż MockBank1
         var baseApr = query.Amount >= 20_000m ? 0.095m : 0.115m;
