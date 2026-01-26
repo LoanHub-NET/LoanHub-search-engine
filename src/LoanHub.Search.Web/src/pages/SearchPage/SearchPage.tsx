@@ -44,6 +44,12 @@ export function SearchPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [authSession, setAuthSession] = useState(getAuthSession());
 
+  useEffect(() => {
+    if (authSession?.role?.toLowerCase().includes('admin')) {
+      navigate('/admin');
+    }
+  }, [authSession, navigate]);
+
   const validateForm = (values: SearchFormValues): FieldError[] => {
     if (showAdvanced) {
       const result = validateExtendedSearch(values);

@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import {
   LandingPage,
   SearchPage,
@@ -16,6 +17,7 @@ import {
   AdminDashboardPage,
   UserDashboardPage,
 } from './pages';
+import { getAuthSession } from './api/apiConfig';
 import './App.css';
 
 function App() {
@@ -47,6 +49,15 @@ function App() {
 }
 
 function RefinePlaceholder() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const session = getAuthSession();
+    if (session?.role?.toLowerCase().includes('admin')) {
+      navigate('/admin');
+    }
+  }, [navigate]);
+
   return (
     <div className="placeholder-page">
       <h1>Refine Your Search</h1>

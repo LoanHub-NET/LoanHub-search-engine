@@ -30,6 +30,13 @@ export function UserDashboardPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const storedProfileKeyPrefix = 'loanhub_user_profile_';
+
+  useEffect(() => {
+    const session = getAuthSession();
+    if (session?.role?.toLowerCase().includes('admin')) {
+      navigate('/admin');
+    }
+  }, [navigate]);
   
   // State
   const [activeTab, setActiveTab] = useState<DashboardTab>(

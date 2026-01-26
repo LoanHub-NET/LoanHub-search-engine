@@ -22,6 +22,7 @@ export function Header({ onLoginClick, onSearchClick, adminUser, onLogout }: Hea
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLLIElement>(null);
   const navigate = useNavigate();
+  const isAdmin = adminUser?.role?.toLowerCase().includes('admin') ?? false;
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -76,9 +77,11 @@ export function Header({ onLoginClick, onSearchClick, adminUser, onLogout }: Hea
               </a>
             </li>
             <li>
-              <button onClick={onSearchClick} className="nav-link nav-button">
-                Search Engine
-              </button>
+              {!isAdmin && (
+                <button onClick={onSearchClick} className="nav-link nav-button">
+                  Search Engine
+                </button>
+              )}
             </li>
             {adminUser ? (
               <li className="user-menu-container" ref={userMenuRef}>
@@ -119,7 +122,12 @@ export function Header({ onLoginClick, onSearchClick, adminUser, onLogout }: Hea
                     <div className="dropdown-divider"></div>
                     <ul className="dropdown-menu">
                       <li>
-                        <button onClick={() => { setUserMenuOpen(false); navigate(adminUser.role === 'Administrator' ? '/admin' : '/dashboard'); }}>
+                        <button
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            navigate(isAdmin ? '/admin' : '/dashboard');
+                          }}
+                        >
                           📋 Dashboard
                         </button>
                       </li>

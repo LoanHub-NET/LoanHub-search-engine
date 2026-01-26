@@ -90,6 +90,13 @@ export function LoanApplicationPage() {
   
   const [authSession, setAuthSession] = useState(getAuthSession());
   const isLoggedIn = Boolean(authSession?.token);
+  const isAdmin = authSession?.role?.toLowerCase().includes('admin') ?? false;
+
+  useEffect(() => {
+    if (isAdmin) {
+      navigate('/admin');
+    }
+  }, [isAdmin, navigate]);
   
   // Current step
   const [currentStep, setCurrentStep] = useState<ApplicationStep>('offer-details');

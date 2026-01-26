@@ -36,6 +36,7 @@ export function SearchResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const [retrySeed, setRetrySeed] = useState(0);
   const [authSession, setAuthSession] = useState(getAuthSession());
+  const isAdmin = authSession?.role?.toLowerCase().includes('admin') ?? false;
 
   const amount = Number(searchParams.get('amount')) || 10000;
   const duration = Number(searchParams.get('duration')) || 12;
@@ -64,6 +65,10 @@ export function SearchResultsPage() {
   }, [amount, duration, income, livingCosts, dependents]);
 
   useEffect(() => {
+    if (isAdmin) {
+      navigate('/admin');
+      return;
+    }
     let isActive = true;
     setIsLoading(true);
     setLoadingProgress(0);
@@ -121,7 +126,7 @@ export function SearchResultsPage() {
       clearInterval(progressInterval);
       isActive = false;
     };
-  }, [amount, duration, hasIncome, searchQuery, retrySeed]);
+  }, [amount, duration, hasIncome, isAdmin, navigate, searchQuery, retrySeed]);
 
   useEffect(() => {
     setAuthSession(getAuthSession());
