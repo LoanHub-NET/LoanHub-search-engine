@@ -43,27 +43,40 @@ const mapStatusHistory = (entries: Array<{ status: string; changedAt: string; re
   }, []);
 };
 
+const mapAdminField = <T,>(data: Record<string, T | undefined>, camel: string, pascal: string) =>
+  data[camel] ?? data[pascal];
+
 const mapAdminApplication = (data: Awaited<ReturnType<typeof getAdminApplication>>): LoanApplication => {
+  const applicantDetails =
+    mapAdminField(data as Record<string, any>, 'applicantDetails', 'ApplicantDetails') ?? {};
+  const offerSnapshot = mapAdminField(data as Record<string, any>, 'offerSnapshot', 'OfferSnapshot') ?? {};
+  const statusHistory =
+    mapAdminField(data as Record<string, any>, 'statusHistory', 'StatusHistory') ?? [];
+  const rejectReason = mapAdminField(data as Record<string, any>, 'rejectReason', 'RejectReason');
+  const createdAt = mapAdminField(data as Record<string, any>, 'createdAt', 'CreatedAt');
+  const updatedAt = mapAdminField(data as Record<string, any>, 'updatedAt', 'UpdatedAt');
+  const validUntil = mapAdminField(data as Record<string, any>, 'validUntil', 'ValidUntil');
+
   return {
     id: data.id,
     referenceNumber: buildReferenceNumber(data.id),
     applicant: {
       email: data.applicantEmail,
-      firstName: data.applicantDetails.firstName,
-      lastName: data.applicantDetails.lastName,
+      firstName: applicantDetails.firstName ?? '',
+      lastName: applicantDetails.lastName ?? '',
       monthlyIncome: undefined,
       livingCosts: undefined,
       dependents: undefined,
       isRegistered: Boolean(data.userId),
-      employment: data.applicantDetails.jobTitle
+      employment: applicantDetails.jobTitle
         ? {
             status: 'employed',
-            jobTitle: data.applicantDetails.jobTitle,
+            jobTitle: applicantDetails.jobTitle,
           }
         : undefined,
-      address: data.applicantDetails.address
+      address: applicantDetails.address
         ? {
-            street: data.applicantDetails.address,
+            street: applicantDetails.address,
             city: '',
             postalCode: '',
             country: '',
@@ -71,30 +84,30 @@ const mapAdminApplication = (data: Awaited<ReturnType<typeof getAdminApplication
         : undefined,
     },
     offer: {
-      offerId: data.offerSnapshot.providerOfferId,
-      amount: data.offerSnapshot.amount,
-      duration: data.offerSnapshot.durationMonths,
-      monthlyInstallment: data.offerSnapshot.installment,
-      interestRate: data.offerSnapshot.apr,
-      apr: data.offerSnapshot.apr,
-      totalRepayment: data.offerSnapshot.totalCost,
+      offerId: offerSnapshot.providerOfferId ?? '',
+      amount: offerSnapshot.amount ?? 0,
+      duration: offerSnapshot.durationMonths ?? 0,
+      monthlyInstallment: offerSnapshot.installment ?? 0,
+      interestRate: offerSnapshot.apr ?? 0,
+      apr: offerSnapshot.apr ?? 0,
+      totalRepayment: offerSnapshot.totalCost ?? 0,
     },
     provider: {
-      id: data.offerSnapshot.provider,
-      name: data.offerSnapshot.provider,
+      id: offerSnapshot.provider ?? 'unknown',
+      name: offerSnapshot.provider ?? 'Unknown provider',
     },
     status: data.status as LoanApplication['status'],
-    statusHistory: mapStatusHistory(data.statusHistory),
+    statusHistory: mapStatusHistory(statusHistory),
     documents: [],
-    createdAt: new Date(data.createdAt),
-    updatedAt: new Date(data.updatedAt),
-    expiresAt: new Date(data.offerSnapshot.validUntil),
+    createdAt: createdAt ? new Date(createdAt) : new Date(),
+    updatedAt: updatedAt ? new Date(updatedAt) : new Date(),
+    expiresAt: validUntil ? new Date(validUntil) : new Date(),
     internalNotes: [],
-    providerResponse: data.rejectReason
+    providerResponse: rejectReason
       ? {
           status: 'rejected',
-          respondedAt: data.updatedAt ? new Date(data.updatedAt) : undefined,
-          message: data.rejectReason ?? undefined,
+          respondedAt: updatedAt ? new Date(updatedAt) : undefined,
+          message: rejectReason ?? undefined,
         }
       : undefined,
   };
