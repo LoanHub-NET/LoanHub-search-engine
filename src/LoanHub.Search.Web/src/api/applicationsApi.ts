@@ -24,7 +24,7 @@ export interface ApplicationRequest extends ApplicationRequestBase {
 export interface ApplicationResponse {
   id: string;
   applicantEmail: string;
-  status: string;
+  status: string | number;
   createdAt: string;
   offerSnapshot: {
     provider: string;
@@ -77,4 +77,27 @@ export const createApplicationForCurrentUser = async (payload: ApplicationReques
   });
 
   return handleResponse(response);
+};
+
+export const listApplicationsForCurrentUser = async () => {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('You must be logged in to view applications.');
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/api/applications/me`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new ApiError(
+      message || `Application request failed with status ${response.status}.`,
+      response.status,
+    );
+  }
+
+  return (await response.json()) as ApplicationResponse[];
 };

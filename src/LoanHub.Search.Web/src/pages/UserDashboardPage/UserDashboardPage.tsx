@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type {
   UserApplication,
@@ -11,13 +11,13 @@ import type {
 } from '../../types/dashboard.types';
 import { USER_STATUS_CONFIG, getDaysRemaining, isExpiringSoon } from '../../types/dashboard.types';
 import {
-  mockUserProfile,
-  mockUserApplications,
   mockNotifications,
   mockSavedSearches,
   mockComparisonHistory,
   calculateUserDashboardStats,
 } from '../../data/mockUserDashboardData';
+import { listApplicationsForCurrentUser } from '../../api/applicationsApi';
+import { ApiError, getAuthSession } from '../../api/apiConfig';
 import { Header, Footer } from '../../components';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import './UserDashboardPage.css';
@@ -30,11 +30,20 @@ export function UserDashboardPage() {
   const [activeTab, setActiveTab] = useState<DashboardTab>(
     (searchParams.get('tab') as DashboardTab) || 'applications'
   );
-  const [applications, setApplications] = useState<UserApplication[]>(mockUserApplications);
-  const [profile, setProfile] = useState<UserProfile>(mockUserProfile);
+  const [applications, setApplications] = useState<UserApplication[]>([]);
+  const [profile, setProfile] = useState<UserProfile>({
+    id: 'guest',
+    email: '',
+    firstName: 'Guest',
+    lastName: '',
+    emailNotifications: true,
+    smsNotifications: false,
+    completionPercentage: 0,
+  });
   const [notifications, setNotifications] = useState<UserNotification[]>(mockNotifications);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(mockSavedSearches);
   const [comparisonHistory] = useState<ComparisonEntry[]>(mockComparisonHistory);
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   // Filters
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>('all');
@@ -106,6 +115,85 @@ export function UserDashboardPage() {
     setProfile(prev => ({ ...prev, ...updatedProfile }));
     setIsEditingProfile(false);
   };
+
+  useEffect(() => {
+    const session = getAuthSession();
+    if (session) {
+      setProfile((prev) => ({
+        ...prev,
+        id: session.id,
+        email: session.email,
+        firstName: session.firstName || 'User',
+        lastName: session.lastName || '',
+      }));
+    }
+
+    const mapStatus = (status: number | string): UserApplication['status'] => {
+      if (typeof status === 'number') {
+        switch (status) {
+          case 1:
+            return 'new';
+          case 2:
+            return 'preliminarily_accepted';
+          case 3:
+            return 'accepted';
+          case 4:
+            return 'rejected';
+          case 6:
+            return 'granted';
+          default:
+            return 'new';
+        }
+      }
+      return (status as UserApplication['status']) ?? 'new';
+    };
+
+    const loadApplications = async () => {
+      try {
+        const data = await listApplicationsForCurrentUser();
+        const mapped = data.map((app) => ({
+          id: app.id,
+          referenceNumber: app.id,
+          provider: {
+            id: app.offerSnapshot.provider,
+            name: app.offerSnapshot.provider,
+          },
+          amount: app.offerSnapshot.amount,
+          duration: app.offerSnapshot.durationMonths,
+          monthlyInstallment: app.offerSnapshot.installment,
+          interestRate: app.offerSnapshot.apr,
+          apr: app.offerSnapshot.apr,
+          totalRepayment: app.offerSnapshot.totalCost,
+          status: mapStatus(app.status),
+          createdAt: new Date(app.createdAt),
+          updatedAt: new Date(app.createdAt),
+          expiresAt: new Date(app.offerSnapshot.validUntil),
+          documentsRequired: [],
+          documentsSubmitted: [],
+          canResign: false,
+          canContinue: false,
+        }));
+
+        setApplications(mapped);
+        setLoadError(null);
+      } catch (err: unknown) {
+        if (err instanceof ApiError && err.status === 401) {
+          setApplications([]);
+          setLoadError(null);
+          return;
+        }
+
+        const message = err instanceof Error ? err.message : 'Unable to load applications.';
+        setLoadError(message);
+      }
+    };
+
+    if (session) {
+      loadApplications();
+    } else {
+      setApplications([]);
+    }
+  }, []);
 
   // Mock user for header
   const mockUser = {
@@ -218,6 +306,7 @@ export function UserDashboardPage() {
                   statusFilter={statusFilter}
                   onStatusFilterChange={setStatusFilter}
                   stats={stats}
+                  loadError={loadError}
                   selectedApplication={selectedApplication}
                   onSelectApplication={setSelectedApplication}
                   onResign={handleResign}
@@ -300,6 +389,7 @@ interface ApplicationsSectionProps {
   statusFilter: UserStatusFilter;
   onStatusFilterChange: (filter: UserStatusFilter) => void;
   stats: ReturnType<typeof calculateUserDashboardStats>;
+  loadError: string | null;
   selectedApplication: UserApplication | null;
   onSelectApplication: (app: UserApplication | null) => void;
   onResign: (app: UserApplication) => void;
@@ -311,6 +401,7 @@ function ApplicationsSection({
   statusFilter,
   onStatusFilterChange,
   stats,
+  loadError,
   selectedApplication,
   onSelectApplication,
   onResign,
@@ -345,7 +436,13 @@ function ApplicationsSection({
       
       {/* Applications List */}
       <div className="applications-grid">
-        {applications.length === 0 ? (
+        {loadError ? (
+          <div className="empty-state">
+            <span className="empty-icon">⚠️</span>
+            <h3>Unable to load applications</h3>
+            <p>{loadError}</p>
+          </div>
+        ) : applications.length === 0 ? (
           <div className="empty-state">
             <span className="empty-icon">📋</span>
             <h3>No applications found</h3>
