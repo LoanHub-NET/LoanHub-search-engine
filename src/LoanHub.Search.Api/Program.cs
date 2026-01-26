@@ -14,13 +14,12 @@ using LoanHub.Search.Api.Notifications;
 using LoanHub.Search.Api.Options;
 using LoanHub.Search.Api.Services;
 using LoanHub.Search.Infrastructure;
+using LoanHub.Search.Infrastructure.Persistence;
 using LoanHub.Search.Infrastructure.Providers;
 using LoanHub.Search.Infrastructure.Repositories;
 using LoanHub.Search.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
@@ -146,13 +145,9 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    dbContext.Database.EnsureCreated();
-    var databaseCreator = dbContext.Database.GetService<IRelationalDatabaseCreator>();
-    if (!databaseCreator.HasTables())
-    {
-        dbContext.Database.EnsureDeleted();
-        dbContext.Database.EnsureCreated();
-    }
+    dbContext.Database.Migrate();
+    var seeder = new ApplicationDbSeeder(dbContext);
+    seeder.SeedAsync(CancellationToken.None).GetAwaiter().GetResult();
 }
 
 app.UseSwagger();

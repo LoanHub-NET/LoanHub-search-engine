@@ -3,7 +3,7 @@ namespace LoanHub.Search.Infrastructure.Repositories;
 using LoanHub.Search.Core.Abstractions.Applications;
 using LoanHub.Search.Core.Models.Applications;
 using LoanHub.Search.Core.Models.Pagination;
-using LoanHub.Search.Infrastructure;
+using LoanHub.Search.Infrastructure.Persistence.Mapping;
 using Microsoft.EntityFrameworkCore;
 
 public sealed class ApplicationRepository : IApplicationRepository
@@ -14,30 +14,43 @@ public sealed class ApplicationRepository : IApplicationRepository
 
     public async Task<LoanApplication> AddAsync(LoanApplication application, CancellationToken ct)
     {
-        _dbContext.Applications.Add(application);
+        var entity = application.ToEntity();
+        _dbContext.Applications.Add(entity);
         await _dbContext.SaveChangesAsync(ct);
-        return application;
+        return entity.ToModel();
     }
 
-    public Task<LoanApplication?> GetAsync(Guid id, CancellationToken ct)
-        => _dbContext.Applications
+    public async Task<LoanApplication?> GetAsync(Guid id, CancellationToken ct)
+    {
+        var entity = await _dbContext.Applications
             .Include(application => application.StatusHistory)
             .FirstOrDefaultAsync(application => application.Id == id, ct);
 
+        return entity?.ToModel();
+    }
+
     public async Task<IReadOnlyList<LoanApplication>> ListAsync(CancellationToken ct)
-        => await _dbContext.Applications
+    {
+        var entities = await _dbContext.Applications
             .AsNoTracking()
             .Include(application => application.StatusHistory)
             .OrderByDescending(application => application.CreatedAt)
             .ToListAsync(ct);
 
+        return entities.Select(application => application.ToModel()).ToList();
+    }
+
     public async Task<IReadOnlyList<LoanApplication>> ListByUserIdAsync(Guid userId, CancellationToken ct)
-        => await _dbContext.Applications
+    {
+        var entities = await _dbContext.Applications
             .AsNoTracking()
             .Include(application => application.StatusHistory)
             .Where(application => application.UserId == userId)
             .OrderByDescending(application => application.CreatedAt)
             .ToListAsync(ct);
+
+        return entities.Select(application => application.ToModel()).ToList();
+    }
 
     public async Task<PagedResult<LoanApplication>> ListAdminAsync(ApplicationAdminQuery query, CancellationToken ct)
     {
@@ -77,7 +90,8 @@ public sealed class ApplicationRepository : IApplicationRepository
             .Take(query.PageSize)
             .ToListAsync(ct);
 
-        return new PagedResult<LoanApplication>(items, query.Page, query.PageSize, totalCount);
+        var mappedItems = items.Select(application => application.ToModel()).ToList();
+        return new PagedResult<LoanApplication>(mappedItems, query.Page, query.PageSize, totalCount);
     }
 
     public async Task<LoanApplication?> UpdateAsync(LoanApplication application, CancellationToken ct)
@@ -86,8 +100,9 @@ public sealed class ApplicationRepository : IApplicationRepository
         if (!exists)
             return null;
 
-        _dbContext.Applications.Update(application);
+        var entity = application.ToEntity();
+        _dbContext.Applications.Update(entity);
         await _dbContext.SaveChangesAsync(ct);
-        return application;
+        return entity.ToModel();
     }
 }
