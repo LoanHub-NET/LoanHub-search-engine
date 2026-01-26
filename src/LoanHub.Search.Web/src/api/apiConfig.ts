@@ -4,6 +4,14 @@ export interface AuthSession {
   role: string;
   firstName?: string | null;
   lastName?: string | null;
+  phone?: string | null;
+  dateOfBirth?: string | null;
+  address?: string | null;
+  jobTitle?: string | null;
+  monthlyIncome?: number | null;
+  livingCosts?: number | null;
+  dependents?: number | null;
+  idDocumentNumber?: string | null;
   token: string;
 }
 
