@@ -101,6 +101,9 @@ public sealed class UserService
     public Task<UserAccount?> GetAsync(Guid id, CancellationToken ct)
         => _repository.GetByIdAsync(id, ct);
 
+    public Task<UserAccount?> GetByEmailAsync(string email, CancellationToken ct)
+        => _repository.GetByEmailAsync(email, ct);
+
     public async Task<UserAccount?> UpdateProfileAsync(Guid id, UserProfile profile, CancellationToken ct)
     {
         var user = await _repository.GetByIdAsync(id, ct);

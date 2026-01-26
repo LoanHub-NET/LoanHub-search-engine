@@ -16,7 +16,11 @@ import {
   mockComparisonHistory,
   calculateUserDashboardStats,
 } from '../../data/mockUserDashboardData';
-import { listApplicationsByEmail, listApplicationsForCurrentUser } from '../../api/applicationsApi';
+import {
+  cancelApplicationForCurrentUser,
+  listApplicationsByEmail,
+  listApplicationsForCurrentUser,
+} from '../../api/applicationsApi';
 import { ApiError, getAuthSession } from '../../api/apiConfig';
 import { Header, Footer } from '../../components';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -50,7 +54,9 @@ export function UserDashboardPage() {
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>('all');
   const [selectedApplication, setSelectedApplication] = useState<UserApplication | null>(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [showResignModal, setShowResignModal] = useState<UserApplication | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState<UserApplication | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
   
   // Stats
   const stats = useMemo(() => calculateUserDashboardStats(applications), [applications]);
@@ -74,20 +80,36 @@ export function UserDashboardPage() {
   };
   
   const handleResign = (app: UserApplication) => {
-    setShowResignModal(app);
+    setShowCancelModal(app);
   };
   
-  const confirmResign = () => {
-    if (!showResignModal) return;
-    setApplications(prev => 
-      prev.map(app => 
-        app.id === showResignModal.id 
-          ? { ...app, status: 'resigned' as const, canResign: false, canContinue: false }
-          : app
-      )
-    );
-    setShowResignModal(null);
-    setSelectedApplication(null);
+  const confirmResign = async () => {
+    if (!showCancelModal) return;
+    setCancelError(null);
+    setIsCancelling(true);
+    try {
+      const updated = await cancelApplicationForCurrentUser(showCancelModal.id);
+      const status = mapStatus(updated.status);
+      setApplications(prev =>
+        prev.map(app =>
+          app.id === showCancelModal.id
+            ? { ...app, status, canResign: false, canContinue: false }
+            : app
+        )
+      );
+      setShowCancelModal(null);
+      setSelectedApplication(null);
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError && err.status === 401
+          ? 'Your session has expired. Please log in again to cancel the application.'
+          : err instanceof Error
+            ? err.message
+            : 'Unable to cancel the application.';
+      setCancelError(message);
+    } finally {
+      setIsCancelling(false);
+    }
   };
   
   const handleMarkAsRead = (notifId: string) => {
@@ -123,6 +145,32 @@ export function UserDashboardPage() {
     setIsEditingProfile(false);
   };
 
+  const mapStatus = (status: number | string): UserApplication['status'] => {
+    if (typeof status === 'number') {
+      switch (status) {
+        case 1:
+          return 'new';
+        case 2:
+          return 'preliminarily_accepted';
+        case 3:
+          return 'accepted';
+        case 4:
+          return 'rejected';
+        case 5:
+          return 'cancelled';
+        case 6:
+          return 'granted';
+        case 7:
+        case 8:
+        case 9:
+          return 'accepted';
+        default:
+          return 'new';
+      }
+    }
+    return (status as UserApplication['status']) ?? 'new';
+  };
+
   useEffect(() => {
     const session = getAuthSession();
     if (session) {
@@ -148,28 +196,11 @@ export function UserDashboardPage() {
       }));
     }
 
-    const mapStatus = (status: number | string): UserApplication['status'] => {
-      if (typeof status === 'number') {
-        switch (status) {
-          case 1:
-            return 'new';
-          case 2:
-            return 'preliminarily_accepted';
-          case 3:
-            return 'accepted';
-          case 4:
-            return 'rejected';
-          case 6:
-            return 'granted';
-          default:
-            return 'new';
-        }
-      }
-      return (status as UserApplication['status']) ?? 'new';
-    };
-
     const mapApplications = (data: Awaited<ReturnType<typeof listApplicationsForCurrentUser>>) =>
-      data.map((app) => ({
+      data.map((app) => {
+        const status = mapStatus(app.status);
+        const canResign = status === 'new' || status === 'preliminarily_accepted';
+        return {
         id: app.id,
         referenceNumber: app.id,
         provider: {
@@ -182,15 +213,16 @@ export function UserDashboardPage() {
         interestRate: app.offerSnapshot.apr,
         apr: app.offerSnapshot.apr,
         totalRepayment: app.offerSnapshot.totalCost,
-        status: mapStatus(app.status),
+        status,
         createdAt: new Date(app.createdAt),
         updatedAt: new Date(app.createdAt),
         expiresAt: new Date(app.offerSnapshot.validUntil),
         documentsRequired: [],
         documentsSubmitted: [],
-        canResign: false,
+        canResign,
         canContinue: false,
-      }));
+        };
+      });
 
     const loadApplications = async () => {
       try {
@@ -401,23 +433,28 @@ export function UserDashboardPage() {
         </section>
       </main>
       
-      {/* Resign Confirmation Modal */}
-      {showResignModal && (
-        <div className="modal-overlay" onClick={() => setShowResignModal(null)}>
+      {/* Cancel Confirmation Modal */}
+      {showCancelModal && (
+        <div className="modal-overlay" onClick={() => setShowCancelModal(null)}>
           <div className="modal-content resign-modal" onClick={e => e.stopPropagation()}>
-            <h2>Resign from Application?</h2>
+            <h2>Cancel application?</h2>
             <p>
-              Are you sure you want to resign from application <strong>{showResignModal.referenceNumber}</strong>?
+              Are you sure you want to cancel application <strong>{showCancelModal.referenceNumber}</strong>?
             </p>
             <p className="warning-text">
               This action cannot be undone. You can apply again with a new search.
             </p>
+            {cancelError && (
+              <p className="error-text">
+                {cancelError}
+              </p>
+            )}
             <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowResignModal(null)}>
-                Cancel
+              <button className="btn btn-secondary" onClick={() => setShowCancelModal(null)} disabled={isCancelling}>
+                Keep Application
               </button>
-              <button className="btn btn-danger" onClick={confirmResign}>
-                Yes, Resign
+              <button className="btn btn-danger" onClick={confirmResign} disabled={isCancelling}>
+                {isCancelling ? 'Cancelling...' : 'Yes, Cancel'}
               </button>
             </div>
           </div>
@@ -545,7 +582,7 @@ function ApplicationCard({ application, isSelected, onSelect, onResign, onContin
   const statusConfig = USER_STATUS_CONFIG[application.status];
   const daysRemaining = getDaysRemaining(application.expiresAt);
   const expiringSoon = isExpiringSoon(application.expiresAt);
-  const isActive = !['granted', 'rejected', 'expired', 'resigned'].includes(application.status);
+  const isActive = !['granted', 'rejected', 'expired', 'cancelled'].includes(application.status);
   
   return (
     <div className={`application-card ${isSelected ? 'selected' : ''} ${expiringSoon && isActive ? 'expiring' : ''}`}>
@@ -617,7 +654,7 @@ function ApplicationCard({ application, isSelected, onSelect, onResign, onContin
           )}
           {application.canResign && (
             <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); onResign(); }}>
-              Resign
+              Cancel
             </button>
           )}
         </div>
@@ -637,7 +674,7 @@ interface ApplicationDetailsProps {
 function ApplicationDetails({ application, onClose, onResign, onContinue }: ApplicationDetailsProps) {
   const statusConfig = USER_STATUS_CONFIG[application.status];
   const daysRemaining = getDaysRemaining(application.expiresAt);
-  const isActive = !['granted', 'rejected', 'expired', 'resigned'].includes(application.status);
+  const isActive = !['granted', 'rejected', 'expired', 'cancelled'].includes(application.status);
   
   return (
     <div className="application-details">
@@ -762,7 +799,7 @@ function ApplicationDetails({ application, onClose, onResign, onContinue }: Appl
             )}
             {application.canResign && (
               <button className="btn btn-outline btn-danger-outline" onClick={onResign}>
-                Resign from Offer
+                Cancel application
               </button>
             )}
           </div>
@@ -1112,7 +1149,7 @@ function DocumentsSection({ applications, profile }: DocumentsSectionProps) {
   
   // Get all required documents across applications
   const pendingDocuments = applications
-    .filter(app => !['granted', 'rejected', 'expired', 'resigned'].includes(app.status))
+    .filter(app => !['granted', 'rejected', 'expired', 'cancelled'].includes(app.status))
     .flatMap(app => 
       app.documentsRequired
         .filter(doc => doc.status === 'pending')

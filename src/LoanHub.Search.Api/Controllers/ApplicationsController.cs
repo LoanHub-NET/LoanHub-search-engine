@@ -141,10 +141,29 @@ public sealed class ApplicationsController : ControllerBase
         return Ok(responses);
     }
 
+    [Authorize]
     [HttpPost("{id:guid}/cancel")]
     public async Task<ActionResult<ApplicationResponse>> Cancel(Guid id, CancellationToken ct)
     {
-        var result = await _service.CancelAsync(id, ct);
+        var user = await GetCurrentUserAsync(ct);
+        if (user is null)
+            return Unauthorized();
+
+        var application = await _service.GetAsync(id, ct);
+        if (application is null)
+            return NotFound();
+
+        if (application.UserId.HasValue)
+        {
+            if (application.UserId != user.Id)
+                return Forbid();
+        }
+        else if (!string.Equals(application.ApplicantEmail, user.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            return Forbid();
+        }
+
+        var result = await _service.CancelAsync(application, ct);
 
         return result.Outcome switch
         {
@@ -263,10 +282,14 @@ public sealed class ApplicationsController : ControllerBase
     private async Task<Core.Models.Users.UserAccount?> GetCurrentUserAsync(CancellationToken ct)
     {
         var userId = GetUserId();
-        if (userId is null)
+        if (userId is not null)
+            return await _userService.GetAsync(userId.Value, ct);
+
+        var email = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue("email");
+        if (string.IsNullOrWhiteSpace(email))
             return null;
 
-        return await _userService.GetAsync(userId.Value, ct);
+        return await _userService.GetByEmailAsync(email, ct);
     }
 
     private Guid? GetUserId()
