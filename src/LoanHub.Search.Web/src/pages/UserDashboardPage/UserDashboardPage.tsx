@@ -100,7 +100,12 @@ export function UserDashboardPage() {
       setShowCancelModal(null);
       setSelectedApplication(null);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unable to cancel the application.';
+      const message =
+        err instanceof ApiError && err.status === 401
+          ? 'Your session has expired. Please log in again to cancel the application.'
+          : err instanceof Error
+            ? err.message
+            : 'Unable to cancel the application.';
       setCancelError(message);
     } finally {
       setIsCancelling(false);

@@ -38,9 +38,31 @@ export interface ApplicationResponse {
   };
 }
 
+const readErrorMessage = async (response: Response) => {
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json') || contentType.includes('application/problem+json')) {
+    try {
+      const payload = (await response.json()) as {
+        title?: string;
+        detail?: string;
+        message?: string;
+      };
+      return payload.detail || payload.title || payload.message;
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    return await response.text();
+  } catch {
+    return null;
+  }
+};
+
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
-    const message = await response.text();
+    const message = await readErrorMessage(response);
     throw new ApiError(
       message || `Application request failed with status ${response.status}.`,
       response.status,
@@ -92,7 +114,7 @@ export const listApplicationsForCurrentUser = async () => {
   });
 
   if (!response.ok) {
-    const message = await response.text();
+    const message = await readErrorMessage(response);
     throw new ApiError(
       message || `Application request failed with status ${response.status}.`,
       response.status,
@@ -108,7 +130,7 @@ export const listApplicationsByEmail = async (email: string) => {
   );
 
   if (!response.ok) {
-    const message = await response.text();
+    const message = await readErrorMessage(response);
     throw new ApiError(
       message || `Application request failed with status ${response.status}.`,
       response.status,
