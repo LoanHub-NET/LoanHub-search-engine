@@ -183,6 +183,7 @@ using (var scope = app.Services.CreateScope())
 
     dbContext.Database.ExecuteSqlRaw("""
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "RejectReason" text;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "UserId" uuid;
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ContractReadyAt" timestamptz;
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractFileName" varchar(240);
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractBlobName" varchar(320);
