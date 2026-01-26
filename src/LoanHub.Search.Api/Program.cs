@@ -180,6 +180,16 @@ using (var scope = app.Services.CreateScope())
         dbContext.Database.EnsureDeleted();
         dbContext.Database.EnsureCreated();
     }
+
+    dbContext.Database.ExecuteSqlRaw("""
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "RejectReason" text;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ContractReadyAt" timestamptz;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractFileName" varchar(240);
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractBlobName" varchar(320);
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractContentType" varchar(160);
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractReceivedAt" timestamptz;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "FinalApprovedAt" timestamptz;
+        """);
 }
 
 app.UseSwagger();
