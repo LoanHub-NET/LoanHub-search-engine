@@ -199,6 +199,11 @@ using (var scope = app.Services.CreateScope())
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractReceivedAt" timestamptz;
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "FinalApprovedAt" timestamptz;
         """);
+    dbContext.Database.ExecuteSqlRaw("""
+        UPDATE "Applications"
+        SET "OfferSnapshot_ValidUntil" = COALESCE("OfferSnapshot_ValidUntil", "CreatedAt", NOW()) + INTERVAL '7 days'
+        WHERE "OfferSnapshot_ValidUntil" IS NULL;
+        """);
 }
 
 app.UseSwagger();
