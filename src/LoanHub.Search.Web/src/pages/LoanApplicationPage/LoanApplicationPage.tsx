@@ -477,8 +477,6 @@ export function LoanApplicationPage() {
           referenceId = response.id;
         } catch (err: unknown) {
           if (err instanceof ApiError && err.status === 401) {
-            clearAuthSession();
-            setAuthSession(null);
             referenceId = await submitAsGuest();
           } else {
             throw err;
