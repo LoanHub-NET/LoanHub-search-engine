@@ -184,6 +184,14 @@ using (var scope = app.Services.CreateScope())
     dbContext.Database.ExecuteSqlRaw("""
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "RejectReason" text;
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "UserId" uuid;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Provider" varchar(120);
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_ProviderOfferId" varchar(120);
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Installment" numeric;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Apr" numeric;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_TotalCost" numeric;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Amount" numeric;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_DurationMonths" integer;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_ValidUntil" timestamptz;
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ContractReadyAt" timestamptz;
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractFileName" varchar(240);
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractBlobName" varchar(320);
