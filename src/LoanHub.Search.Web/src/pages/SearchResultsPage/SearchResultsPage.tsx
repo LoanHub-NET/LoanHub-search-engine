@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
 import { fetchSearchResults, type SearchApiSource } from '../../api/searchApi';
+import { clearAuthSession, getAuthSession } from '../../api/apiConfig';
 import { formatCurrency, formatPercent, formatDuration } from '../../utils/formatters';
 import type { LoanOffer, LoanSearchQuery } from '../../types';
 import './SearchResultsPage.css';
@@ -34,6 +35,7 @@ export function SearchResultsPage() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [retrySeed, setRetrySeed] = useState(0);
+  const [authSession, setAuthSession] = useState(getAuthSession());
 
   const amount = Number(searchParams.get('amount')) || 10000;
   const duration = Number(searchParams.get('duration')) || 12;
@@ -121,8 +123,28 @@ export function SearchResultsPage() {
     };
   }, [amount, duration, hasIncome, searchQuery, retrySeed]);
 
+  useEffect(() => {
+    setAuthSession(getAuthSession());
+  }, []);
+
+  const adminUser = useMemo(() => {
+    if (!authSession) return undefined;
+    const displayName =
+      `${authSession.firstName ?? ''} ${authSession.lastName ?? ''}`.trim() || authSession.email;
+    return {
+      name: displayName,
+      email: authSession.email,
+      role: authSession.role,
+    };
+  }, [authSession]);
+
   const handleLoginClick = () => navigate('/login');
   const handleSearchClick = () => navigate('/search');
+  const handleLogout = () => {
+    clearAuthSession();
+    setAuthSession(null);
+    navigate('/login');
+  };
 
   const handleSelectOffer = (offer: LoanOffer) => {
     // Navigate to application page with offer data
@@ -150,7 +172,12 @@ export function SearchResultsPage() {
 
   return (
     <div className="results-page">
-      <Header onLoginClick={handleLoginClick} onSearchClick={handleSearchClick} />
+      <Header
+        onLoginClick={handleLoginClick}
+        onSearchClick={handleSearchClick}
+        adminUser={adminUser}
+        onLogout={handleLogout}
+      />
       
       <main className="results-main">
         <div className="results-container">

@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
 import { useForm } from '../../hooks';
-import { getAuthSession } from '../../api/apiConfig';
+import { clearAuthSession, getAuthSession } from '../../api/apiConfig';
 import type { UserProfile } from '../../types/dashboard.types';
 import { 
   validateQuickSearch, 
@@ -42,6 +42,7 @@ const getStoredProfile = (userId?: string | null): Partial<UserProfile> | null =
 export function SearchPage() {
   const navigate = useNavigate();
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [authSession, setAuthSession] = useState(getAuthSession());
 
   const validateForm = (values: SearchFormValues): FieldError[] => {
     if (showAdvanced) {
@@ -97,6 +98,7 @@ export function SearchPage() {
 
   useEffect(() => {
     const session = getAuthSession();
+    setAuthSession(session);
     if (!session) return;
     const storedProfile = getStoredProfile(session.id);
 
@@ -122,8 +124,24 @@ export function SearchPage() {
     }
   }, [setValue, showAdvanced, values.dependents, values.livingCosts, values.monthlyIncome]);
 
+  const adminUser = useMemo(() => {
+    if (!authSession) return undefined;
+    const displayName =
+      `${authSession.firstName ?? ''} ${authSession.lastName ?? ''}`.trim() || authSession.email;
+    return {
+      name: displayName,
+      email: authSession.email,
+      role: authSession.role,
+    };
+  }, [authSession]);
+
   const handleLoginClick = () => navigate('/login');
   const handleSearchClick = () => {}; // Already on search page
+  const handleLogout = () => {
+    clearAuthSession();
+    setAuthSession(null);
+    navigate('/login');
+  };
 
   const getFieldError = (field: keyof SearchFormValues) => {
     return touched[field] && errors[field] ? errors[field] : null;
@@ -131,7 +149,12 @@ export function SearchPage() {
 
   return (
     <div className="search-page">
-      <Header onLoginClick={handleLoginClick} onSearchClick={handleSearchClick} />
+      <Header
+        onLoginClick={handleLoginClick}
+        onSearchClick={handleSearchClick}
+        adminUser={adminUser}
+        onLogout={handleLogout}
+      />
       
       <main className="search-main">
         <div className="search-container">
