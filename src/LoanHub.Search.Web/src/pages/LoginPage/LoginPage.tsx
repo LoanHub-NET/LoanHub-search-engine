@@ -58,7 +58,7 @@ export function LoginPage() {
             age: null,
             jobTitle: pendingProfileForEmail?.jobTitle || null,
             address: pendingProfileForEmail?.address || null,
-            phone: pendingProfileForEmail?.phone || null,
+            phone: formData.phone || pendingProfileForEmail?.phone || null,
             dateOfBirth: pendingProfileForEmail?.dateOfBirth || null,
             monthlyIncome: pendingProfileForEmail?.monthlyIncome ?? null,
             livingCosts: pendingProfileForEmail?.livingCosts ?? null,
