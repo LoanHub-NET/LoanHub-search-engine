@@ -3,7 +3,7 @@ import type { FormEvent } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Header, Footer } from '../../components';
 import { loginUser, registerUser } from '../../api/userApi';
-import { clearPendingProfile, getPendingProfile } from '../../api/apiConfig';
+import { ApiError, clearPendingProfile, getPendingProfile } from '../../api/apiConfig';
 import './LoginPage.css';
 
 type Mode = 'login' | 'register';
@@ -84,6 +84,11 @@ export function LoginPage() {
         navigate('/dashboard');
       }, 900);
     } catch (err: unknown) {
+      if (mode === 'login' && err instanceof ApiError && err.status === 401) {
+        setError('błedne hasło');
+        setIsSubmitting(false);
+        return;
+      }
       const messageText =
         err instanceof Error ? err.message : 'We could not complete the request.';
       setError(messageText);
