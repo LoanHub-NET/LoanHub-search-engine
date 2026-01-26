@@ -17,8 +17,6 @@ public partial class ApplicationDbContextModelSnapshot : ModelSnapshot
             .HasAnnotation("ProductVersion", "9.0.0")
             .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-        Npgsql.EntityFrameworkCore.PostgreSQL.Metadata.NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
         modelBuilder.Entity("LoanHub.Search.Infrastructure.Persistence.Entities.ExternalIdentityEntity", b =>
             {
                 b.Property<Guid>("Id")

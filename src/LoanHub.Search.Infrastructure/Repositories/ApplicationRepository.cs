@@ -69,7 +69,7 @@ public sealed class ApplicationRepository : IApplicationRepository
         }
 
         if (query.Status is not null)
-            applications = applications.Where(application => application.Status == query.Status);
+            applications = applications.Where(application => application.Status == (int)query.Status);
 
         if (query.CreatedFrom is not null)
             applications = applications.Where(application => application.CreatedAt >= query.CreatedFrom);
