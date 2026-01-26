@@ -27,8 +27,15 @@ type SortKey = 'date' | 'amount' | 'status';
 
 const buildReferenceNumber = (id: string) => `APP-${id.slice(0, 8).toUpperCase()}`;
 
-const mapStatusHistory = (entries: Array<{ status: string; changedAt: string; reason?: string | null }>) => {
-  const sorted = [...entries].sort((a, b) => new Date(a.changedAt).getTime() - new Date(b.changedAt).getTime());
+const mapStatusHistory = (
+  entries: Array<{ status?: string; Status?: string; changedAt?: string; ChangedAt?: string; reason?: string | null; Reason?: string | null }>,
+) => {
+  const normalized = entries.map(entry => ({
+    status: entry.status ?? entry.Status ?? '',
+    changedAt: entry.changedAt ?? entry.ChangedAt ?? '',
+    reason: entry.reason ?? entry.Reason ?? undefined,
+  }));
+  const sorted = [...normalized].sort((a, b) => new Date(a.changedAt).getTime() - new Date(b.changedAt).getTime());
   return sorted.reduce<StatusHistoryEntry[]>((acc, entry, index) => {
     const previousStatus = index > 0 ? acc[index - 1]?.newStatus ?? null : null;
     acc.push({
@@ -47,6 +54,11 @@ const mapAdminField = <T,>(data: Record<string, T | undefined>, camel: string, p
   data[camel] ?? data[pascal];
 
 const mapAdminApplication = (data: Awaited<ReturnType<typeof getAdminApplication>>): LoanApplication => {
+  const id = mapAdminField(data as Record<string, any>, 'id', 'Id') ?? '';
+  const applicantEmail =
+    mapAdminField(data as Record<string, any>, 'applicantEmail', 'ApplicantEmail') ?? '';
+  const status = mapAdminField(data as Record<string, any>, 'status', 'Status') ?? 'new';
+  const userId = mapAdminField(data as Record<string, any>, 'userId', 'UserId');
   const applicantDetails =
     mapAdminField(data as Record<string, any>, 'applicantDetails', 'ApplicantDetails') ?? {};
   const offerSnapshot = mapAdminField(data as Record<string, any>, 'offerSnapshot', 'OfferSnapshot') ?? {};
@@ -58,16 +70,16 @@ const mapAdminApplication = (data: Awaited<ReturnType<typeof getAdminApplication
   const validUntil = mapAdminField(data as Record<string, any>, 'validUntil', 'ValidUntil');
 
   return {
-    id: data.id,
-    referenceNumber: buildReferenceNumber(data.id),
+    id,
+    referenceNumber: buildReferenceNumber(id || 'unknown'),
     applicant: {
-      email: data.applicantEmail,
+      email: applicantEmail,
       firstName: applicantDetails.firstName ?? '',
       lastName: applicantDetails.lastName ?? '',
       monthlyIncome: undefined,
       livingCosts: undefined,
       dependents: undefined,
-      isRegistered: Boolean(data.userId),
+      isRegistered: Boolean(userId),
       employment: applicantDetails.jobTitle
         ? {
             status: 'employed',
@@ -96,7 +108,7 @@ const mapAdminApplication = (data: Awaited<ReturnType<typeof getAdminApplication
       id: offerSnapshot.provider ?? 'unknown',
       name: offerSnapshot.provider ?? 'Unknown provider',
     },
-    status: data.status as LoanApplication['status'],
+    status: status as LoanApplication['status'],
     statusHistory: mapStatusHistory(statusHistory),
     documents: [],
     createdAt: createdAt ? new Date(createdAt) : new Date(),
@@ -146,7 +158,10 @@ export function AdminDashboardPage() {
       setIsLoading(true);
       setLoadError(null);
       const page = await listAdminApplications({ pageSize: 200 });
-      const details = await Promise.all(page.items.map(item => getAdminApplication(item.id)));
+      const ids = page.items
+        .map(item => (item as { id?: string; Id?: string }).id ?? (item as { Id?: string }).Id)
+        .filter((id): id is string => Boolean(id));
+      const details = await Promise.all(ids.map(id => getAdminApplication(id)));
       const mapped = details.map(mapAdminApplication);
       setApplications(mapped);
     } catch (error) {
