@@ -135,19 +135,3 @@ export const updateUserProfile = async (
   });
   return data;
 };
-
-export const getUserProfile = async (userId: string) => {
-  const token = getAuthToken();
-  if (!token) {
-    throw new Error('You must be logged in to load your profile.');
-  }
-
-  const response = await fetch(`${getApiBaseUrl()}/api/users/${userId}`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  return handleAuthResponse(response);
-};
