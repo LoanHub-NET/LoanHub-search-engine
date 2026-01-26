@@ -31,5 +31,18 @@ services:
     volumes:
       - loanhub-postgres:/var/lib/postgresql/data
 
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@loanhub.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    volumes:
+      - loanhub-pgadmin:/var/lib/pgadmin
+
 volumes:
   loanhub-postgres:
+  loanhub-pgadmin:
