@@ -309,6 +309,11 @@
   font-weight: 600;
 }
 
+.form-message.error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
 .login-footer {
   margin-top: 1.5rem;
   display: flex;
