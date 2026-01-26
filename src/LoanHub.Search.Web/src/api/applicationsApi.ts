@@ -117,3 +117,19 @@ export const listApplicationsByEmail = async (email: string) => {
 
   return (await response.json()) as ApplicationResponse[];
 };
+
+export const cancelApplicationForCurrentUser = async (applicationId: string) => {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('You must be logged in to cancel this application.');
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/api/applications/${applicationId}/cancel`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return handleResponse(response);
+};

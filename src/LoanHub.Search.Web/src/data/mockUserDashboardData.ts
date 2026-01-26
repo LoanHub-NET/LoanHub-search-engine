@@ -466,7 +466,7 @@ export function calculateUserDashboardStats(applications: UserApplication[]) {
   const accepted = applications.filter(a => a.status === 'accepted').length;
   const granted = applications.filter(a => a.status === 'granted').length;
   const expiringSoon = applications.filter(a => {
-    if (['granted', 'rejected', 'expired', 'resigned'].includes(a.status)) return false;
+    if (['granted', 'rejected', 'expired', 'cancelled'].includes(a.status)) return false;
     const daysLeft = Math.ceil((new Date(a.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
     return daysLeft <= 3 && daysLeft > 0;
   }).length;

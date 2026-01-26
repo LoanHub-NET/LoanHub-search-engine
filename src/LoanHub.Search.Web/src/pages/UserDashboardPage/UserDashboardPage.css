@@ -1448,6 +1448,11 @@
   font-weight: 600;
 }
 
+.error-text {
+  color: #ef4444 !important;
+  font-weight: 600;
+}
+
 .modal-actions {
   display: flex;
   gap: 1rem;
