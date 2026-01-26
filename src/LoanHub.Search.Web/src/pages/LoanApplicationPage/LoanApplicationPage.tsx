@@ -9,7 +9,7 @@ import {
   getAuthSession,
   storePendingProfile,
 } from '../../api/apiConfig';
-import { updateUserProfile } from '../../api/userApi';
+import { getUserProfile, updateUserProfile } from '../../api/userApi';
 import type { 
   ApplicationStep, 
   ApplicationFormData,
@@ -24,6 +24,42 @@ import {
   INITIAL_APPLICATION_DATA
 } from '../../types/application.types';
 import './LoanApplicationPage.css';
+
+const parseAddress = (address?: string | null) => {
+  if (!address) {
+    return null;
+  }
+  const parts = address.split(',').map(part => part.trim()).filter(Boolean);
+  if (parts.length === 0) {
+    return null;
+  }
+
+  const hasApartment = parts[1]?.toLowerCase().startsWith('apt ');
+  const street = parts[0] ?? '';
+  const apartment = hasApartment ? parts[1].replace(/^apt\s+/i, '').trim() : '';
+  const cityPostal = hasApartment ? parts[2] : parts[1];
+  const country = parts[parts.length - 1];
+
+  let postalCode = '';
+  let city = '';
+  if (cityPostal) {
+    const match = cityPostal.match(/(\d{2}-\d{3})\s*(.*)/);
+    if (match) {
+      postalCode = match[1];
+      city = match[2]?.trim() ?? '';
+    } else {
+      city = cityPostal.trim();
+    }
+  }
+
+  return {
+    street,
+    apartment,
+    city,
+    postalCode,
+    country,
+  };
+};
 
 // Mock generate offer function (same as SearchResultsPage)
 const generateMockOffer = (amount: number, duration: number, provider: { name: string; logo: string }): ApplicationOffer => {
@@ -115,6 +151,11 @@ export function LoanApplicationPage() {
       const firstName = authSession?.firstName ?? '';
       const lastName = authSession?.lastName ?? '';
       const email = authSession?.email ?? '';
+      const jobTitle = authSession?.jobTitle ?? '';
+      const monthlyIncome = authSession?.monthlyIncome ?? null;
+      const livingCosts = authSession?.livingCosts ?? null;
+      const dependents = authSession?.dependents ?? null;
+      const address = parseAddress(authSession?.address ?? null);
       setFormData(prev => ({
         ...prev,
         authMode: 'logged-in',
@@ -123,13 +164,23 @@ export function LoanApplicationPage() {
           firstName,
           lastName,
           email,
+          phone: authSession?.phone ?? prev.personalInfo.phone,
+          dateOfBirth: authSession?.dateOfBirth ?? prev.personalInfo.dateOfBirth,
+          address: address ?? prev.personalInfo.address,
         },
-        employment: prev.employment,
+        employment: {
+          ...prev.employment,
+          position: jobTitle || prev.employment.position,
+          monthlyIncome: monthlyIncome !== null ? String(monthlyIncome) : prev.employment.monthlyIncome,
+          livingCosts: livingCosts !== null ? String(livingCosts) : prev.employment.livingCosts,
+          dependents: dependents !== null ? String(dependents) : prev.employment.dependents,
+        },
         documents: {
           ...prev.documents,
           idFrontFile: undefined,
           idBackFile: undefined,
           additionalDocs: undefined,
+          idNumber: authSession?.idDocumentNumber ?? prev.documents.idNumber,
         },
       }));
     } else {
@@ -139,6 +190,38 @@ export function LoanApplicationPage() {
       }));
     }
   }, [authSession, isLoggedIn]);
+
+  useEffect(() => {
+    if (!authSession?.id || !isLoggedIn) {
+      return;
+    }
+
+    const refreshProfile = async () => {
+      try {
+        const data = await getUserProfile(authSession.id);
+        setAuthSession({
+          id: data.id,
+          email: data.email,
+          role: data.role,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phone: data.phone,
+          dateOfBirth: data.dateOfBirth,
+          address: data.address,
+          jobTitle: data.jobTitle,
+          monthlyIncome: data.monthlyIncome,
+          livingCosts: data.livingCosts,
+          dependents: data.dependents,
+          idDocumentNumber: data.idDocumentNumber,
+          token: data.token,
+        });
+      } catch {
+        // Ignore profile refresh failures and fall back to stored session.
+      }
+    };
+
+    refreshProfile();
+  }, [authSession?.id, isLoggedIn]);
 
   useEffect(() => {
     setAuthSession(getAuthSession());
@@ -316,6 +399,11 @@ export function LoanApplicationPage() {
         jobTitle: employment.position || employment.employerName || 'Applicant',
         address,
         idDocumentNumber: documents.idNumber,
+        phone: personalInfo.phone || undefined,
+        dateOfBirth: personalInfo.dateOfBirth || undefined,
+        monthlyIncome: employment.monthlyIncome ? Number(employment.monthlyIncome) : undefined,
+        livingCosts: employment.livingCosts ? Number(employment.livingCosts) : undefined,
+        dependents: employment.dependents ? Number(employment.dependents) : undefined,
         provider: offer.providerName,
         providerOfferId: offer.id,
         installment: offer.monthlyInstallment,
@@ -370,13 +458,34 @@ export function LoanApplicationPage() {
 
       if (authSession?.id && isLoggedIn) {
         try {
-          await updateUserProfile(authSession.id, {
+          const updatedProfile = await updateUserProfile(authSession.id, {
             firstName: personalInfo.firstName,
             lastName: personalInfo.lastName,
             age: age ?? null,
             jobTitle: employment.position || employment.employerName || null,
             address,
+            phone: personalInfo.phone || null,
+            dateOfBirth: personalInfo.dateOfBirth || null,
+            monthlyIncome: employment.monthlyIncome ? Number(employment.monthlyIncome) : null,
+            livingCosts: employment.livingCosts ? Number(employment.livingCosts) : null,
+            dependents: employment.dependents ? Number(employment.dependents) : null,
             idDocumentNumber: documents.idNumber || null,
+          });
+          setAuthSession({
+            id: updatedProfile.id,
+            email: updatedProfile.email,
+            role: updatedProfile.role,
+            firstName: updatedProfile.firstName,
+            lastName: updatedProfile.lastName,
+            phone: updatedProfile.phone,
+            dateOfBirth: updatedProfile.dateOfBirth,
+            address: updatedProfile.address,
+            jobTitle: updatedProfile.jobTitle,
+            monthlyIncome: updatedProfile.monthlyIncome,
+            livingCosts: updatedProfile.livingCosts,
+            dependents: updatedProfile.dependents,
+            idDocumentNumber: updatedProfile.idDocumentNumber,
+            token: updatedProfile.token,
           });
 
           const response = await createApplicationForCurrentUser({

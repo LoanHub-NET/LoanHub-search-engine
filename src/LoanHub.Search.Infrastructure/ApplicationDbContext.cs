@@ -45,6 +45,7 @@ public sealed class ApplicationDbContext : DbContext
                 details.Property(d => d.JobTitle).HasMaxLength(160);
                 details.Property(d => d.Address).HasMaxLength(320);
                 details.Property(d => d.IdDocumentNumber).HasMaxLength(80);
+                details.Property(d => d.Phone).HasMaxLength(40);
             });
 
             entity.OwnsOne(application => application.OfferSnapshot, snapshot =>
