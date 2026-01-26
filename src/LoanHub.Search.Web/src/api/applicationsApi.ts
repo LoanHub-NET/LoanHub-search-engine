@@ -19,6 +19,11 @@ export interface ApplicationRequest extends ApplicationRequestBase {
   jobTitle: string;
   address: string;
   idDocumentNumber: string;
+  phone?: string;
+  dateOfBirth?: string;
+  monthlyIncome?: number;
+  livingCosts?: number;
+  dependents?: number;
 }
 
 export interface ApplicationResponse {
