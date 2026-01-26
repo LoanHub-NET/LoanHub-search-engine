@@ -531,7 +531,26 @@ export function LoanApplicationPage() {
   if (currentStep === 'submitted' && submissionResult) {
     return (
       <div className="application-page-wrapper">
-        <Header onLoginClick={() => navigate('/login')} onSearchClick={() => navigate('/search')} />
+        <Header
+          onLoginClick={() => navigate('/login')}
+          onSearchClick={() => navigate('/search')}
+          adminUser={
+            authSession
+              ? {
+                  name:
+                    `${authSession.firstName ?? ''} ${authSession.lastName ?? ''}`.trim() ||
+                    authSession.email,
+                  email: authSession.email,
+                  role: authSession.role,
+                }
+              : undefined
+          }
+          onLogout={() => {
+            clearAuthSession();
+            setAuthSession(null);
+            navigate('/login');
+          }}
+        />
         <div className="application-page">
           <div className="application-container">
             <div className="submission-success-card">
@@ -594,7 +613,26 @@ export function LoanApplicationPage() {
   
   return (
     <div className="application-page-wrapper">
-      <Header onLoginClick={() => navigate('/login')} onSearchClick={() => navigate('/search')} />
+      <Header
+        onLoginClick={() => navigate('/login')}
+        onSearchClick={() => navigate('/search')}
+        adminUser={
+          authSession
+            ? {
+                name:
+                  `${authSession.firstName ?? ''} ${authSession.lastName ?? ''}`.trim() ||
+                  authSession.email,
+                email: authSession.email,
+                role: authSession.role,
+              }
+            : undefined
+        }
+        onLogout={() => {
+          clearAuthSession();
+          setAuthSession(null);
+          navigate('/login');
+        }}
+      />
       <div className="application-page">
         <div className="application-container">
           {/* Progress Steps */}
