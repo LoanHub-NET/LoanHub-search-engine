@@ -136,6 +136,11 @@ public sealed class UsersController : ControllerBase
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
+                null,
                 null);
 
             user = await _service.RegisterExternalAsync(
