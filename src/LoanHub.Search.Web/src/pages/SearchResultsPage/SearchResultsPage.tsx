@@ -6,124 +6,122 @@ import { formatCurrency, formatPercent, formatDuration } from '../../utils/forma
 import type { LoanOffer } from '../../types';
 import './SearchResultsPage.css';
 
-const providers = [
-  { id: 'bank1', name: 'First National Bank', logo: '🏦' },
-  { id: 'bank2', name: 'Metro Credit Union', logo: '🏢' },
-  { id: 'bank3', name: 'Digital Finance Co.', logo: '💳' },
-  { id: 'bank4', name: 'Summit Trust', logo: '🏛️' },
-  { id: 'bank5', name: 'Harborline Bank', logo: '💼' },
-];
-const minProvidersForResults = 3;
+type QuickSearchOffer = {
+  provider: string;
+  providerOfferId: string;
+  installment: number;
+  apr: number;
+  totalCost: number;
+  validUntil: string;
+};
 
-const generateMockOffer = (
+type QuickSearchSource = {
+  provider: string;
+  status: string;
+  durationMs: number;
+  error?: string | null;
+};
+
+type QuickSearchResponse = {
+  inquiryId: string;
+  offers: QuickSearchOffer[];
+  sources: QuickSearchSource[];
+};
+
+const getProviderLogo = (providerName: string) => providerName.charAt(0).toUpperCase();
+
+const mapQuickOfferToLoanOffer = (
+  offer: QuickSearchOffer,
   amount: number,
   duration: number,
-  provider: typeof providers[number],
-  index: number,
-): LoanOffer => {
-  const baseRate = 5 + index * 1.5 + Math.random() * 2;
-  const rate = Math.round(baseRate * 100) / 100;
-  const monthlyRate = rate / 100 / 12;
-  const installment =
-    amount * (monthlyRate * Math.pow(1 + monthlyRate, duration)) /
-    (Math.pow(1 + monthlyRate, duration) - 1);
-
-  return {
-    id: `offer-${provider.id}-${Date.now()}`,
-    providerId: provider.id,
-    providerName: provider.name,
-    providerLogo: provider.logo,
-    amount,
-    duration,
-    monthlyInstallment: Math.round(installment * 100) / 100,
-    interestRate: rate,
-    apr: rate + 0.5,
-    totalRepayment: Math.round(installment * duration * 100) / 100,
-    isPersonalized: false,
-    validUntil: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
-  };
-};
+): LoanOffer => ({
+  id: offer.providerOfferId,
+  providerId: offer.provider.toLowerCase().replace(/\s+/g, '-'),
+  providerName: offer.provider,
+  providerLogo: getProviderLogo(offer.provider),
+  amount,
+  duration,
+  monthlyInstallment: offer.installment,
+  interestRate: offer.apr,
+  apr: offer.apr,
+  totalRepayment: offer.totalCost,
+  isPersonalized: false,
+  validUntil: new Date(offer.validUntil),
+});
 
 export function SearchResultsPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
   const [offers, setOffers] = useState<LoanOffer[]>([]);
+  const [sources, setSources] = useState<QuickSearchSource[]>([]);
   const [showBlockingLoad, setShowBlockingLoad] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [respondedProviders, setRespondedProviders] = useState<string[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const amount = Number(searchParams.get('amount')) || 10000;
   const duration = Number(searchParams.get('duration')) || 12;
   const hasIncome = searchParams.has('income');
 
   useEffect(() => {
-    // Simulate API call with progress
     setShowBlockingLoad(true);
     setLoadingProgress(0);
-    setRespondedProviders([]);
     setOffers([]);
+    setSources([]);
+    setErrorMessage(null);
 
+    const controller = new AbortController();
     const progressInterval = setInterval(() => {
-      setLoadingProgress((prev) => {
-        if (prev >= 100) return 100;
-        if (prev >= 95) return 95;
-        return prev + Math.random() * 12;
-      });
+      setLoadingProgress((prev) => (prev >= 90 ? prev : prev + Math.random() * 12));
     }, 250);
 
-    const blockingTimeout = setTimeout(() => {
-      setShowBlockingLoad(false);
-    }, 5000);
-    const completionTimeouts: Array<ReturnType<typeof setTimeout>> = [];
-
-    const timeouts: Array<ReturnType<typeof setTimeout>> = [];
-
-    const providerDelays = [800, 1400, 2000, 9000, 12000];
-    providers.forEach((provider, index) => {
-      const delay = providerDelays[index] ?? (1500 + index * 1000);
-      const timeout = setTimeout(() => {
-        setRespondedProviders((prev) => {
-          const next = [...prev, provider.id];
-          if (next.length >= providers.length) {
-            setLoadingProgress(100);
-          } else {
-            setLoadingProgress((progress) => Math.min(95, progress + 20));
-          }
-
-          if (next.length >= minProvidersForResults) {
-            clearTimeout(blockingTimeout);
-            completionTimeouts.forEach(clearTimeout);
-            completionTimeouts.push(
-              setTimeout(() => {
-                setShowBlockingLoad(false);
-              }, 600),
-            );
-          }
-          return next;
+    const loadQuickSearch = async () => {
+      try {
+        const response = await fetch('/api/search/quick', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            amount,
+            durationMonths: duration,
+          }),
+          signal: controller.signal,
         });
-        setOffers((prev) => {
-          const next = [
-            ...prev,
-            generateMockOffer(amount, duration, provider, index),
-          ];
-          return next.sort((a, b) => a.monthlyInstallment - b.monthlyInstallment);
-        });
-      }, delay);
-      timeouts.push(timeout);
-    });
 
-    const maxTimeout = setTimeout(() => {
-      setLoadingProgress(100);
-      setShowBlockingLoad(false);
-    }, 15000);
+        if (!response.ok) {
+          const message = await response.text();
+          throw new Error(message || 'Failed to load offers.');
+        }
+
+        const data = (await response.json()) as QuickSearchResponse;
+        const mappedOffers = data.offers
+          .map((offer) => mapQuickOfferToLoanOffer(offer, amount, duration))
+          .sort((a, b) => a.monthlyInstallment - b.monthlyInstallment);
+
+        setOffers(mappedOffers);
+        setSources(data.sources);
+        setLoadingProgress(100);
+        setShowBlockingLoad(false);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setErrorMessage(
+          error instanceof Error ? error.message : 'Unable to load offers right now.',
+        );
+        setShowBlockingLoad(false);
+        setLoadingProgress(0);
+      } finally {
+        clearInterval(progressInterval);
+      }
+    };
+
+    loadQuickSearch();
 
     return () => {
-      clearTimeout(maxTimeout);
-      clearTimeout(blockingTimeout);
-      completionTimeouts.forEach(clearTimeout);
+      controller.abort();
       clearInterval(progressInterval);
-      timeouts.forEach(clearTimeout);
     };
   }, [amount, duration]);
 
@@ -151,9 +149,8 @@ export function SearchResultsPage() {
     navigate('/apply', { state: { offer: applicationOffer } });
   };
 
-  const pendingProviders = providers.filter(
-    (provider) => !respondedProviders.includes(provider.id),
-  );
+  const availableProviders = sources.filter((source) => source.status === 'Ok');
+  const pendingProviders = sources.filter((source) => source.status !== 'Ok');
 
   return (
     <div className="results-page">
@@ -199,17 +196,7 @@ export function SearchResultsPage() {
                 </div>
                 
                 <div className="providers-status">
-                  {providers.map((provider) => (
-                    <span
-                      key={provider.id}
-                      className={`provider-dot ${
-                        respondedProviders.includes(provider.id) ? 'active' : ''
-                      }`}
-                    ></span>
-                  ))}
-                  <span className="status-text">
-                    {respondedProviders.length} providers responded
-                  </span>
+                  <span className="status-text">Collecting offers from providers...</span>
                 </div>
                 
                 <p className="loading-note">
@@ -220,11 +207,20 @@ export function SearchResultsPage() {
           ) : (
             <>
               <div className="results-info">
-                {respondedProviders.length < providers.length ? (
+                {sources.length === 0 ? (
+                  <div className="info-partial">
+                    <div className="partial-text">Waiting for provider status updates.</div>
+                    <div className="partial-loader">
+                      <span className="pulse-dot"></span>
+                      <span className="pulse-dot"></span>
+                      <span className="pulse-dot"></span>
+                    </div>
+                  </div>
+                ) : availableProviders.length < sources.length ? (
                   <div className="info-partial">
                     <div className="partial-text">
-                      Available results: {respondedProviders.length}/{providers.length}.{' '}
-                      Waiting for {providers.length - respondedProviders.length} providers.
+                      Available results: {availableProviders.length}/{sources.length}.{' '}
+                      {sources.length - availableProviders.length} providers unavailable.
                     </div>
                     <div className="partial-loader">
                       <span className="pulse-dot"></span>
@@ -250,7 +246,30 @@ export function SearchResultsPage() {
                 )}
               </div>
 
+              {errorMessage && (
+                <div className="info-notice">
+                  <span className="notice-icon">⚠️</span>
+                  <span>{errorMessage}</span>
+                </div>
+              )}
+
               <div className="offers-list">
+                {offers.length === 0 && !errorMessage && (
+                  <div className="offer-card pending-offer">
+                    <div className="offer-header">
+                      <div className="provider-info">
+                        <span className="provider-logo">ℹ️</span>
+                        <span className="provider-name">No offers yet</span>
+                      </div>
+                    </div>
+                    <div className="offer-details">
+                      <div className="detail-item main">
+                        <span className="detail-label">Monthly Payment</span>
+                        <span className="detail-value">—</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {offers.map((offer, index) => (
                   <div 
                     key={offer.id} 
@@ -312,13 +331,13 @@ export function SearchResultsPage() {
                 ))}
 
                 {pendingProviders.map((provider) => (
-                  <div key={provider.id} className="offer-card pending-offer">
+                  <div key={provider.provider} className="offer-card pending-offer">
                     <div className="offer-header">
                       <div className="provider-info">
-                        <span className="provider-logo">{provider.logo}</span>
-                        <span className="provider-name">{provider.name}</span>
+                        <span className="provider-logo">{getProviderLogo(provider.provider)}</span>
+                        <span className="provider-name">{provider.provider}</span>
                       </div>
-                      <span className="pending-tag">Pending</span>
+                      <span className="pending-tag">{provider.status}</span>
                     </div>
 
                     <div className="offer-details">
@@ -345,7 +364,7 @@ export function SearchResultsPage() {
 
                     <div className="offer-actions">
                       <button className="select-btn pending-btn" type="button" disabled>
-                        Waiting for response...
+                        {provider.error ?? 'No response from provider'}
                       </button>
                     </div>
                   </div>
