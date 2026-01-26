@@ -2,6 +2,14 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
+import { createApplication, createApplicationForCurrentUser } from '../../api/applicationsApi';
+import {
+  ApiError,
+  clearAuthSession,
+  getAuthSession,
+  storePendingProfile,
+} from '../../api/apiConfig';
+import { updateUserProfile } from '../../api/userApi';
 import type { 
   ApplicationStep, 
   ApplicationFormData,
@@ -13,8 +21,7 @@ import type {
 } from '../../types/application.types';
 import { 
   APPLICATION_STEPS, 
-  INITIAL_APPLICATION_DATA,
-  MOCK_LOGGED_IN_USER 
+  INITIAL_APPLICATION_DATA
 } from '../../types/application.types';
 import './LoanApplicationPage.css';
 
@@ -58,8 +65,8 @@ export function LoanApplicationPage() {
   // Get initial offer from location state
   const initialOffer = (location.state?.offer as ApplicationOffer | undefined) || null;
   
-  // Mock logged-in state (toggle for testing)
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authSession, setAuthSession] = useState(getAuthSession());
+  const isLoggedIn = Boolean(authSession?.token);
   
   // Current step
   const [currentStep, setCurrentStep] = useState<ApplicationStep>('offer-details');
@@ -78,6 +85,7 @@ export function LoanApplicationPage() {
     referenceNumber: string;
     message: string;
   } | null>(null);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   
   // Load offer from URL params if not from location state
   useEffect(() => {
@@ -104,13 +112,21 @@ export function LoanApplicationPage() {
   // Auto-fill user data if logged in
   useEffect(() => {
     if (isLoggedIn) {
+      const firstName = authSession?.firstName ?? '';
+      const lastName = authSession?.lastName ?? '';
+      const email = authSession?.email ?? '';
       setFormData(prev => ({
         ...prev,
         authMode: 'logged-in',
-        personalInfo: MOCK_LOGGED_IN_USER.personalInfo,
-        employment: MOCK_LOGGED_IN_USER.employment,
+        personalInfo: {
+          ...prev.personalInfo,
+          firstName,
+          lastName,
+          email,
+        },
+        employment: prev.employment,
         documents: {
-          ...MOCK_LOGGED_IN_USER.documents,
+          ...prev.documents,
           idFrontFile: undefined,
           idBackFile: undefined,
           additionalDocs: undefined,
@@ -122,7 +138,11 @@ export function LoanApplicationPage() {
         authMode: 'guest',
       }));
     }
-  }, [isLoggedIn]);
+  }, [authSession, isLoggedIn]);
+
+  useEffect(() => {
+    setAuthSession(getAuthSession());
+  }, []);
   
   // Get current step index
   const currentStepIndex = APPLICATION_STEPS.findIndex(s => s.id === currentStep);
@@ -241,22 +261,164 @@ export function LoanApplicationPage() {
   
   // Handle form submission
   const handleSubmit = async () => {
+    if (!formData.offer) {
+      setSubmissionError('Missing offer data. Please select an offer again.');
+      return;
+    }
+
     setIsSubmitting(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const referenceNumber = `LH-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-    
-    setSubmissionResult({
-      success: true,
-      referenceNumber,
-      message: 'Your application has been submitted successfully!',
-    });
-    
-    setCompletedSteps(prev => new Set([...prev, 'review']));
-    setCurrentStep('submitted');
-    setIsSubmitting(false);
+    setSubmissionError(null);
+
+    const submitAsGuest = async () => {
+      const personalInfo = formData.personalInfo;
+      const employment = formData.employment;
+      const documents = formData.documents;
+
+      const dateOfBirth = personalInfo.dateOfBirth ? new Date(personalInfo.dateOfBirth) : null;
+      const age = dateOfBirth && !Number.isNaN(dateOfBirth.getTime())
+        ? Math.max(0, new Date().getFullYear() - dateOfBirth.getFullYear())
+        : null;
+
+      const addressParts = [
+        personalInfo.address.street,
+        personalInfo.address.apartment ? `Apt ${personalInfo.address.apartment}` : '',
+        personalInfo.address.postalCode && personalInfo.address.city
+          ? `${personalInfo.address.postalCode} ${personalInfo.address.city}`
+          : personalInfo.address.city,
+        personalInfo.address.country,
+      ].filter(Boolean);
+      const address = addressParts.join(', ');
+
+      if (!personalInfo.email || !personalInfo.firstName || !personalInfo.lastName) {
+        throw new Error('Please provide your name and email before submitting.');
+      }
+
+      if (!age || age <= 0) {
+        throw new Error('Please provide a valid date of birth.');
+      }
+
+      if (!employment.position && !employment.employerName) {
+        throw new Error('Please provide your job title or employer.');
+      }
+
+      if (!documents.idNumber) {
+        throw new Error('Please provide your ID document number.');
+      }
+
+      const offer = formData.offer!;
+      const validUntil = offer.validUntil ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      const response = await createApplication({
+        applicantEmail: personalInfo.email,
+        firstName: personalInfo.firstName,
+        lastName: personalInfo.lastName,
+        age,
+        jobTitle: employment.position || employment.employerName || 'Applicant',
+        address,
+        idDocumentNumber: documents.idNumber,
+        provider: offer.providerName,
+        providerOfferId: offer.id,
+        installment: offer.monthlyInstallment,
+        apr: offer.apr,
+        totalCost: offer.totalRepayment,
+        amount: offer.amount,
+        durationMonths: offer.duration,
+        validUntil: validUntil.toISOString(),
+      });
+
+      storePendingProfile({
+        email: personalInfo.email,
+        firstName: personalInfo.firstName,
+        lastName: personalInfo.lastName,
+        phone: personalInfo.phone,
+        dateOfBirth: personalInfo.dateOfBirth,
+        address,
+        jobTitle: employment.position || employment.employerName || undefined,
+        monthlyIncome: employment.monthlyIncome ? Number(employment.monthlyIncome) : undefined,
+        livingCosts: employment.livingCosts ? Number(employment.livingCosts) : undefined,
+        dependents: employment.dependents ? Number(employment.dependents) : undefined,
+        idDocumentNumber: documents.idNumber || undefined,
+      });
+
+      return response.id;
+    };
+
+    try {
+      const personalInfo = formData.personalInfo;
+      const employment = formData.employment;
+      const documents = formData.documents;
+
+      const dateOfBirth = personalInfo.dateOfBirth ? new Date(personalInfo.dateOfBirth) : null;
+      const age = dateOfBirth && !Number.isNaN(dateOfBirth.getTime())
+        ? Math.max(0, new Date().getFullYear() - dateOfBirth.getFullYear())
+        : null;
+
+      const addressParts = [
+        personalInfo.address.street,
+        personalInfo.address.apartment ? `Apt ${personalInfo.address.apartment}` : '',
+        personalInfo.address.postalCode && personalInfo.address.city
+          ? `${personalInfo.address.postalCode} ${personalInfo.address.city}`
+          : personalInfo.address.city,
+        personalInfo.address.country,
+      ].filter(Boolean);
+      const address = addressParts.join(', ');
+
+      const offer = formData.offer;
+      const validUntil = offer.validUntil ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      let referenceId: string;
+
+      if (authSession?.id && isLoggedIn) {
+        try {
+          await updateUserProfile(authSession.id, {
+            firstName: personalInfo.firstName,
+            lastName: personalInfo.lastName,
+            age: age ?? null,
+            jobTitle: employment.position || employment.employerName || null,
+            address,
+            idDocumentNumber: documents.idNumber || null,
+          });
+
+          const response = await createApplicationForCurrentUser({
+            provider: offer.providerName,
+            providerOfferId: offer.id,
+            installment: offer.monthlyInstallment,
+            apr: offer.apr,
+            totalCost: offer.totalRepayment,
+            amount: offer.amount,
+            durationMonths: offer.duration,
+            validUntil: validUntil.toISOString(),
+          });
+
+          referenceId = response.id;
+        } catch (err: unknown) {
+          if (err instanceof ApiError && err.status === 401) {
+            clearAuthSession();
+            setAuthSession(null);
+            referenceId = await submitAsGuest();
+          } else {
+            throw err;
+          }
+        }
+      } else {
+        referenceId = await submitAsGuest();
+      }
+
+      setSubmissionResult({
+        success: true,
+        referenceNumber: referenceId,
+        message: 'Your application has been submitted successfully!',
+      });
+
+      setCompletedSteps(prev => new Set([...prev, 'review']));
+      setCurrentStep('submitted');
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'We could not submit your application.';
+      setSubmissionError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   // No offer selected
@@ -315,7 +477,21 @@ export function LoanApplicationPage() {
                   </button>
                 ) : (
                   <>
-                    <button className="btn-primary" onClick={() => navigate('/register')}>
+                    <button
+                      className="btn-primary"
+                      onClick={() =>
+                        navigate('/login?mode=register', {
+                          state: {
+                            prefill: {
+                              firstName: formData.personalInfo.firstName,
+                              lastName: formData.personalInfo.lastName,
+                              email: formData.personalInfo.email,
+                              phone: formData.personalInfo.phone,
+                            },
+                          },
+                        })
+                      }
+                    >
                       Create Account to Track
                     </button>
                     <button className="btn-secondary" onClick={() => navigate('/')}>
@@ -361,19 +537,6 @@ export function LoanApplicationPage() {
               </div>
             );
           })}
-        </div>
-        
-        {/* Login Toggle (for demo purposes) */}
-        <div className="demo-login-toggle">
-          <label className="toggle-label">
-            <input 
-              type="checkbox" 
-              checked={isLoggedIn} 
-              onChange={(e) => setIsLoggedIn(e.target.checked)} 
-            />
-            <span className="toggle-slider"></span>
-            Demo: Logged in user (auto-fill enabled)
-          </label>
         </div>
         
         {/* Step Content */}
@@ -437,6 +600,7 @@ export function LoanApplicationPage() {
             <ReviewStep
               formData={formData}
               consents={formData.consents}
+              submissionError={submissionError}
               onUpdateConsents={updateConsents}
               onSubmit={handleSubmit}
               onBack={goToPrevStep}
@@ -1107,13 +1271,22 @@ function DocumentsStep({ data, onChange, onNext, onBack }: DocumentsStepProps) {
 interface ReviewStepProps {
   formData: ApplicationFormData;
   consents: ApplicationFormData['consents'];
+  submissionError: string | null;
   onUpdateConsents: (key: keyof ApplicationFormData['consents'], value: boolean) => void;
   onSubmit: () => void;
   onBack: () => void;
   isSubmitting: boolean;
 }
 
-function ReviewStep({ formData, consents, onUpdateConsents, onSubmit, onBack, isSubmitting }: ReviewStepProps) {
+function ReviewStep({
+  formData,
+  consents,
+  submissionError,
+  onUpdateConsents,
+  onSubmit,
+  onBack,
+  isSubmitting,
+}: ReviewStepProps) {
   const canSubmit = consents.termsAccepted && consents.privacyAccepted && consents.creditCheckAuthorized;
   
   return (
@@ -1290,6 +1463,12 @@ function ReviewStep({ formData, consents, onUpdateConsents, onSubmit, onBack, is
           </span>
         </label>
       </div>
+
+      {submissionError && (
+        <div className="form-error">
+          {submissionError}
+        </div>
+      )}
       
       <div className="step-actions">
         <button className="btn-secondary" onClick={onBack} disabled={isSubmitting}>

@@ -32,6 +32,25 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
+builder.Services.AddCors(options =>
+{
+    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+    options.AddPolicy("Frontend", policy =>
+    {
+        if (allowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
+        else
+        {
+            policy.AllowAnyOrigin()
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
+    });
+});
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<OidcOptions>(builder.Configuration.GetSection("Oidc"));
@@ -161,11 +180,43 @@ using (var scope = app.Services.CreateScope())
         dbContext.Database.EnsureDeleted();
         dbContext.Database.EnsureCreated();
     }
+
+    dbContext.Database.ExecuteSqlRaw("""
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "RejectReason" text;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "UserId" uuid;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Provider" varchar(120);
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_ProviderOfferId" varchar(120);
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Installment" numeric;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Apr" numeric;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_TotalCost" numeric;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Amount" numeric;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_DurationMonths" integer;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_ValidUntil" timestamptz;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ContractReadyAt" timestamptz;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractFileName" varchar(240);
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractBlobName" varchar(320);
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractContentType" varchar(160);
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractReceivedAt" timestamptz;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "FinalApprovedAt" timestamptz;
+        """);
+    dbContext.Database.ExecuteSqlRaw("""
+        UPDATE "Applications"
+        SET "OfferSnapshot_ValidUntil" = COALESCE("OfferSnapshot_ValidUntil", "CreatedAt", NOW()) + INTERVAL '7 days'
+        WHERE "OfferSnapshot_ValidUntil" IS NULL;
+        """);
+    dbContext.Database.ExecuteSqlRaw("""
+        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "Phone" varchar(40);
+        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "DateOfBirth" timestamptz;
+        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "MonthlyIncome" numeric;
+        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "LivingCosts" numeric;
+        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "Dependents" integer;
+        """);
 }
 
 app.UseSwagger();
 app.UseSwaggerUI();
 
+app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 

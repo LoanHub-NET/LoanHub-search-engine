@@ -29,6 +29,11 @@ public sealed class UserService
             Age = profile.Age,
             JobTitle = profile.JobTitle,
             Address = profile.Address,
+            Phone = profile.Phone,
+            DateOfBirth = profile.DateOfBirth,
+            MonthlyIncome = profile.MonthlyIncome,
+            LivingCosts = profile.LivingCosts,
+            Dependents = profile.Dependents,
             IdDocumentNumber = profile.IdDocumentNumber
         };
 
@@ -68,6 +73,11 @@ public sealed class UserService
                 Age = profile.Age,
                 JobTitle = profile.JobTitle,
                 Address = profile.Address,
+                Phone = profile.Phone,
+                DateOfBirth = profile.DateOfBirth,
+                MonthlyIncome = profile.MonthlyIncome,
+                LivingCosts = profile.LivingCosts,
+                Dependents = profile.Dependents,
                 IdDocumentNumber = profile.IdDocumentNumber
             };
 
@@ -102,6 +112,11 @@ public sealed class UserService
         user.Age = profile.Age;
         user.JobTitle = profile.JobTitle;
         user.Address = profile.Address;
+        user.Phone = profile.Phone;
+        user.DateOfBirth = profile.DateOfBirth;
+        user.MonthlyIncome = profile.MonthlyIncome;
+        user.LivingCosts = profile.LivingCosts;
+        user.Dependents = profile.Dependents;
         user.IdDocumentNumber = profile.IdDocumentNumber;
         user.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -114,6 +129,11 @@ public sealed class UserService
         int? Age,
         string? JobTitle,
         string? Address,
+        string? Phone,
+        DateTime? DateOfBirth,
+        decimal? MonthlyIncome,
+        decimal? LivingCosts,
+        int? Dependents,
         string? IdDocumentNumber
     );
 }

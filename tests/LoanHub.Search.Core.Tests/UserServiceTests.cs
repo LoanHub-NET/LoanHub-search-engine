@@ -11,7 +11,7 @@ public sealed class UserServiceTests
     {
         var repository = new InMemoryUserRepository();
         var service = new UserService(repository);
-        var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", "ABC123");
+        var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", null, null, null, null, null, "ABC123");
 
         await service.RegisterLocalAsync("jane@example.com", "Password1!", profile, CancellationToken.None);
 
@@ -24,7 +24,7 @@ public sealed class UserServiceTests
     {
         var repository = new InMemoryUserRepository();
         var service = new UserService(repository);
-        var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", "ABC123");
+        var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", null, null, null, null, null, "ABC123");
 
         var user = await service.RegisterLocalAsync("jane@example.com", "Password1!", profile, CancellationToken.None);
 
@@ -39,7 +39,7 @@ public sealed class UserServiceTests
     {
         var repository = new InMemoryUserRepository();
         var service = new UserService(repository);
-        var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", "ABC123");
+        var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", null, null, null, null, null, "ABC123");
 
         var user = await service.RegisterLocalAsync("jane@example.com", "Password1!", profile, CancellationToken.None);
 
@@ -55,7 +55,7 @@ public sealed class UserServiceTests
     {
         var repository = new InMemoryUserRepository();
         var service = new UserService(repository);
-        var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", "ABC123");
+        var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", null, null, null, null, null, "ABC123");
 
         await service.RegisterExternalAsync("google", "sub-123", "jane@example.com", profile, CancellationToken.None);
 
