@@ -25,6 +25,7 @@ import './UserDashboardPage.css';
 export function UserDashboardPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const storedProfileKeyPrefix = 'loanhub_user_profile_';
   
   // State
   const [activeTab, setActiveTab] = useState<DashboardTab>(
@@ -112,19 +113,38 @@ export function UserDashboardPage() {
   };
   
   const handleProfileUpdate = (updatedProfile: Partial<UserProfile>) => {
-    setProfile(prev => ({ ...prev, ...updatedProfile }));
+    setProfile(prev => {
+      const merged = { ...prev, ...updatedProfile };
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(`${storedProfileKeyPrefix}${merged.id}`, JSON.stringify(merged));
+      }
+      return merged;
+    });
     setIsEditingProfile(false);
   };
 
   useEffect(() => {
     const session = getAuthSession();
     if (session) {
+      const storedProfileRaw =
+        typeof window !== 'undefined'
+          ? window.localStorage.getItem(`${storedProfileKeyPrefix}${session.id}`)
+          : null;
+      let storedProfile: Partial<UserProfile> | null = null;
+      if (storedProfileRaw) {
+        try {
+          storedProfile = JSON.parse(storedProfileRaw) as Partial<UserProfile>;
+        } catch {
+          storedProfile = null;
+        }
+      }
       setProfile((prev) => ({
         ...prev,
+        ...storedProfile,
         id: session.id,
         email: session.email,
-        firstName: session.firstName || 'User',
-        lastName: session.lastName || '',
+        firstName: storedProfile?.firstName || session.firstName || 'User',
+        lastName: storedProfile?.lastName || session.lastName || '',
       }));
     }
 
@@ -765,6 +785,10 @@ interface ProfileSectionProps {
 
 function ProfileSection({ profile, isEditing, onEdit, onSave, onCancel }: ProfileSectionProps) {
   const [formData, setFormData] = useState<UserProfile>(profile);
+
+  useEffect(() => {
+    setFormData(profile);
+  }, [profile]);
   
   const handleChange = (field: string, value: string | number | boolean) => {
     setFormData(prev => {
