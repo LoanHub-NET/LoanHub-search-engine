@@ -49,7 +49,6 @@ export function SearchResultsPage() {
   const navigate = useNavigate();
   
   const [offers, setOffers] = useState<LoanOffer[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [showBlockingLoad, setShowBlockingLoad] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [respondedProviders, setRespondedProviders] = useState<string[]>([]);
@@ -60,7 +59,6 @@ export function SearchResultsPage() {
 
   useEffect(() => {
     // Simulate API call with progress
-    setIsLoading(true);
     setShowBlockingLoad(true);
     setLoadingProgress(0);
     setRespondedProviders([]);
@@ -111,14 +109,12 @@ export function SearchResultsPage() {
           ];
           return next.sort((a, b) => a.monthlyInstallment - b.monthlyInstallment);
         });
-        setIsLoading(false);
       }, delay);
       timeouts.push(timeout);
     });
 
     const maxTimeout = setTimeout(() => {
       setLoadingProgress(100);
-      setIsLoading(false);
       setShowBlockingLoad(false);
     }, 15000);
 

@@ -268,6 +268,24 @@ export const ADMIN_STATUS_CONFIG: Record<AdminApplicationStatus, {
     bgColor: 'rgba(16, 185, 129, 0.1)',
     icon: '✅',
   },
+  contract_ready: {
+    label: 'Contract Ready',
+    color: '#0ea5e9',
+    bgColor: 'rgba(14, 165, 233, 0.1)',
+    icon: '📄',
+  },
+  signed_contract_received: {
+    label: 'Signed Contract Received',
+    color: '#6366f1',
+    bgColor: 'rgba(99, 102, 241, 0.1)',
+    icon: '✍️',
+  },
+  final_approved: {
+    label: 'Final Approved',
+    color: '#16a34a',
+    bgColor: 'rgba(22, 163, 74, 0.1)',
+    icon: '🏁',
+  },
   granted: {
     label: 'Granted',
     color: '#059669',
