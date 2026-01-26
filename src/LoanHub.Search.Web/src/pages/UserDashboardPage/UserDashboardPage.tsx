@@ -447,7 +447,13 @@ function ApplicationsSection({
             <span className="empty-icon">📋</span>
             <h3>No applications found</h3>
             <p>Start a new loan search to see your applications here.</p>
-            <a href="/search" className="btn btn-primary">Start New Search</a>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => navigate('/search')}
+            >
+              Start New Search
+            </button>
           </div>
         ) : (
           applications.map(app => (
