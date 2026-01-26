@@ -62,6 +62,11 @@ export function SearchResultsPage() {
   const amount = Number(searchParams.get('amount')) || 10000;
   const duration = Number(searchParams.get('duration')) || 12;
   const hasIncome = searchParams.has('income');
+  const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)
+    ?? (import.meta.env.DEV
+      ? '/api'
+      : `http://${window.location.hostname}:8080/api`);
+  const quickSearchUrl = `${apiBase.replace(/\/$/, '')}/search/quick`;
 
   useEffect(() => {
     setShowBlockingLoad(true);
@@ -77,7 +82,7 @@ export function SearchResultsPage() {
 
     const loadQuickSearch = async () => {
       try {
-        const response = await fetch('/api/search/quick', {
+        const response = await fetch(quickSearchUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
