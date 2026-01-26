@@ -1,48 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
 import { formatCurrency, formatPercent, formatDuration } from '../../utils/formatters';
-import type { LoanOffer } from '../../types';
+import type { LoanOffer, LoanProvider } from '../../types';
+import { searchDetailed, searchQuick } from '../../api/searchApi';
 import './SearchResultsPage.css';
 
-const providers = [
-  { id: 'bank1', name: 'First National Bank', logo: '🏦' },
-  { id: 'bank2', name: 'Metro Credit Union', logo: '🏢' },
-  { id: 'bank3', name: 'Digital Finance Co.', logo: '💳' },
-  { id: 'bank4', name: 'Summit Trust', logo: '🏛️' },
-  { id: 'bank5', name: 'Harborline Bank', logo: '💼' },
-];
-const minProvidersForResults = 3;
-
-const generateMockOffer = (
-  amount: number,
-  duration: number,
-  provider: typeof providers[number],
-  index: number,
-): LoanOffer => {
-  const baseRate = 5 + index * 1.5 + Math.random() * 2;
-  const rate = Math.round(baseRate * 100) / 100;
-  const monthlyRate = rate / 100 / 12;
-  const installment =
-    amount * (monthlyRate * Math.pow(1 + monthlyRate, duration)) /
-    (Math.pow(1 + monthlyRate, duration) - 1);
-
-  return {
-    id: `offer-${provider.id}-${Date.now()}`,
-    providerId: provider.id,
-    providerName: provider.name,
-    providerLogo: provider.logo,
-    amount,
-    duration,
-    monthlyInstallment: Math.round(installment * 100) / 100,
-    interestRate: rate,
-    apr: rate + 0.5,
-    totalRepayment: Math.round(installment * duration * 100) / 100,
-    isPersonalized: false,
-    validUntil: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
-  };
+const providerLogoMap: Record<string, string> = {
+  MockBank1: '🏦',
+  MockBank2: '🏛️',
 };
+
+const fallbackProviders: LoanProvider[] = [
+  { id: 'mockbank1', name: 'MockBank1', logo: '🏦' },
+  { id: 'mockbank2', name: 'MockBank2', logo: '🏛️' },
+];
+
+const minProvidersForResults = 2;
+
+const toSlug = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
 export function SearchResultsPage() {
   const [searchParams] = useSearchParams();
@@ -52,17 +29,37 @@ export function SearchResultsPage() {
   const [showBlockingLoad, setShowBlockingLoad] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [respondedProviders, setRespondedProviders] = useState<string[]>([]);
+  const [providers, setProviders] = useState<LoanProvider[]>(fallbackProviders);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const amount = Number(searchParams.get('amount')) || 10000;
   const duration = Number(searchParams.get('duration')) || 12;
-  const hasIncome = searchParams.has('income');
+  const incomeParam = searchParams.get('income');
+  const costsParam = searchParams.get('costs');
+  const dependentsParam = searchParams.get('dependents');
+
+  const income = incomeParam ? Number(incomeParam) : null;
+  const livingCosts = costsParam ? Number(costsParam) : null;
+  const dependents = dependentsParam ? Number(dependentsParam) : null;
+
+  const isPersonalizedSearch = useMemo(() => {
+    if (income === null || livingCosts === null || dependents === null) {
+      return false;
+    }
+    return income > 0 && livingCosts >= 0 && dependents >= 0;
+  }, [income, livingCosts, dependents]);
 
   useEffect(() => {
-    // Simulate API call with progress
+    const controller = new AbortController();
+    let isActive = true;
+
     setShowBlockingLoad(true);
     setLoadingProgress(0);
     setRespondedProviders([]);
     setOffers([]);
+    setErrorMessage(null);
+    setProviders(fallbackProviders);
 
     const progressInterval = setInterval(() => {
       setLoadingProgress((prev) => {
@@ -72,60 +69,74 @@ export function SearchResultsPage() {
       });
     }, 250);
 
-    const blockingTimeout = setTimeout(() => {
-      setShowBlockingLoad(false);
-    }, 5000);
-    const completionTimeouts: Array<ReturnType<typeof setTimeout>> = [];
-
-    const timeouts: Array<ReturnType<typeof setTimeout>> = [];
-
-    const providerDelays = [800, 1400, 2000, 9000, 12000];
-    providers.forEach((provider, index) => {
-      const delay = providerDelays[index] ?? (1500 + index * 1000);
-      const timeout = setTimeout(() => {
-        setRespondedProviders((prev) => {
-          const next = [...prev, provider.id];
-          if (next.length >= providers.length) {
-            setLoadingProgress(100);
-          } else {
-            setLoadingProgress((progress) => Math.min(95, progress + 20));
-          }
-
-          if (next.length >= minProvidersForResults) {
-            clearTimeout(blockingTimeout);
-            completionTimeouts.forEach(clearTimeout);
-            completionTimeouts.push(
-              setTimeout(() => {
-                setShowBlockingLoad(false);
-              }, 600),
+    const fetchOffers = async () => {
+      try {
+        const response = isPersonalizedSearch
+          ? await searchDetailed(
+              {
+                amount,
+                durationMonths: duration,
+                income: income ?? 0,
+                livingCosts: livingCosts ?? 0,
+                dependents: dependents ?? 0,
+              },
+              controller.signal,
+            )
+          : await searchQuick(
+              {
+                amount,
+                durationMonths: duration,
+              },
+              controller.signal,
             );
-          }
-          return next;
-        });
-        setOffers((prev) => {
-          const next = [
-            ...prev,
-            generateMockOffer(amount, duration, provider, index),
-          ];
-          return next.sort((a, b) => a.monthlyInstallment - b.monthlyInstallment);
-        });
-      }, delay);
-      timeouts.push(timeout);
-    });
 
-    const maxTimeout = setTimeout(() => {
-      setLoadingProgress(100);
-      setShowBlockingLoad(false);
-    }, 15000);
+        if (!isActive) return;
+
+        const apiProviders: LoanProvider[] = response.sources.map((source) => ({
+          id: toSlug(source.provider),
+          name: source.provider,
+          logo: providerLogoMap[source.provider] ?? '🏦',
+        }));
+
+        const mappedOffers: LoanOffer[] = response.offers.map((offer, index) => ({
+          id: `${offer.providerOfferId}-${index}`,
+          providerId: toSlug(offer.provider),
+          providerName: offer.provider,
+          providerLogo: providerLogoMap[offer.provider] ?? '🏦',
+          amount,
+          duration,
+          monthlyInstallment: offer.installment,
+          interestRate: offer.apr * 100,
+          apr: offer.apr * 100,
+          totalRepayment: offer.totalCost,
+          isPersonalized: isPersonalizedSearch,
+          validUntil: new Date(offer.validUntil),
+        }));
+
+        setProviders(apiProviders.length ? apiProviders : fallbackProviders);
+        setRespondedProviders(apiProviders.map((provider) => provider.id));
+        setOffers(
+          mappedOffers.sort((a, b) => a.monthlyInstallment - b.monthlyInstallment),
+        );
+        setLoadingProgress(100);
+        setShowBlockingLoad(false);
+      } catch (error) {
+        if (!isActive || controller.signal.aborted) return;
+        const message = error instanceof Error ? error.message : 'Failed to load offers.';
+        setErrorMessage(message);
+        setLoadingProgress(100);
+        setShowBlockingLoad(false);
+      }
+    };
+
+    void fetchOffers();
 
     return () => {
-      clearTimeout(maxTimeout);
-      clearTimeout(blockingTimeout);
-      completionTimeouts.forEach(clearTimeout);
+      isActive = false;
+      controller.abort();
       clearInterval(progressInterval);
-      timeouts.forEach(clearTimeout);
     };
-  }, [amount, duration]);
+  }, [amount, duration, dependents, income, isPersonalizedSearch, livingCosts, reloadKey]);
 
   const handleLoginClick = () => navigate('/login');
   const handleSearchClick = () => navigate('/search');
@@ -239,7 +250,7 @@ export function SearchResultsPage() {
                   </div>
                 )}
                 
-                {!hasIncome && (
+                {!isPersonalizedSearch && (
                   <div className="info-notice">
                     <span className="notice-icon">💡</span>
                     <span>
@@ -250,107 +261,120 @@ export function SearchResultsPage() {
                 )}
               </div>
 
-              <div className="offers-list">
-                {offers.map((offer, index) => (
-                  <div 
-                    key={offer.id} 
-                    className={`offer-card ${index === 0 ? 'best-offer' : ''}`}
-                  >
-                    {index === 0 && (
-                      <div className="best-badge">Best Rate</div>
-                    )}
-                    
-                    <div className="offer-header">
-                      <div className="provider-info">
-                        <span className="provider-logo">{offer.providerLogo}</span>
-                        <span className="provider-name">{offer.providerName}</span>
-                      </div>
-                    </div>
-
-                    <div className="offer-details">
-                      <div className="detail-item main">
-                        <span className="detail-label">Monthly Payment</span>
-                        <span className="detail-value">
-                          {formatCurrency(offer.monthlyInstallment)}
-                        </span>
-                      </div>
-                      
-                      <div className="detail-grid">
-                        <div className="detail-item">
-                          <span className="detail-label">Interest Rate</span>
-                          <span className="detail-value">{formatPercent(offer.interestRate)}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">APR</span>
-                          <span className="detail-value">{formatPercent(offer.apr)}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Total Repayment</span>
-                          <span className="detail-value">{formatCurrency(offer.totalRepayment)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="offer-actions">
-                      <button 
-                        className="select-btn"
-                        onClick={() => handleSelectOffer(offer)}
-                      >
-                        Apply Now →
-                      </button>
-                    </div>
-
-                    <div className="offer-footer">
-                      <span className="validity">
-                        Valid until {offer.validUntil.toLocaleDateString()}
-                      </span>
-                      {!offer.isPersonalized && (
-                        <span className="estimate-tag">Estimated rate</span>
+              {errorMessage ? (
+                <div className="loading-state">
+                  <div className="loading-card">
+                    <div className="loading-icon">⚠️</div>
+                    <h2>Unable to load offers</h2>
+                    <p>{errorMessage}</p>
+                    <button className="select-btn" onClick={() => setReloadKey((prev) => prev + 1)}>
+                      Try Again
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="offers-list">
+                  {offers.map((offer, index) => (
+                    <div 
+                      key={offer.id} 
+                      className={`offer-card ${index === 0 ? 'best-offer' : ''}`}
+                    >
+                      {index === 0 && (
+                        <div className="best-badge">Best Rate</div>
                       )}
-                    </div>
-                  </div>
-                ))}
-
-                {pendingProviders.map((provider) => (
-                  <div key={provider.id} className="offer-card pending-offer">
-                    <div className="offer-header">
-                      <div className="provider-info">
-                        <span className="provider-logo">{provider.logo}</span>
-                        <span className="provider-name">{provider.name}</span>
-                      </div>
-                      <span className="pending-tag">Pending</span>
-                    </div>
-
-                    <div className="offer-details">
-                      <div className="detail-item main">
-                        <span className="detail-label">Monthly Payment</span>
-                        <span className="detail-value skeleton-line wide"></span>
-                      </div>
-
-                      <div className="detail-grid">
-                        <div className="detail-item">
-                          <span className="detail-label">Interest Rate</span>
-                          <span className="detail-value skeleton-line"></span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">APR</span>
-                          <span className="detail-value skeleton-line"></span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Total Repayment</span>
-                          <span className="detail-value skeleton-line"></span>
+                      
+                      <div className="offer-header">
+                        <div className="provider-info">
+                          <span className="provider-logo">{offer.providerLogo}</span>
+                          <span className="provider-name">{offer.providerName}</span>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="offer-actions">
-                      <button className="select-btn pending-btn" type="button" disabled>
-                        Waiting for response...
-                      </button>
+                      <div className="offer-details">
+                        <div className="detail-item main">
+                          <span className="detail-label">Monthly Payment</span>
+                          <span className="detail-value">
+                            {formatCurrency(offer.monthlyInstallment)}
+                          </span>
+                        </div>
+                        
+                        <div className="detail-grid">
+                          <div className="detail-item">
+                            <span className="detail-label">Interest Rate</span>
+                            <span className="detail-value">{formatPercent(offer.interestRate)}</span>
+                          </div>
+                          <div className="detail-item">
+                            <span className="detail-label">APR</span>
+                            <span className="detail-value">{formatPercent(offer.apr)}</span>
+                          </div>
+                          <div className="detail-item">
+                            <span className="detail-label">Total Repayment</span>
+                            <span className="detail-value">{formatCurrency(offer.totalRepayment)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="offer-actions">
+                        <button 
+                          className="select-btn"
+                          onClick={() => handleSelectOffer(offer)}
+                        >
+                          Apply Now →
+                        </button>
+                      </div>
+
+                      <div className="offer-footer">
+                        <span className="validity">
+                          Valid until {offer.validUntil.toLocaleDateString()}
+                        </span>
+                        {!offer.isPersonalized && (
+                          <span className="estimate-tag">Estimated rate</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+
+                  {pendingProviders.map((provider) => (
+                    <div key={provider.id} className="offer-card pending-offer">
+                      <div className="offer-header">
+                        <div className="provider-info">
+                          <span className="provider-logo">{provider.logo}</span>
+                          <span className="provider-name">{provider.name}</span>
+                        </div>
+                        <span className="pending-tag">Pending</span>
+                      </div>
+
+                      <div className="offer-details">
+                        <div className="detail-item main">
+                          <span className="detail-label">Monthly Payment</span>
+                          <span className="detail-value skeleton-line wide"></span>
+                        </div>
+
+                        <div className="detail-grid">
+                          <div className="detail-item">
+                            <span className="detail-label">Interest Rate</span>
+                            <span className="detail-value skeleton-line"></span>
+                          </div>
+                          <div className="detail-item">
+                            <span className="detail-label">APR</span>
+                            <span className="detail-value skeleton-line"></span>
+                          </div>
+                          <div className="detail-item">
+                            <span className="detail-label">Total Repayment</span>
+                            <span className="detail-value skeleton-line"></span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="offer-actions">
+                        <button className="select-btn pending-btn" type="button" disabled>
+                          Waiting for response...
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className="results-footer">
                 <p>
