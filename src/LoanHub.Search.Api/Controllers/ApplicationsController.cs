@@ -39,7 +39,12 @@ public sealed class ApplicationsController : ControllerBase
                 request.Age,
                 request.JobTitle,
                 request.Address,
-                request.IdDocumentNumber
+                request.IdDocumentNumber,
+                request.Phone,
+                NormalizeDateTime(request.DateOfBirth),
+                request.MonthlyIncome,
+                request.LivingCosts,
+                request.Dependents
             ),
             OfferSnapshot = new OfferSnapshot(
                 request.Provider,
@@ -197,6 +202,11 @@ public sealed class ApplicationsController : ControllerBase
         string JobTitle,
         string Address,
         string IdDocumentNumber,
+        string? Phone,
+        DateTime? DateOfBirth,
+        decimal? MonthlyIncome,
+        decimal? LivingCosts,
+        int? Dependents,
         string Provider,
         string ProviderOfferId,
         decimal Installment,
@@ -305,8 +315,27 @@ public sealed class ApplicationsController : ControllerBase
             user.Age!.Value,
             user.JobTitle!,
             user.Address!,
-            user.IdDocumentNumber!);
+            user.IdDocumentNumber!,
+            user.Phone,
+            user.DateOfBirth,
+            user.MonthlyIncome,
+            user.LivingCosts,
+            user.Dependents);
 
         return true;
+    }
+
+    private static DateTime? NormalizeDateTime(DateTime? value)
+    {
+        if (!value.HasValue)
+            return null;
+
+        var date = value.Value;
+        return date.Kind switch
+        {
+            DateTimeKind.Utc => date,
+            DateTimeKind.Local => date.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(date, DateTimeKind.Utc)
+        };
     }
 }

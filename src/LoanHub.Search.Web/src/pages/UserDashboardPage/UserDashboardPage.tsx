@@ -18,9 +18,84 @@ import {
 } from '../../data/mockUserDashboardData';
 import { listApplicationsByEmail, listApplicationsForCurrentUser } from '../../api/applicationsApi';
 import { ApiError, getAuthSession } from '../../api/apiConfig';
+import type { AuthResponse } from '../../api/userApi';
+import { getUserProfile, updateUserProfile } from '../../api/userApi';
 import { Header, Footer } from '../../components';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import './UserDashboardPage.css';
+
+const parseAddress = (address?: string | null): UserProfile['address'] | undefined => {
+  if (!address) return undefined;
+  const parts = address.split(',').map(part => part.trim()).filter(Boolean);
+  if (parts.length === 0) return undefined;
+
+  const hasApartment = parts[1]?.toLowerCase().startsWith('apt ');
+  const street = parts[0] ?? '';
+  const apartment = hasApartment ? parts[1].replace(/^apt\s+/i, '').trim() : undefined;
+  const cityPostal = hasApartment ? parts[2] : parts[1];
+  const country = parts[parts.length - 1];
+
+  let postalCode = '';
+  let city = '';
+  if (cityPostal) {
+    const match = cityPostal.match(/(\d{2}-\d{3})\s*(.*)/);
+    if (match) {
+      postalCode = match[1];
+      city = match[2]?.trim() ?? '';
+    } else {
+      city = cityPostal.trim();
+    }
+  }
+
+  return {
+    street,
+    apartment,
+    city,
+    postalCode,
+    country,
+  };
+};
+
+const formatAddress = (address?: UserProfile['address']) => {
+  if (!address) return null;
+  const parts = [
+    address.street,
+    address.apartment ? `Apt ${address.apartment}` : '',
+    address.postalCode && address.city ? `${address.postalCode} ${address.city}` : address.city,
+    address.country,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(', ') : null;
+};
+
+const mapAuthResponseToProfile = (
+  data: AuthResponse,
+  fallback: UserProfile,
+): UserProfile => ({
+  ...fallback,
+  id: data.id,
+  email: data.email,
+  firstName: data.firstName ?? fallback.firstName,
+  lastName: data.lastName ?? fallback.lastName,
+  phone: data.phone ?? fallback.phone,
+  dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : fallback.dateOfBirth,
+  address: data.address ? parseAddress(data.address) : fallback.address,
+  employment: data.jobTitle
+    ? {
+        status: 'employed',
+        position: data.jobTitle,
+      }
+    : fallback.employment,
+  monthlyIncome: data.monthlyIncome ?? fallback.monthlyIncome,
+  livingCosts: data.livingCosts ?? fallback.livingCosts,
+  dependents: data.dependents ?? fallback.dependents,
+  idDocument: data.idDocumentNumber
+    ? {
+        type: 'national_id',
+        number: data.idDocumentNumber,
+        verified: false,
+      }
+    : fallback.idDocument,
+});
 
 export function UserDashboardPage() {
   const navigate = useNavigate();
@@ -111,9 +186,43 @@ export function UserDashboardPage() {
     navigate(`/search?amount=${entry.searchParams.amount}&duration=${entry.searchParams.duration}`);
   };
   
-  const handleProfileUpdate = (updatedProfile: Partial<UserProfile>) => {
+  const handleProfileUpdate = async (updatedProfile: Partial<UserProfile>) => {
     setProfile(prev => ({ ...prev, ...updatedProfile }));
-    setIsEditingProfile(false);
+
+    const session = getAuthSession();
+    if (!session) {
+      setIsEditingProfile(false);
+      return;
+    }
+
+    try {
+      const fullProfile = updatedProfile as UserProfile;
+      const address = formatAddress(fullProfile.address);
+      const jobTitle = fullProfile.employment?.position || fullProfile.employment?.employerName || null;
+      const dateOfBirth = fullProfile.dateOfBirth
+        ? new Date(fullProfile.dateOfBirth).toISOString()
+        : null;
+
+      const response = await updateUserProfile(session.id, {
+        firstName: fullProfile.firstName,
+        lastName: fullProfile.lastName,
+        age: null,
+        jobTitle,
+        address,
+        phone: fullProfile.phone || null,
+        dateOfBirth,
+        monthlyIncome: fullProfile.monthlyIncome ?? null,
+        livingCosts: fullProfile.livingCosts ?? null,
+        dependents: fullProfile.dependents ?? null,
+        idDocumentNumber: fullProfile.idDocument?.number || null,
+      });
+      setProfile(prev => mapAuthResponseToProfile(response, prev));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unable to update profile.';
+      setLoadError(message);
+    } finally {
+      setIsEditingProfile(false);
+    }
   };
 
   useEffect(() => {
@@ -215,8 +324,22 @@ export function UserDashboardPage() {
       }
     };
 
+    const loadProfile = async () => {
+      if (!session?.id) {
+        return;
+      }
+
+      try {
+        const data = await getUserProfile(session.id);
+        setProfile(prev => mapAuthResponseToProfile(data, prev));
+      } catch {
+        setProfile((prev) => prev);
+      }
+    };
+
     if (session) {
       loadApplications();
+      loadProfile();
     } else {
       setApplications([]);
     }
@@ -759,12 +882,16 @@ interface ProfileSectionProps {
   profile: UserProfile;
   isEditing: boolean;
   onEdit: () => void;
-  onSave: (profile: Partial<UserProfile>) => void;
+  onSave: (profile: Partial<UserProfile>) => Promise<void> | void;
   onCancel: () => void;
 }
 
 function ProfileSection({ profile, isEditing, onEdit, onSave, onCancel }: ProfileSectionProps) {
   const [formData, setFormData] = useState<UserProfile>(profile);
+
+  useEffect(() => {
+    setFormData(profile);
+  }, [profile]);
   
   const handleChange = (field: string, value: string | number | boolean) => {
     setFormData(prev => {
@@ -784,9 +911,9 @@ function ProfileSection({ profile, isEditing, onEdit, onSave, onCancel }: Profil
     });
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    await onSave(formData);
   };
 
   return (

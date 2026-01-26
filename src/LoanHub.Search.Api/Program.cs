@@ -192,6 +192,11 @@ using (var scope = app.Services.CreateScope())
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Amount" numeric;
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_DurationMonths" integer;
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_ValidUntil" timestamptz;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ApplicantDetails_Phone" varchar(40);
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ApplicantDetails_DateOfBirth" timestamptz;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ApplicantDetails_MonthlyIncome" numeric;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ApplicantDetails_LivingCosts" numeric;
+        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ApplicantDetails_Dependents" integer;
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ContractReadyAt" timestamptz;
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractFileName" varchar(240);
         ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractBlobName" varchar(320);

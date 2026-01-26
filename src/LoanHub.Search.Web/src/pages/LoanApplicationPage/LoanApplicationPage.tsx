@@ -115,6 +115,10 @@ export function LoanApplicationPage() {
       const firstName = authSession?.firstName ?? '';
       const lastName = authSession?.lastName ?? '';
       const email = authSession?.email ?? '';
+      const jobTitle = authSession?.jobTitle ?? '';
+      const monthlyIncome = authSession?.monthlyIncome ?? null;
+      const livingCosts = authSession?.livingCosts ?? null;
+      const dependents = authSession?.dependents ?? null;
       setFormData(prev => ({
         ...prev,
         authMode: 'logged-in',
@@ -123,13 +127,22 @@ export function LoanApplicationPage() {
           firstName,
           lastName,
           email,
+          phone: authSession?.phone ?? prev.personalInfo.phone,
+          dateOfBirth: authSession?.dateOfBirth ?? prev.personalInfo.dateOfBirth,
         },
-        employment: prev.employment,
+        employment: {
+          ...prev.employment,
+          position: jobTitle || prev.employment.position,
+          monthlyIncome: monthlyIncome !== null ? String(monthlyIncome) : prev.employment.monthlyIncome,
+          livingCosts: livingCosts !== null ? String(livingCosts) : prev.employment.livingCosts,
+          dependents: dependents !== null ? String(dependents) : prev.employment.dependents,
+        },
         documents: {
           ...prev.documents,
           idFrontFile: undefined,
           idBackFile: undefined,
           additionalDocs: undefined,
+          idNumber: authSession?.idDocumentNumber ?? prev.documents.idNumber,
         },
       }));
     } else {
@@ -316,6 +329,11 @@ export function LoanApplicationPage() {
         jobTitle: employment.position || employment.employerName || 'Applicant',
         address,
         idDocumentNumber: documents.idNumber,
+        phone: personalInfo.phone || undefined,
+        dateOfBirth: personalInfo.dateOfBirth || undefined,
+        monthlyIncome: employment.monthlyIncome ? Number(employment.monthlyIncome) : undefined,
+        livingCosts: employment.livingCosts ? Number(employment.livingCosts) : undefined,
+        dependents: employment.dependents ? Number(employment.dependents) : undefined,
         provider: offer.providerName,
         providerOfferId: offer.id,
         installment: offer.monthlyInstallment,
@@ -370,13 +388,34 @@ export function LoanApplicationPage() {
 
       if (authSession?.id && isLoggedIn) {
         try {
-          await updateUserProfile(authSession.id, {
+          const updatedProfile = await updateUserProfile(authSession.id, {
             firstName: personalInfo.firstName,
             lastName: personalInfo.lastName,
             age: age ?? null,
             jobTitle: employment.position || employment.employerName || null,
             address,
+            phone: personalInfo.phone || null,
+            dateOfBirth: personalInfo.dateOfBirth || null,
+            monthlyIncome: employment.monthlyIncome ? Number(employment.monthlyIncome) : null,
+            livingCosts: employment.livingCosts ? Number(employment.livingCosts) : null,
+            dependents: employment.dependents ? Number(employment.dependents) : null,
             idDocumentNumber: documents.idNumber || null,
+          });
+          setAuthSession({
+            id: updatedProfile.id,
+            email: updatedProfile.email,
+            role: updatedProfile.role,
+            firstName: updatedProfile.firstName,
+            lastName: updatedProfile.lastName,
+            phone: updatedProfile.phone,
+            dateOfBirth: updatedProfile.dateOfBirth,
+            address: updatedProfile.address,
+            jobTitle: updatedProfile.jobTitle,
+            monthlyIncome: updatedProfile.monthlyIncome,
+            livingCosts: updatedProfile.livingCosts,
+            dependents: updatedProfile.dependents,
+            idDocumentNumber: updatedProfile.idDocumentNumber,
+            token: updatedProfile.token,
           });
 
           const response = await createApplicationForCurrentUser({

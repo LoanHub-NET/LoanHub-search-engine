@@ -56,6 +56,14 @@ const handleAuthResponse = async (response: Response) => {
     role: data.role,
     firstName: data.firstName,
     lastName: data.lastName,
+    phone: data.phone,
+    dateOfBirth: data.dateOfBirth,
+    address: data.address,
+    jobTitle: data.jobTitle,
+    monthlyIncome: data.monthlyIncome,
+    livingCosts: data.livingCosts,
+    dependents: data.dependents,
+    idDocumentNumber: data.idDocumentNumber,
     token: data.token,
   });
   return data;
@@ -108,5 +116,38 @@ export const updateUserProfile = async (
     throw new ApiError(message || `Profile update failed with status ${response.status}.`, response.status);
   }
 
-  return (await response.json()) as AuthResponse;
+  const data = (await response.json()) as AuthResponse;
+  storeAuthSession({
+    id: data.id,
+    email: data.email,
+    role: data.role,
+    firstName: data.firstName,
+    lastName: data.lastName,
+    phone: data.phone,
+    dateOfBirth: data.dateOfBirth,
+    address: data.address,
+    jobTitle: data.jobTitle,
+    monthlyIncome: data.monthlyIncome,
+    livingCosts: data.livingCosts,
+    dependents: data.dependents,
+    idDocumentNumber: data.idDocumentNumber,
+    token: data.token,
+  });
+  return data;
+};
+
+export const getUserProfile = async (userId: string) => {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('You must be logged in to load your profile.');
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/api/users/${userId}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return handleAuthResponse(response);
 };

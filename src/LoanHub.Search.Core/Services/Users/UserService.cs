@@ -1,15 +1,22 @@
 namespace LoanHub.Search.Core.Services.Users;
 
+using LoanHub.Search.Core.Abstractions.Applications;
 using LoanHub.Search.Core.Abstractions.Users;
 using LoanHub.Search.Core.Models.Users;
 using Microsoft.AspNetCore.Identity;
+using System.Linq;
 
 public sealed class UserService
 {
     private readonly IUserRepository _repository;
+    private readonly IApplicationRepository _applications;
     private readonly PasswordHasher<UserAccount> _hasher = new();
 
-    public UserService(IUserRepository repository) => _repository = repository;
+    public UserService(IUserRepository repository, IApplicationRepository applications)
+    {
+        _repository = repository;
+        _applications = applications;
+    }
 
     public async Task<UserAccount> RegisterLocalAsync(
         string email,
@@ -20,21 +27,23 @@ public sealed class UserService
         if (await _repository.EmailExistsAsync(email, ct))
             throw new InvalidOperationException("Email already registered.");
 
+        var mergedProfile = await MergeWithLatestApplicationAsync(profile, email, ct);
+
         var user = new UserAccount
         {
             Email = email,
             Role = UserRole.User,
-            FirstName = profile.FirstName,
-            LastName = profile.LastName,
-            Age = profile.Age,
-            JobTitle = profile.JobTitle,
-            Address = profile.Address,
-            Phone = profile.Phone,
-            DateOfBirth = profile.DateOfBirth,
-            MonthlyIncome = profile.MonthlyIncome,
-            LivingCosts = profile.LivingCosts,
-            Dependents = profile.Dependents,
-            IdDocumentNumber = profile.IdDocumentNumber
+            FirstName = mergedProfile.FirstName,
+            LastName = mergedProfile.LastName,
+            Age = mergedProfile.Age,
+            JobTitle = mergedProfile.JobTitle,
+            Address = mergedProfile.Address,
+            Phone = mergedProfile.Phone,
+            DateOfBirth = NormalizeDateTime(mergedProfile.DateOfBirth),
+            MonthlyIncome = mergedProfile.MonthlyIncome,
+            LivingCosts = mergedProfile.LivingCosts,
+            Dependents = mergedProfile.Dependents,
+            IdDocumentNumber = mergedProfile.IdDocumentNumber
         };
 
         user.PasswordHash = _hasher.HashPassword(user, password);
@@ -64,21 +73,23 @@ public sealed class UserService
         var user = await _repository.GetByEmailAsync(email, ct);
         if (user is null)
         {
+            var mergedProfile = await MergeWithLatestApplicationAsync(profile, email, ct);
+
             user = new UserAccount
             {
                 Email = email,
                 Role = UserRole.User,
-                FirstName = profile.FirstName,
-                LastName = profile.LastName,
-                Age = profile.Age,
-                JobTitle = profile.JobTitle,
-                Address = profile.Address,
-                Phone = profile.Phone,
-                DateOfBirth = profile.DateOfBirth,
-                MonthlyIncome = profile.MonthlyIncome,
-                LivingCosts = profile.LivingCosts,
-                Dependents = profile.Dependents,
-                IdDocumentNumber = profile.IdDocumentNumber
+                FirstName = mergedProfile.FirstName,
+                LastName = mergedProfile.LastName,
+                Age = mergedProfile.Age,
+                JobTitle = mergedProfile.JobTitle,
+                Address = mergedProfile.Address,
+                Phone = mergedProfile.Phone,
+                DateOfBirth = NormalizeDateTime(mergedProfile.DateOfBirth),
+                MonthlyIncome = mergedProfile.MonthlyIncome,
+                LivingCosts = mergedProfile.LivingCosts,
+                Dependents = mergedProfile.Dependents,
+                IdDocumentNumber = mergedProfile.IdDocumentNumber
             };
 
             user = await _repository.AddAsync(user, ct);
@@ -113,7 +124,7 @@ public sealed class UserService
         user.JobTitle = profile.JobTitle;
         user.Address = profile.Address;
         user.Phone = profile.Phone;
-        user.DateOfBirth = profile.DateOfBirth;
+        user.DateOfBirth = NormalizeDateTime(profile.DateOfBirth);
         user.MonthlyIncome = profile.MonthlyIncome;
         user.LivingCosts = profile.LivingCosts;
         user.Dependents = profile.Dependents;
@@ -122,6 +133,69 @@ public sealed class UserService
 
         return await _repository.UpdateAsync(user, ct);
     }
+
+    private static DateTime? NormalizeDateTime(DateTime? value)
+    {
+        if (!value.HasValue)
+            return null;
+
+        var date = value.Value;
+        return date.Kind switch
+        {
+            DateTimeKind.Utc => date,
+            DateTimeKind.Local => date.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(date, DateTimeKind.Utc)
+        };
+    }
+
+    private async Task<UserProfile> MergeWithLatestApplicationAsync(
+        UserProfile profile,
+        string email,
+        CancellationToken ct)
+    {
+        if (!NeedsApplicationFallback(profile))
+            return profile;
+
+        var applications = await _applications.ListAsync(ct);
+        var latest = applications
+            .Where(app => app.ApplicantEmail.Equals(email, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(app => app.CreatedAt)
+            .FirstOrDefault();
+
+        if (latest is null)
+            return profile;
+
+        var details = latest.ApplicantDetails;
+
+        return profile with
+        {
+            FirstName = string.IsNullOrWhiteSpace(profile.FirstName) ? details.FirstName : profile.FirstName,
+            LastName = string.IsNullOrWhiteSpace(profile.LastName) ? details.LastName : profile.LastName,
+            Age = profile.Age ?? details.Age,
+            JobTitle = string.IsNullOrWhiteSpace(profile.JobTitle) ? details.JobTitle : profile.JobTitle,
+            Address = string.IsNullOrWhiteSpace(profile.Address) ? details.Address : profile.Address,
+            Phone = string.IsNullOrWhiteSpace(profile.Phone) ? details.Phone : profile.Phone,
+            DateOfBirth = profile.DateOfBirth ?? details.DateOfBirth,
+            MonthlyIncome = profile.MonthlyIncome ?? details.MonthlyIncome,
+            LivingCosts = profile.LivingCosts ?? details.LivingCosts,
+            Dependents = profile.Dependents ?? details.Dependents,
+            IdDocumentNumber = string.IsNullOrWhiteSpace(profile.IdDocumentNumber)
+                ? details.IdDocumentNumber
+                : profile.IdDocumentNumber
+        };
+    }
+
+    private static bool NeedsApplicationFallback(UserProfile profile)
+        => string.IsNullOrWhiteSpace(profile.FirstName)
+           || string.IsNullOrWhiteSpace(profile.LastName)
+           || string.IsNullOrWhiteSpace(profile.JobTitle)
+           || string.IsNullOrWhiteSpace(profile.Address)
+           || string.IsNullOrWhiteSpace(profile.IdDocumentNumber)
+           || string.IsNullOrWhiteSpace(profile.Phone)
+           || profile.DateOfBirth is null
+           || profile.MonthlyIncome is null
+           || profile.LivingCosts is null
+           || profile.Dependents is null;
 
     public sealed record UserProfile(
         string? FirstName,
