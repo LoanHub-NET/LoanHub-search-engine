@@ -3,6 +3,7 @@ import {
   LandingPage,
   SearchPage,
   SearchResultsPage,
+  LoanApplicationPage,
   CareersPage,
   AboutPage,
   ContactPage,
@@ -36,22 +37,12 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/admin" element={<AdminDashboardPage />} />
           <Route path="/dashboard" element={<UserDashboardPage />} />
-          <Route path="/apply" element={<ApplyPlaceholder />} />
+          <Route path="/apply" element={<LoanApplicationPage />} />
           <Route path="/search/refine" element={<RefinePlaceholder />} />
           <Route path="*" element={<NotFoundPlaceholder />} />
         </Routes>
       </div>
     </BrowserRouter>
-  );
-}
-
-function ApplyPlaceholder() {
-  return (
-    <div className="placeholder-page">
-      <h1>Application Page</h1>
-      <p>Loan application form coming soon...</p>
-      <a href="/search/results">← Back to Results</a>
-    </div>
   );
 }
 

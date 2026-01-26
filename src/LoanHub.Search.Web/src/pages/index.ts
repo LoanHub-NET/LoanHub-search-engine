@@ -1,6 +1,7 @@
 export { LandingPage } from './LandingPage';
 export { SearchPage } from './SearchPage';
 export { SearchResultsPage } from './SearchResultsPage';
+export { LoanApplicationPage } from './LoanApplicationPage';
 export { CareersPage } from './CareersPage';
 export { AboutPage } from './AboutPage';
 export { ContactPage } from './ContactPage';

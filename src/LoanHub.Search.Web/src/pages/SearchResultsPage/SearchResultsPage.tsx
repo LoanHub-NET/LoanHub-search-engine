@@ -131,13 +131,24 @@ export function SearchResultsPage() {
   const handleSearchClick = () => navigate('/search');
 
   const handleSelectOffer = (offer: LoanOffer) => {
-    // If not personalized, redirect to refine search
-    if (!offer.isPersonalized && !hasIncome) {
-      navigate(`/search/refine?offerId=${offer.id}&amount=${amount}&duration=${duration}`);
-    } else {
-      // Proceed with application
-      navigate(`/apply?offerId=${offer.id}`);
-    }
+    // Navigate to application page with offer data
+    // Convert to the format expected by LoanApplicationPage (ApplicationOffer)
+    const applicationOffer = {
+      id: offer.id,
+      providerId: offer.providerId,
+      providerName: offer.providerName,
+      providerLogo: offer.providerLogo,
+      amount: offer.amount,
+      duration: offer.duration,
+      interestRate: offer.interestRate,
+      apr: offer.apr,
+      monthlyInstallment: offer.monthlyInstallment,
+      totalRepayment: offer.totalRepayment,
+      totalInterest: offer.totalRepayment - offer.amount,
+      processingTime: '1-3 business days',
+    };
+    
+    navigate('/apply', { state: { offer: applicationOffer } });
   };
 
   const pendingProviders = providers.filter(
@@ -285,7 +296,7 @@ export function SearchResultsPage() {
                         className="select-btn"
                         onClick={() => handleSelectOffer(offer)}
                       >
-                        {hasIncome ? 'Apply Now' : 'Get Personalized Rate'}
+                        Apply Now →
                       </button>
                     </div>
 
