@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { 
   LoanApplication, 
@@ -8,7 +8,15 @@ import type {
   DashboardStats,
 } from '../../types/admin.types';
 import { ADMIN_STATUS_CONFIG, calculateSlaInfo } from '../../types/admin.types';
-import { mockApplications, calculateDashboardStats, mockProviders } from '../../data/mockAdminData';
+import { calculateDashboardStats } from '../../data/mockAdminData';
+import {
+  acceptAdminApplication,
+  getAdminApplication,
+  listAdminApplications,
+  rejectAdminApplication,
+} from '../../api/loanhubApi';
+import { mapApplicationResponseToAdminApplication } from '../../api/mappers';
+import { getStoredAuth, clearStoredAuth, getRoleLabel } from '../../utils/auth';
 import { ApplicationDetailModal, DecisionModal } from '../../components/admin';
 import { Header, Footer } from '../../components';
 import type { AdminUser } from '../../components/Header/Header';
@@ -17,29 +25,62 @@ import './AdminDashboardPage.css';
 
 type SortKey = 'date' | 'amount' | 'status';
 
-// Mock admin user (in real app, this would come from auth context)
-const mockAdminUser: AdminUser = {
-  name: 'Admin User',
-  email: 'admin@loanhub.com',
-  role: 'Administrator',
-};
-
 export function AdminDashboardPage() {
   const navigate = useNavigate();
+  const storedAuth = getStoredAuth();
   
   // State
-  const [applications, setApplications] = useState<LoanApplication[]>(mockApplications);
+  const [applications, setApplications] = useState<LoanApplication[]>([]);
   const [filters, setFilters] = useState<ApplicationFilters>({
     status: 'all',
     searchTerm: '',
     sortBy: 'date',
     sortOrder: 'desc',
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [selectedApplication, setSelectedApplication] = useState<LoanApplication | null>(null);
   const [decisionModal, setDecisionModal] = useState<{
     application: LoanApplication;
     type: 'accept' | 'reject';
   } | null>(null);
+
+  useEffect(() => {
+    if (!storedAuth) {
+      setLoadError('Please log in as an admin to view applications.');
+      return;
+    }
+
+    if (getRoleLabel(storedAuth.user.role) !== 'admin') {
+      setLoadError('Admin access required.');
+      return;
+    }
+
+    setAdminUser({
+      name: `${storedAuth.user.firstName ?? 'Admin'} ${storedAuth.user.lastName ?? ''}`.trim(),
+      email: storedAuth.user.email,
+      role: 'Administrator',
+    });
+
+    const fetchApplications = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const response = await listAdminApplications(storedAuth.token);
+        const details = await Promise.all(
+          response.items.map((item) => getAdminApplication(storedAuth.token, item.id)),
+        );
+        setApplications(details.map(mapApplicationResponseToAdminApplication));
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : 'Failed to load applications.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchApplications();
+  }, [storedAuth]);
 
   // Calculate stats
   const stats: DashboardStats = useMemo(() => {
@@ -99,6 +140,14 @@ export function AdminDashboardPage() {
     return result;
   }, [applications, filters]);
 
+  const providerOptions = useMemo(() => {
+    const providerMap = new Map<string, LoanApplication['provider']>();
+    applications.forEach((app) => {
+      providerMap.set(app.provider.id, app.provider);
+    });
+    return Array.from(providerMap.values());
+  }, [applications]);
+
   // Handlers
   const handleStatusFilter = (status: StatusFilter) => {
     setFilters(prev => ({ ...prev, status }));
@@ -123,44 +172,25 @@ export function AdminDashboardPage() {
     }));
   };
 
-  const handleDecisionSubmit = (decision: DecisionPayload) => {
-    // Update application status
-    setApplications(prev => prev.map(app => {
-      if (app.id !== decision.applicationId) return app;
-      
-      const newStatus = decision.decision === 'accept' ? 'preliminarily_accepted' : 'rejected';
-      const newHistoryEntry = {
-        id: `hist-${Date.now()}`,
-        previousStatus: app.status,
-        newStatus,
-        changedAt: new Date(),
-        changedBy: 'current-admin@loanhub.com',
-        reason: decision.reason,
-        notes: decision.notes,
-      };
+  const handleDecisionSubmit = async (decision: DecisionPayload) => {
+    if (!storedAuth) {
+      setLoadError('Please log in as an admin to manage applications.');
+      return;
+    }
 
-      return {
-        ...app,
-        status: newStatus,
-        statusHistory: [...app.statusHistory, newHistoryEntry],
-        updatedAt: new Date(),
-        internalNotes: decision.notes 
-          ? [...app.internalNotes, {
-              id: `note-${Date.now()}`,
-              content: decision.notes,
-              createdAt: new Date(),
-              createdBy: 'current-admin@loanhub.com',
-            }]
-          : app.internalNotes,
-      } as LoanApplication;
-    }));
+    try {
+      const updated =
+        decision.decision === 'accept'
+          ? await acceptAdminApplication(storedAuth.token, decision.applicationId)
+          : await rejectAdminApplication(storedAuth.token, decision.applicationId, decision.reason);
 
-    // Close modals
-    setDecisionModal(null);
-    setSelectedApplication(null);
-
-    // Show success message (in real app, this would be a toast notification)
-    console.log(`Application ${decision.applicationId} ${decision.decision}ed. Email sent: ${decision.sendEmail}`);
+      const mapped = mapApplicationResponseToAdminApplication(updated);
+      setApplications((prev) => prev.map((app) => (app.id === mapped.id ? mapped : app)));
+      setDecisionModal(null);
+      setSelectedApplication(null);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Failed to update application.');
+    }
   };
 
   const openAcceptModal = (app: LoanApplication) => {
@@ -182,8 +212,7 @@ export function AdminDashboardPage() {
   ];
 
   const handleLogout = () => {
-    // In a real app, this would clear auth state and redirect
-    console.log('Logging out...');
+    clearStoredAuth();
     navigate('/');
   };
 
@@ -192,7 +221,7 @@ export function AdminDashboardPage() {
       <Header
         onLoginClick={() => navigate('/login')}
         onSearchClick={() => navigate('/search')}
-        adminUser={mockAdminUser}
+        adminUser={adminUser ?? undefined}
         onLogout={handleLogout}
       />
       <main className="admin-page">
@@ -209,6 +238,18 @@ export function AdminDashboardPage() {
 
         <section className="admin-content">
           <div className="admin-content-container">
+            {loadError && (
+              <div className="results-empty">
+                <h2>Unable to load applications</h2>
+                <p>{loadError}</p>
+              </div>
+            )}
+            {isLoading && !loadError && (
+              <div className="results-empty">
+                <h2>Loading applications...</h2>
+                <p>Fetching the latest applications from the backend.</p>
+              </div>
+            )}
             {/* Stats Cards */}
             <div className="admin-stats">
               <div className="stat-card pending">
@@ -282,7 +323,7 @@ export function AdminDashboardPage() {
                   onChange={handleProviderFilter}
                 >
                   <option value="">All Providers</option>
-                  {mockProviders.map(provider => (
+                  {providerOptions.map(provider => (
                     <option key={provider.id} value={provider.id}>
                       {provider.name}
                     </option>

@@ -1,65 +1,50 @@
 import { useState, useEffect } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
-import type { 
-  ApplicationStep, 
+import type {
+  ApplicationStep,
   ApplicationFormData,
   ApplicationOffer,
   PersonalInfoData,
   EmploymentData,
   DocumentData,
-  PersonalizationData 
+  PersonalizationData,
 } from '../../types/application.types';
-import { 
-  APPLICATION_STEPS, 
+import {
+  APPLICATION_STEPS,
   INITIAL_APPLICATION_DATA,
-  MOCK_LOGGED_IN_USER 
 } from '../../types/application.types';
+import {
+  applyOfferSelection,
+  recalculateOffer,
+} from '../../api/loanhubApi';
+import { mapOfferSnapshotToApplicationOffer } from '../../api/mappers';
+import { getStoredAuth } from '../../utils/auth';
 import './LoanApplicationPage.css';
 
-// Mock generate offer function (same as SearchResultsPage)
-const generateMockOffer = (amount: number, duration: number, provider: { name: string; logo: string }): ApplicationOffer => {
-  const baseRate = 7.5 + Math.random() * 5;
-  const rate = parseFloat(baseRate.toFixed(2));
-  const monthlyRate = rate / 100 / 12;
-  const installment = amount * (monthlyRate * Math.pow(1 + monthlyRate, duration)) / (Math.pow(1 + monthlyRate, duration) - 1);
-  const totalPayment = installment * duration;
-  const totalInterest = totalPayment - amount;
-
-  return {
-    id: `${provider.name.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`,
-    providerName: provider.name,
-    providerLogo: provider.logo,
-    amount,
-    duration,
-    interestRate: rate,
-    apr: parseFloat((rate + 0.5 + Math.random() * 0.5).toFixed(2)),
-    monthlyInstallment: parseFloat(installment.toFixed(2)),
-    totalRepayment: parseFloat(totalPayment.toFixed(2)),
-    totalInterest: parseFloat(totalInterest.toFixed(2)),
-    processingTime: `${Math.floor(Math.random() * 3) + 1} business days`,
-  };
+const getAgeFromBirthDate = (dateOfBirth: string) => {
+  const date = new Date(dateOfBirth);
+  if (Number.isNaN(date.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - date.getFullYear();
+  const monthDiff = today.getMonth() - date.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < date.getDate())) {
+    age -= 1;
+  }
+  return age;
 };
-
-const MOCK_PROVIDERS = [
-  { name: 'First National Bank', logo: '🏦' },
-  { name: 'Metro Credit Union', logo: '🏛️' },
-  { name: 'Digital Finance Co.', logo: '💳' },
-  { name: 'Summit Trust', logo: '🏔️' },
-  { name: 'Harborline Bank', logo: '⚓' },
-];
 
 export function LoanApplicationPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   
   // Get initial offer from location state
   const initialOffer = (location.state?.offer as ApplicationOffer | undefined) || null;
   
-  // Mock logged-in state (toggle for testing)
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const selectionId = location.state?.selectionId ?? null;
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   
   // Current step
   const [currentStep, setCurrentStep] = useState<ApplicationStep>('offer-details');
@@ -79,50 +64,36 @@ export function LoanApplicationPage() {
     message: string;
   } | null>(null);
   
-  // Load offer from URL params if not from location state
   useEffect(() => {
-    // Skip if we already have an offer from location state
-    if (initialOffer) {
-      return;
-    }
-    
-    // Otherwise generate from URL params
-    const amountParam = searchParams.get('amount');
-    const durationParam = searchParams.get('duration');
-    const providerParam = searchParams.get('provider');
-    
-    if (amountParam && durationParam) {
-      const amount = parseInt(amountParam, 10);
-      const duration = parseInt(durationParam, 10);
-      const provider = MOCK_PROVIDERS.find(p => p.name === providerParam) || MOCK_PROVIDERS[0];
-      
-      const offer = generateMockOffer(amount, duration, provider);
-      setFormData(prev => ({ ...prev, offer }));
-    }
-  }, [initialOffer, searchParams]);
-  
-  // Auto-fill user data if logged in
-  useEffect(() => {
-    if (isLoggedIn) {
-      setFormData(prev => ({
-        ...prev,
-        authMode: 'logged-in',
-        personalInfo: MOCK_LOGGED_IN_USER.personalInfo,
-        employment: MOCK_LOGGED_IN_USER.employment,
-        documents: {
-          ...MOCK_LOGGED_IN_USER.documents,
-          idFrontFile: undefined,
-          idBackFile: undefined,
-          additionalDocs: undefined,
-        },
-      }));
-    } else {
-      setFormData(prev => ({
+    const auth = getStoredAuth();
+    setIsLoggedIn(Boolean(auth));
+    if (!auth) {
+      setFormData((prev) => ({
         ...prev,
         authMode: 'guest',
       }));
+      return;
     }
-  }, [isLoggedIn]);
+
+    setFormData((prev) => ({
+      ...prev,
+      authMode: 'logged-in',
+      personalInfo: {
+        ...prev.personalInfo,
+        firstName: auth.user.firstName ?? prev.personalInfo.firstName,
+        lastName: auth.user.lastName ?? prev.personalInfo.lastName,
+        email: auth.user.email ?? prev.personalInfo.email,
+      },
+      employment: {
+        ...prev.employment,
+        position: auth.user.jobTitle ?? prev.employment.position,
+      },
+      documents: {
+        ...prev.documents,
+        idNumber: auth.user.idDocumentNumber ?? prev.documents.idNumber,
+      },
+    }));
+  }, []);
   
   // Get current step index
   const currentStepIndex = APPLICATION_STEPS.findIndex(s => s.id === currentStep);
@@ -193,70 +164,156 @@ export function LoanApplicationPage() {
   };
   
   // Apply personalization to get better rate
-  const applyPersonalization = () => {
+  const applyPersonalization = async () => {
     if (!formData.offer) return;
-    
+
     const { monthlyIncome, livingCosts, dependents } = formData.personalization;
     if (!monthlyIncome || !livingCosts) return;
-    
-    // Calculate DTI (Debt-to-Income ratio)
-    const income = parseFloat(monthlyIncome);
-    const costs = parseFloat(livingCosts);
-    const depsCount = parseInt(dependents, 10);
-    
-    const disposableIncome = income - costs - (depsCount * 500);
+
+    const income = Number(monthlyIncome);
+    const costs = Number(livingCosts);
+    const depsCount = Number(dependents || 0);
+
+    if (selectionId) {
+      try {
+        const response = await recalculateOffer(selectionId, {
+          income,
+          livingCosts: costs,
+          dependents: depsCount,
+        });
+        const recalculated = response.recalculatedOffer ?? response.selectedOffer;
+        setFormData((prev) => ({
+          ...prev,
+          isPersonalized: true,
+          offer: mapOfferSnapshotToApplicationOffer(recalculated),
+        }));
+      } catch (error) {
+        setSubmissionError(
+          error instanceof Error ? error.message : 'Failed to recalculate offer.',
+        );
+      }
+      return;
+    }
+
+    // Fallback calculation when no selection is available
+    const disposableIncome = income - costs - depsCount * 500;
     const dti = formData.offer.monthlyInstallment / income;
-    
-    // Better DTI = better rate discount
+
     let rateDiscount = 0;
     if (dti < 0.2) rateDiscount = 1.5;
     else if (dti < 0.3) rateDiscount = 1.0;
     else if (dti < 0.4) rateDiscount = 0.5;
-    
+
     if (disposableIncome > 5000) rateDiscount += 0.5;
-    if (disposableIncome > 10000) rateDiscount += 0.5;
-    
-    // Update offer with personalized rate
+
     const newRate = Math.max(formData.offer.interestRate - rateDiscount, 5);
     const monthlyRate = newRate / 100 / 12;
     const amount = formData.offer.amount;
     const duration = formData.offer.duration;
-    const newInstallment = amount * (monthlyRate * Math.pow(1 + monthlyRate, duration)) / (Math.pow(1 + monthlyRate, duration) - 1);
+    const newInstallment =
+      (amount * (monthlyRate * Math.pow(1 + monthlyRate, duration))) /
+      (Math.pow(1 + monthlyRate, duration) - 1);
     const newTotalPayment = newInstallment * duration;
     const newTotalInterest = newTotalPayment - amount;
-    
-    setFormData(prev => ({
+
+    setFormData((prev) => ({
       ...prev,
       isPersonalized: true,
-      offer: prev.offer ? {
-        ...prev.offer,
-        interestRate: parseFloat(newRate.toFixed(2)),
-        apr: parseFloat((newRate + 0.5).toFixed(2)),
-        monthlyInstallment: parseFloat(newInstallment.toFixed(2)),
-        totalRepayment: parseFloat(newTotalPayment.toFixed(2)),
-        totalInterest: parseFloat(newTotalInterest.toFixed(2)),
-      } : null,
+      offer: prev.offer
+        ? {
+            ...prev.offer,
+            interestRate: parseFloat(newRate.toFixed(2)),
+            apr: parseFloat((newRate + 0.5).toFixed(2)),
+            monthlyInstallment: parseFloat(newInstallment.toFixed(2)),
+            totalRepayment: parseFloat(newTotalPayment.toFixed(2)),
+            totalInterest: parseFloat(newTotalInterest.toFixed(2)),
+          }
+        : null,
     }));
   };
   
   // Handle form submission
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const referenceNumber = `LH-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-    
-    setSubmissionResult({
-      success: true,
-      referenceNumber,
-      message: 'Your application has been submitted successfully!',
-    });
-    
-    setCompletedSteps(prev => new Set([...prev, 'review']));
-    setCurrentStep('submitted');
-    setIsSubmitting(false);
+    setSubmissionError(null);
+
+    if (!selectionId) {
+      setSubmissionError('Missing offer selection. Please choose an offer again.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const { personalInfo, employment, documents } = formData;
+    const ageFromDob = personalInfo.dateOfBirth
+      ? getAgeFromBirthDate(personalInfo.dateOfBirth)
+      : null;
+    const auth = getStoredAuth();
+    const age = ageFromDob ?? auth?.user.age ?? null;
+
+    const addressParts = [
+      personalInfo.address.street,
+      personalInfo.address.apartment,
+      personalInfo.address.city,
+      personalInfo.address.postalCode,
+      personalInfo.address.country,
+    ].filter(Boolean);
+
+    const address = addressParts.join(', ');
+
+    if (!personalInfo.email || !personalInfo.firstName || !personalInfo.lastName) {
+      setSubmissionError('Please complete your personal information before submitting.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!age || age <= 0) {
+      setSubmissionError('Please provide a valid date of birth.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!employment.position) {
+      setSubmissionError('Please provide your job title.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!address) {
+      setSubmissionError('Please provide your address.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!documents.idNumber) {
+      setSubmissionError('Please provide your ID document number.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const response = await applyOfferSelection(selectionId, {
+        applicantEmail: personalInfo.email,
+        firstName: personalInfo.firstName,
+        lastName: personalInfo.lastName,
+        age,
+        jobTitle: employment.position,
+        address,
+        idDocumentNumber: documents.idNumber,
+      });
+
+      setSubmissionResult({
+        success: true,
+        referenceNumber: `LH-${response.id.split('-')[0].toUpperCase()}`,
+        message: 'Your application has been submitted successfully!',
+      });
+
+      setCompletedSteps(prev => new Set([...prev, 'review']));
+      setCurrentStep('submitted');
+    } catch (error) {
+      setSubmissionError(error instanceof Error ? error.message : 'Submission failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   // No offer selected
@@ -363,18 +420,14 @@ export function LoanApplicationPage() {
           })}
         </div>
         
-        {/* Login Toggle (for demo purposes) */}
-        <div className="demo-login-toggle">
-          <label className="toggle-label">
-            <input 
-              type="checkbox" 
-              checked={isLoggedIn} 
-              onChange={(e) => setIsLoggedIn(e.target.checked)} 
-            />
-            <span className="toggle-slider"></span>
-            Demo: Logged in user (auto-fill enabled)
-          </label>
-        </div>
+        {isLoggedIn && (
+          <div className="demo-login-toggle">
+            <label className="toggle-label">
+              <span className="toggle-slider"></span>
+              Logged in profile detected - auto-fill enabled
+            </label>
+          </div>
+        )}
         
         {/* Step Content */}
         <div className="step-content">
@@ -441,6 +494,7 @@ export function LoanApplicationPage() {
               onSubmit={handleSubmit}
               onBack={goToPrevStep}
               isSubmitting={isSubmitting}
+              errorMessage={submissionError}
             />
           )}
         </div>
@@ -1111,9 +1165,18 @@ interface ReviewStepProps {
   onSubmit: () => void;
   onBack: () => void;
   isSubmitting: boolean;
+  errorMessage?: string | null;
 }
 
-function ReviewStep({ formData, consents, onUpdateConsents, onSubmit, onBack, isSubmitting }: ReviewStepProps) {
+function ReviewStep({
+  formData,
+  consents,
+  onUpdateConsents,
+  onSubmit,
+  onBack,
+  isSubmitting,
+  errorMessage,
+}: ReviewStepProps) {
   const canSubmit = consents.termsAccepted && consents.privacyAccepted && consents.creditCheckAuthorized;
   
   return (
@@ -1291,6 +1354,10 @@ function ReviewStep({ formData, consents, onUpdateConsents, onSubmit, onBack, is
         </label>
       </div>
       
+      {errorMessage && (
+        <p className="form-message error-message">{errorMessage}</p>
+      )}
+
       <div className="step-actions">
         <button className="btn-secondary" onClick={onBack} disabled={isSubmitting}>
           ← Back

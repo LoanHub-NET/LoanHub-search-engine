@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header, Footer } from '../../components';
+import { loginUser, registerUser } from '../../api/loanhubApi';
+import { getRoleLabel, setStoredAuth } from '../../utils/auth';
 import './LoginPage.css';
 
 type Mode = 'login' | 'register';
@@ -32,18 +34,64 @@ export function LoginPage() {
     return role === 'admin' ? 'Register bank admin' : 'Create your account';
   }, [mode, role]);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
     setMessage(null);
 
-    setTimeout(() => {
+    if (mode === 'register' && formData.password !== formData.confirmPassword) {
+      setMessage('Passwords do not match.');
       setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const response =
+        mode === 'login'
+          ? await loginUser({
+              email: formData.email,
+              password: formData.password,
+            })
+          : await registerUser({
+              email: formData.email,
+              password: formData.password,
+              profile: {
+                firstName: formData.firstName || null,
+                lastName: formData.lastName || null,
+                age: null,
+                jobTitle: null,
+                address: null,
+                idDocumentNumber: null,
+              },
+            });
+
+      setStoredAuth({
+        token: response.token,
+        user: {
+          id: response.id,
+          email: response.email,
+          role: response.role,
+          firstName: response.firstName,
+          lastName: response.lastName,
+          age: response.age,
+          jobTitle: response.jobTitle,
+          address: response.address,
+          idDocumentNumber: response.idDocumentNumber,
+        },
+      });
+
+      const roleLabel = getRoleLabel(response.role);
+      if (role === 'admin' && roleLabel !== 'admin') {
+        setMessage('This account is not an admin user.');
+        return;
+      }
+
       setMessage(
         mode === 'login'
-          ? 'Login successful (mock). Redirecting...'
-          : 'Registration submitted (mock). Redirecting...',
+          ? 'Login successful. Redirecting...'
+          : 'Registration submitted. Redirecting...',
       );
+
       setTimeout(() => {
         if (role === 'admin') {
           navigate('/admin');
@@ -51,7 +99,11 @@ export function LoginPage() {
         }
         navigate('/dashboard');
       }, 900);
-    }, 900);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Login failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleOAuth = (provider: string) => {
@@ -59,11 +111,8 @@ export function LoginPage() {
     setMessage(null);
     setTimeout(() => {
       setIsSubmitting(false);
-      setMessage(`OAuth login via ${provider} (mock). Redirecting...`);
-      setTimeout(() => {
-        navigate('/');
-      }, 900);
-    }, 900);
+      setMessage(`OAuth login via ${provider} is not configured yet.`);
+    }, 600);
   };
 
   const handleChange =
@@ -221,11 +270,22 @@ export function LoginPage() {
                       required
                     />
                   </div>
+                  <div className="form-group">
+                    <label htmlFor="phone">Phone number</label>
+                    <input
+                      id="phone"
+                      name="phone"
+                      type="tel"
+                      value={formData.phone}
+                      onChange={handleChange('phone')}
+                      placeholder="+48 123 456 789"
+                    />
+                  </div>
                 </div>
               )}
 
               <div className="form-group">
-                <label htmlFor="email">Email</label>
+                <label htmlFor="email">Email address</label>
                 <input
                   id="email"
                   name="email"
@@ -236,30 +296,25 @@ export function LoginPage() {
                 />
               </div>
 
-              {mode === 'register' && (
-                <div className="form-group">
-                  <label htmlFor="phone">Phone</label>
-                  <input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    value={formData.phone}
-                    onChange={handleChange('phone')}
-                    required
-                  />
-                </div>
-              )}
-
               <div className="form-group">
                 <label htmlFor="password">Password</label>
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.password}
-                  onChange={handleChange('password')}
-                  required
-                />
+                <div className="password-input-wrapper">
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={handleChange('password')}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="toggle-password"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
               </div>
 
               {mode === 'register' && (
@@ -276,61 +331,52 @@ export function LoginPage() {
                 </div>
               )}
 
-              <label className="password-toggle">
-                <input
-                  type="checkbox"
-                  checked={showPassword}
-                  onChange={(event) => setShowPassword(event.target.checked)}
-                />
-                <span>Show password</span>
-              </label>
-
-              {mode === 'register' && role === 'admin' && (
-                <>
-                  <div className="form-group">
-                    <label htmlFor="bankName">Bank name</label>
-                    <input
-                      id="bankName"
-                      name="bankName"
-                      type="text"
-                      value={formData.bankName}
-                      onChange={handleChange('bankName')}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="apiEndpoint">Bank API endpoint</label>
-                    <input
-                      id="apiEndpoint"
-                      name="apiEndpoint"
-                      type="url"
-                      placeholder="https://api.bank.com/loans"
-                      value={formData.apiEndpoint}
-                      onChange={handleChange('apiEndpoint')}
-                      required
-                    />
-                  </div>
-                </>
+              {role === 'admin' && mode === 'register' && (
+                <div className="form-group">
+                  <label htmlFor="bankName">Bank name</label>
+                  <input
+                    id="bankName"
+                    name="bankName"
+                    type="text"
+                    value={formData.bankName}
+                    onChange={handleChange('bankName')}
+                    required
+                  />
+                </div>
               )}
 
-              <button className="submit-btn" type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Submitting...' : mode === 'login' ? 'Log in' : 'Register'}
+              {role === 'admin' && (
+                <div className="form-group">
+                  <label htmlFor="apiEndpoint">Bank API endpoint</label>
+                  <input
+                    id="apiEndpoint"
+                    name="apiEndpoint"
+                    type="url"
+                    placeholder="https://api.bank.com/loans"
+                    value={formData.apiEndpoint}
+                    onChange={handleChange('apiEndpoint')}
+                  />
+                </div>
+              )}
+
+              {message && <p className="form-message">{message}</p>}
+
+              <button type="submit" className="submit-btn" disabled={isSubmitting}>
+                {isSubmitting ? 'Submitting...' : mode === 'login' ? 'Login' : 'Create account'}
               </button>
             </form>
 
-            {message && <div className="form-message">{message}</div>}
-
-            <div className="login-footer">
+            <div className="form-footer">
               <p>
-                {mode === 'login' ? 'No account yet?' : 'Already have an account?'}
+                {mode === 'login' ? "Don't have an account?" : 'Already have an account?'}
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+                >
+                  {mode === 'login' ? 'Register' : 'Login'}
+                </button>
               </p>
-              <button
-                type="button"
-                className="text-link"
-                onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-              >
-                {mode === 'login' ? 'Create one' : 'Log in instead'}
-              </button>
             </div>
           </div>
         </section>

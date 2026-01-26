@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type {
   UserApplication,
@@ -11,13 +11,14 @@ import type {
 } from '../../types/dashboard.types';
 import { USER_STATUS_CONFIG, getDaysRemaining, isExpiringSoon } from '../../types/dashboard.types';
 import {
-  mockUserProfile,
-  mockUserApplications,
   mockNotifications,
   mockSavedSearches,
   mockComparisonHistory,
   calculateUserDashboardStats,
 } from '../../data/mockUserDashboardData';
+import { getUserProfile, listUserApplications, updateUserProfile } from '../../api/loanhubApi';
+import { mapApplicationResponseToUserApplication, mapAuthResponseToUserProfile } from '../../api/mappers';
+import { getStoredAuth, clearStoredAuth } from '../../utils/auth';
 import { Header, Footer } from '../../components';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import './UserDashboardPage.css';
@@ -25,13 +26,37 @@ import './UserDashboardPage.css';
 export function UserDashboardPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const storedAuth = getStoredAuth();
+
+  const initialProfile: UserProfile = {
+    id: storedAuth?.user.id ?? '',
+    email: storedAuth?.user.email ?? '',
+    firstName: storedAuth?.user.firstName ?? '',
+    lastName: storedAuth?.user.lastName ?? '',
+    emailNotifications: true,
+    smsNotifications: false,
+    completionPercentage: 0,
+  };
+
+  const getAgeFromDate = (date?: Date) => {
+    if (!date) return null;
+    const today = new Date();
+    let age = today.getFullYear() - date.getFullYear();
+    const monthDiff = today.getMonth() - date.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < date.getDate())) {
+      age -= 1;
+    }
+    return age;
+  };
   
   // State
   const [activeTab, setActiveTab] = useState<DashboardTab>(
     (searchParams.get('tab') as DashboardTab) || 'applications'
   );
-  const [applications, setApplications] = useState<UserApplication[]>(mockUserApplications);
-  const [profile, setProfile] = useState<UserProfile>(mockUserProfile);
+  const [applications, setApplications] = useState<UserApplication[]>([]);
+  const [profile, setProfile] = useState<UserProfile>(initialProfile);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<UserNotification[]>(mockNotifications);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(mockSavedSearches);
   const [comparisonHistory] = useState<ComparisonEntry[]>(mockComparisonHistory);
@@ -42,6 +67,32 @@ export function UserDashboardPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [showResignModal, setShowResignModal] = useState<UserApplication | null>(null);
   
+  useEffect(() => {
+    if (!storedAuth) {
+      setLoadError('Please log in to access your dashboard.');
+      return;
+    }
+
+    const fetchDashboardData = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const [profileResponse, applicationsResponse] = await Promise.all([
+          getUserProfile(storedAuth.token, storedAuth.user.id),
+          listUserApplications(storedAuth.token),
+        ]);
+        setProfile(mapAuthResponseToUserProfile(profileResponse));
+        setApplications(applicationsResponse.map(mapApplicationResponseToUserApplication));
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : 'Failed to load dashboard data.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [storedAuth]);
+
   // Stats
   const stats = useMemo(() => calculateUserDashboardStats(applications), [applications]);
   
@@ -102,14 +153,45 @@ export function UserDashboardPage() {
     navigate(`/search?amount=${entry.searchParams.amount}&duration=${entry.searchParams.duration}`);
   };
   
-  const handleProfileUpdate = (updatedProfile: Partial<UserProfile>) => {
-    setProfile(prev => ({ ...prev, ...updatedProfile }));
-    setIsEditingProfile(false);
+  const handleProfileUpdate = async (updatedProfile: Partial<UserProfile>) => {
+    if (!storedAuth) {
+      setLoadError('Please log in to update your profile.');
+      return;
+    }
+
+    const nextProfile = { ...profile, ...updatedProfile };
+    setProfile(nextProfile);
+
+    try {
+      const address = nextProfile.address
+        ? [
+            nextProfile.address.street,
+            nextProfile.address.apartment,
+            nextProfile.address.city,
+            nextProfile.address.postalCode,
+            nextProfile.address.country,
+          ]
+            .filter(Boolean)
+            .join(', ')
+        : null;
+
+      const response = await updateUserProfile(storedAuth.token, storedAuth.user.id, {
+        firstName: nextProfile.firstName,
+        lastName: nextProfile.lastName,
+        age: getAgeFromDate(nextProfile.dateOfBirth) ?? null,
+        jobTitle: nextProfile.employment?.position ?? null,
+        address,
+        idDocumentNumber: nextProfile.idDocument?.number ?? null,
+      });
+      setProfile(mapAuthResponseToUserProfile(response));
+      setIsEditingProfile(false);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Failed to update profile.');
+    }
   };
 
-  // Mock user for header
-  const mockUser = {
-    name: `${profile.firstName} ${profile.lastName}`,
+  const headerUser = {
+    name: `${profile.firstName} ${profile.lastName}`.trim() || profile.email,
     email: profile.email,
     role: 'User',
   };
@@ -119,8 +201,11 @@ export function UserDashboardPage() {
       <Header 
         onLoginClick={() => navigate('/login')}
         onSearchClick={() => navigate('/search')}
-        adminUser={mockUser}
-        onLogout={() => navigate('/login')}
+        adminUser={headerUser}
+        onLogout={() => {
+          clearStoredAuth();
+          navigate('/login');
+        }}
       />
       
       <main className="dashboard-main">
@@ -164,6 +249,18 @@ export function UserDashboardPage() {
             </div>
           </div>
         </section>
+        {loadError && (
+          <div className="results-empty">
+            <h2>Unable to load dashboard</h2>
+            <p>{loadError}</p>
+          </div>
+        )}
+        {isLoading && !loadError && (
+          <div className="results-empty">
+            <h2>Loading dashboard...</h2>
+            <p>Fetching your latest applications and profile.</p>
+          </div>
+        )}
         
         {/* Dashboard Content */}
         <section className="dashboard-content">

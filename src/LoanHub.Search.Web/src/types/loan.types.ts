@@ -34,6 +34,7 @@ export interface LoanOffer {
   providerId: string;
   providerName: string;
   providerLogo?: string;
+  providerOfferId?: string;
   amount: number;
   duration: number;
   monthlyInstallment: number;
