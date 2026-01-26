@@ -1,4 +1,4 @@
-import { getApiBaseUrl, getAuthToken, storeAuthSession } from './apiConfig';
+import { ApiError, getApiBaseUrl, getAuthToken, storeAuthSession } from './apiConfig';
 
 export interface AuthResponse {
   id: string;
@@ -37,7 +37,7 @@ export interface LoginPayload {
 const handleAuthResponse = async (response: Response) => {
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || `Auth request failed with status ${response.status}.`);
+    throw new ApiError(message || `Auth request failed with status ${response.status}.`, response.status);
   }
   const data = (await response.json()) as AuthResponse;
   storeAuthSession({
@@ -95,7 +95,7 @@ export const updateUserProfile = async (
 
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || `Profile update failed with status ${response.status}.`);
+    throw new ApiError(message || `Profile update failed with status ${response.status}.`, response.status);
   }
 
   return (await response.json()) as AuthResponse;

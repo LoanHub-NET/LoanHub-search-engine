@@ -1,4 +1,4 @@
-import { getApiBaseUrl, getAuthToken } from './apiConfig';
+import { ApiError, getApiBaseUrl, getAuthToken } from './apiConfig';
 
 export interface ApplicationRequestBase {
   provider: string;
@@ -41,7 +41,10 @@ export interface ApplicationResponse {
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || `Application request failed with status ${response.status}.`);
+    throw new ApiError(
+      message || `Application request failed with status ${response.status}.`,
+      response.status,
+    );
   }
   return (await response.json()) as ApplicationResponse;
 };

@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
 import { createApplication, createApplicationForCurrentUser } from '../../api/applicationsApi';
-import { getAuthSession } from '../../api/apiConfig';
+import { ApiError, clearAuthSession, getAuthSession } from '../../api/apiConfig';
 import { updateUserProfile } from '../../api/userApi';
 import type { 
   ApplicationStep, 
@@ -264,6 +264,66 @@ export function LoanApplicationPage() {
     setIsSubmitting(true);
     setSubmissionError(null);
 
+    const submitAsGuest = async () => {
+      const personalInfo = formData.personalInfo;
+      const employment = formData.employment;
+      const documents = formData.documents;
+
+      const dateOfBirth = personalInfo.dateOfBirth ? new Date(personalInfo.dateOfBirth) : null;
+      const age = dateOfBirth && !Number.isNaN(dateOfBirth.getTime())
+        ? Math.max(0, new Date().getFullYear() - dateOfBirth.getFullYear())
+        : null;
+
+      const addressParts = [
+        personalInfo.address.street,
+        personalInfo.address.apartment ? `Apt ${personalInfo.address.apartment}` : '',
+        personalInfo.address.postalCode && personalInfo.address.city
+          ? `${personalInfo.address.postalCode} ${personalInfo.address.city}`
+          : personalInfo.address.city,
+        personalInfo.address.country,
+      ].filter(Boolean);
+      const address = addressParts.join(', ');
+
+      if (!personalInfo.email || !personalInfo.firstName || !personalInfo.lastName) {
+        throw new Error('Please provide your name and email before submitting.');
+      }
+
+      if (!age || age <= 0) {
+        throw new Error('Please provide a valid date of birth.');
+      }
+
+      if (!employment.position && !employment.employerName) {
+        throw new Error('Please provide your job title or employer.');
+      }
+
+      if (!documents.idNumber) {
+        throw new Error('Please provide your ID document number.');
+      }
+
+      const offer = formData.offer!;
+      const validUntil = offer.validUntil ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      const response = await createApplication({
+        applicantEmail: personalInfo.email,
+        firstName: personalInfo.firstName,
+        lastName: personalInfo.lastName,
+        age,
+        jobTitle: employment.position || employment.employerName || 'Applicant',
+        address,
+        idDocumentNumber: documents.idNumber,
+        provider: offer.providerName,
+        providerOfferId: offer.id,
+        installment: offer.monthlyInstallment,
+        apr: offer.apr,
+        totalCost: offer.totalRepayment,
+        amount: offer.amount,
+        durationMonths: offer.duration,
+        validUntil: validUntil.toISOString(),
+      });
+
+      return response.id;
+    };
+
     try {
       const personalInfo = formData.personalInfo;
       const employment = formData.employment;
@@ -287,73 +347,49 @@ export function LoanApplicationPage() {
       const offer = formData.offer;
       const validUntil = offer.validUntil ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
+      let referenceId: string;
+
       if (authSession?.id && isLoggedIn) {
-        await updateUserProfile(authSession.id, {
-          firstName: personalInfo.firstName,
-          lastName: personalInfo.lastName,
-          age: age ?? null,
-          jobTitle: employment.position || employment.employerName || null,
-          address,
-          idDocumentNumber: documents.idNumber || null,
-        });
+        try {
+          await updateUserProfile(authSession.id, {
+            firstName: personalInfo.firstName,
+            lastName: personalInfo.lastName,
+            age: age ?? null,
+            jobTitle: employment.position || employment.employerName || null,
+            address,
+            idDocumentNumber: documents.idNumber || null,
+          });
 
-        const response = await createApplicationForCurrentUser({
-          provider: offer.providerName,
-          providerOfferId: offer.id,
-          installment: offer.monthlyInstallment,
-          apr: offer.apr,
-          totalCost: offer.totalRepayment,
-          amount: offer.amount,
-          durationMonths: offer.duration,
-          validUntil: validUntil.toISOString(),
-        });
+          const response = await createApplicationForCurrentUser({
+            provider: offer.providerName,
+            providerOfferId: offer.id,
+            installment: offer.monthlyInstallment,
+            apr: offer.apr,
+            totalCost: offer.totalRepayment,
+            amount: offer.amount,
+            durationMonths: offer.duration,
+            validUntil: validUntil.toISOString(),
+          });
 
-        setSubmissionResult({
-          success: true,
-          referenceNumber: response.id,
-          message: 'Your application has been submitted successfully!',
-        });
+          referenceId = response.id;
+        } catch (err: unknown) {
+          if (err instanceof ApiError && err.status === 401) {
+            clearAuthSession();
+            setAuthSession(null);
+            referenceId = await submitAsGuest();
+          } else {
+            throw err;
+          }
+        }
       } else {
-        if (!personalInfo.email || !personalInfo.firstName || !personalInfo.lastName) {
-          throw new Error('Please provide your name and email before submitting.');
-        }
-
-        if (!age || age <= 0) {
-          throw new Error('Please provide a valid date of birth.');
-        }
-
-        if (!employment.position && !employment.employerName) {
-          throw new Error('Please provide your job title or employer.');
-        }
-
-        if (!documents.idNumber) {
-          throw new Error('Please provide your ID document number.');
-        }
-
-        const response = await createApplication({
-          applicantEmail: personalInfo.email,
-          firstName: personalInfo.firstName,
-          lastName: personalInfo.lastName,
-          age,
-          jobTitle: employment.position || employment.employerName || 'Applicant',
-          address,
-          idDocumentNumber: documents.idNumber,
-          provider: offer.providerName,
-          providerOfferId: offer.id,
-          installment: offer.monthlyInstallment,
-          apr: offer.apr,
-          totalCost: offer.totalRepayment,
-          amount: offer.amount,
-          durationMonths: offer.duration,
-          validUntil: validUntil.toISOString(),
-        });
-
-        setSubmissionResult({
-          success: true,
-          referenceNumber: response.id,
-          message: 'Your application has been submitted successfully!',
-        });
+        referenceId = await submitAsGuest();
       }
+
+      setSubmissionResult({
+        success: true,
+        referenceNumber: referenceId,
+        message: 'Your application has been submitted successfully!',
+      });
 
       setCompletedSteps(prev => new Set([...prev, 'review']));
       setCurrentStep('submitted');
