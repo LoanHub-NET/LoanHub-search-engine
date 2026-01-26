@@ -119,7 +119,15 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Applications")));
 builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
 builder.Services.AddScoped<ApplicationService>();
-builder.Services.AddSingleton<IContractStorage, AzureBlobContractStorage>();
+var contractStorageOptions = builder.Configuration.GetSection("ContractStorage").Get<ContractStorageOptions>() ?? new ContractStorageOptions();
+if (string.IsNullOrWhiteSpace(contractStorageOptions.ConnectionString))
+{
+    builder.Services.AddSingleton<IContractStorage, LocalFileContractStorage>();
+}
+else
+{
+    builder.Services.AddSingleton<IContractStorage, AzureBlobContractStorage>();
+}
 builder.Services.AddScoped<IOfferSelectionRepository, OfferSelectionRepository>();
 builder.Services.AddScoped<OfferSelectionService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
