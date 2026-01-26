@@ -19,6 +19,7 @@ import type {
   DocumentData,
   PersonalizationData 
 } from '../../types/application.types';
+import type { UserProfile } from '../../types/dashboard.types';
 import { 
   APPLICATION_STEPS, 
   INITIAL_APPLICATION_DATA
@@ -56,6 +57,28 @@ const MOCK_PROVIDERS = [
   { name: 'Summit Trust', logo: '🏔️' },
   { name: 'Harborline Bank', logo: '⚓' },
 ];
+
+const storedProfileKeyPrefix = 'loanhub_user_profile_';
+
+const getStoredProfile = (userId?: string | null): Partial<UserProfile> | null => {
+  if (!userId || typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(`${storedProfileKeyPrefix}${userId}`);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as Partial<UserProfile>;
+  } catch {
+    return null;
+  }
+};
+
+const normalizeDateInput = (value?: string | Date | null) => {
+  if (!value) return '';
+  const dateValue = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(dateValue.getTime())) {
+    return typeof value === 'string' ? value : '';
+  }
+  return dateValue.toISOString().split('T')[0];
+};
 
 export function LoanApplicationPage() {
   const location = useLocation();
@@ -112,37 +135,64 @@ export function LoanApplicationPage() {
   // Auto-fill user data if logged in
   useEffect(() => {
     if (isLoggedIn) {
+      const storedProfile = getStoredProfile(authSession?.id);
       const firstName = authSession?.firstName ?? '';
       const lastName = authSession?.lastName ?? '';
       const email = authSession?.email ?? '';
-      const jobTitle = authSession?.jobTitle ?? '';
-      const monthlyIncome = authSession?.monthlyIncome ?? null;
-      const livingCosts = authSession?.livingCosts ?? null;
-      const dependents = authSession?.dependents ?? null;
+      const jobTitle = storedProfile?.employment?.position ?? authSession?.jobTitle ?? '';
+      const monthlyIncome = storedProfile?.monthlyIncome ?? authSession?.monthlyIncome ?? null;
+      const livingCosts = storedProfile?.livingCosts ?? authSession?.livingCosts ?? null;
+      const dependents = storedProfile?.dependents ?? authSession?.dependents ?? null;
+      const address = storedProfile?.address;
+      const employment = storedProfile?.employment;
+      const idDocument = storedProfile?.idDocument;
       setFormData(prev => ({
         ...prev,
         authMode: 'logged-in',
         personalInfo: {
           ...prev.personalInfo,
-          firstName,
-          lastName,
+          firstName: storedProfile?.firstName || firstName,
+          lastName: storedProfile?.lastName || lastName,
           email,
-          phone: authSession?.phone ?? prev.personalInfo.phone,
-          dateOfBirth: authSession?.dateOfBirth ?? prev.personalInfo.dateOfBirth,
+          phone: storedProfile?.phone ?? authSession?.phone ?? prev.personalInfo.phone,
+          dateOfBirth:
+            normalizeDateInput(storedProfile?.dateOfBirth ?? authSession?.dateOfBirth) ||
+            prev.personalInfo.dateOfBirth,
+          address: {
+            ...prev.personalInfo.address,
+            street: address?.street ?? prev.personalInfo.address.street,
+            apartment: address?.apartment ?? prev.personalInfo.address.apartment,
+            city: address?.city ?? prev.personalInfo.address.city,
+            postalCode: address?.postalCode ?? prev.personalInfo.address.postalCode,
+            country: address?.country ?? prev.personalInfo.address.country,
+          },
         },
         employment: {
           ...prev.employment,
+          status: employment?.status ?? prev.employment.status,
+          employerName: employment?.employerName ?? prev.employment.employerName,
           position: jobTitle || prev.employment.position,
+          employedSince:
+            normalizeDateInput(employment?.startDate) || prev.employment.employedSince,
+          contractType: employment?.contractType ?? prev.employment.contractType,
           monthlyIncome: monthlyIncome !== null ? String(monthlyIncome) : prev.employment.monthlyIncome,
           livingCosts: livingCosts !== null ? String(livingCosts) : prev.employment.livingCosts,
           dependents: dependents !== null ? String(dependents) : prev.employment.dependents,
+        },
+        personalization: {
+          ...prev.personalization,
+          monthlyIncome: monthlyIncome !== null ? String(monthlyIncome) : prev.personalization.monthlyIncome,
+          livingCosts: livingCosts !== null ? String(livingCosts) : prev.personalization.livingCosts,
+          dependents: dependents !== null ? String(dependents) : prev.personalization.dependents,
         },
         documents: {
           ...prev.documents,
           idFrontFile: undefined,
           idBackFile: undefined,
           additionalDocs: undefined,
-          idNumber: authSession?.idDocumentNumber ?? prev.documents.idNumber,
+          idType: idDocument?.type ?? prev.documents.idType,
+          idNumber: idDocument?.number ?? authSession?.idDocumentNumber ?? prev.documents.idNumber,
+          idExpiry: normalizeDateInput(idDocument?.expiryDate) || prev.documents.idExpiry,
         },
       }));
     } else {
