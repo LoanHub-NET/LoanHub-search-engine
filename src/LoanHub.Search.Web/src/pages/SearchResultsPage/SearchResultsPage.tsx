@@ -62,6 +62,7 @@ export function SearchResultsPage() {
   const amount = Number(searchParams.get('amount')) || 10000;
   const duration = Number(searchParams.get('duration')) || 12;
   const hasIncome = searchParams.has('income');
+  const quickSearchUrl = '/api/search/quick';
 
   useEffect(() => {
     setShowBlockingLoad(true);
@@ -77,7 +78,7 @@ export function SearchResultsPage() {
 
     const loadQuickSearch = async () => {
       try {
-        const response = await fetch('/api/search/quick', {
+        const response = await fetch(quickSearchUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

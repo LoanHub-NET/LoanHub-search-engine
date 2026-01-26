@@ -10,5 +10,7 @@ RUN npm run build
 FROM nginx:1.27-alpine
 WORKDIR /usr/share/nginx/html
 COPY --from=build /app/dist ./
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY docker-entrypoint.d/10-envsubst.sh /docker-entrypoint.d/10-envsubst.sh
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
