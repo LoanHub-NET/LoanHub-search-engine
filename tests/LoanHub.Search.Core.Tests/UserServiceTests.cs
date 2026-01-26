@@ -6,12 +6,26 @@ namespace LoanHub.Search.Core.Tests;
 
 public sealed class UserServiceTests
 {
+    private static UserService.UserProfile CreateProfile()
+        => new(
+            "Jane",
+            "Doe",
+            30,
+            "Engineer",
+            "Main St",
+            "123-456-789",
+            new DateTime(1993, 1, 1),
+            7500m,
+            2500m,
+            2,
+            "ABC123");
+
     [Fact]
     public async Task RegisterLocalAsync_ThrowsWhenEmailExists()
     {
         var repository = new InMemoryUserRepository();
         var service = new UserService(repository);
-        var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", "ABC123");
+        var profile = CreateProfile();
 
         await service.RegisterLocalAsync("jane@example.com", "Password1!", profile, CancellationToken.None);
 
@@ -24,7 +38,7 @@ public sealed class UserServiceTests
     {
         var repository = new InMemoryUserRepository();
         var service = new UserService(repository);
-        var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", "ABC123");
+        var profile = CreateProfile();
 
         var user = await service.RegisterLocalAsync("jane@example.com", "Password1!", profile, CancellationToken.None);
 
@@ -39,7 +53,7 @@ public sealed class UserServiceTests
     {
         var repository = new InMemoryUserRepository();
         var service = new UserService(repository);
-        var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", "ABC123");
+        var profile = CreateProfile();
 
         var user = await service.RegisterLocalAsync("jane@example.com", "Password1!", profile, CancellationToken.None);
 
@@ -55,7 +69,7 @@ public sealed class UserServiceTests
     {
         var repository = new InMemoryUserRepository();
         var service = new UserService(repository);
-        var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", "ABC123");
+        var profile = CreateProfile();
 
         await service.RegisterExternalAsync("google", "sub-123", "jane@example.com", profile, CancellationToken.None);
 
