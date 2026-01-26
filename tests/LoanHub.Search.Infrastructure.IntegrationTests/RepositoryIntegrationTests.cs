@@ -64,7 +64,7 @@ public sealed class RepositoryIntegrationTests
             ApplicantDetails = new ApplicantDetails("Jane", "Doe", 30, "Analyst", "Street 1", "ID-1"),
             OfferSnapshot = new OfferSnapshot("MockBank", "MB-10", 220.5m, 0.08m, 13230m, 10000m, 60, DateTimeOffset.UtcNow.AddDays(10))
         };
-        application.AddStatus(ApplicationStatus.Submitted, "Ready");
+        application.AddStatus(ApplicationStatus.PreliminarilyAccepted, "Ready");
 
         await repository.AddAsync(application, CancellationToken.None);
         var loaded = await repository.GetAsync(application.Id, CancellationToken.None);
