@@ -9,7 +9,7 @@ import type {
 } from '../../types/admin.types';
 import { ADMIN_STATUS_CONFIG, calculateSlaInfo } from '../../types/admin.types';
 import { ApplicationDetailModal, DecisionModal } from '../../components/admin';
-import { Header, Footer } from '../../components';
+import { Header, AdminFooter } from '../../components';
 import type { AdminUser } from '../../components/Header/Header';
 import { clearAuthSession, getAuthSession } from '../../api/apiConfig';
 import {
@@ -571,7 +571,7 @@ export function AdminDashboardPage() {
           </div>
         </section>
       </main>
-      <Footer />
+      <AdminFooter />
 
       {/* Application Detail Modal */}
       {selectedApplication && (

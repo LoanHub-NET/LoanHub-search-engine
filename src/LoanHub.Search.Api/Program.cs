@@ -136,8 +136,17 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("AdminOnly", policy =>
         policy.RequireAuthenticatedUser()
             .AddRequirements(new AdminAccessRequirement()));
+    
+    options.AddPolicy("UserOnly", policy =>
+        policy.RequireAuthenticatedUser()
+            .AddRequirements(new UserOnlyRequirement()));
+    
+    options.AddPolicy("NotAdmin", policy =>
+        policy.AddRequirements(new NotAdminRequirement()));
 });
 builder.Services.AddScoped<IAuthorizationHandler, AdminAccessHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, UserOnlyHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, NotAdminHandler>();
 
 builder.Services.AddScoped<ILoanOfferProviderRegistry, BankApiOfferProviderRegistry>();
 builder.Services.AddScoped<OffersAggregator>();

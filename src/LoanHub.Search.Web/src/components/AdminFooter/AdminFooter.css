@@ -1,0 +1,19 @@
+.admin-footer {
+  background-color: var(--color-bg-dark, #1a1f2e);
+  color: var(--color-text-muted, #8892a4);
+  padding: 1.5rem 2rem;
+  margin-top: auto;
+}
+
+.admin-footer-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.admin-copyright {
+  font-size: 0.875rem;
+  margin: 0;
+}

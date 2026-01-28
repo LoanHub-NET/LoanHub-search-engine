@@ -6,9 +6,26 @@ import './Header.css';
 export interface AdminUser {
   name: string;
   email: string;
-  role: string;
+  role: string | number;
   avatar?: string;
 }
+
+/**
+ * Converts role to human-readable display string
+ */
+const getRoleDisplayName = (role: string | number): string => {
+  if (role === 1 || role === '1' || role === 'Admin' || role === 'Administrator') {
+    return 'Administrator';
+  }
+  return 'User';
+};
+
+/**
+ * Checks if role represents an admin
+ */
+const isAdminRole = (role: string | number): boolean => {
+  return role === 1 || role === '1' || role === 'Admin' || role === 'Administrator';
+};
 
 interface HeaderProps {
   onLoginClick: () => void;
@@ -45,12 +62,15 @@ export function Header({ onLoginClick, onSearchClick, adminUser, onLogout }: Hea
     navigate('/#how-it-works');
   };
 
+  // Determine logo destination based on user role
+  const logoDestination = adminUser && isAdminRole(adminUser.role) ? '/admin' : '/';
+
   return (
     <header className="header">
       <div className="header-container">
         <a
           className="logo"
-          href="/"
+          href={logoDestination}
           aria-label="LoanHub home"
           title="LoanHub home"
           style={{ backgroundImage: `url(${logo})` }}
@@ -66,20 +86,25 @@ export function Header({ onLoginClick, onSearchClick, adminUser, onLogout }: Hea
 
         <nav className={`nav ${menuOpen ? 'nav-open' : ''}`}>
           <ul className="nav-list">
-            <li>
-              <a
-                href="/#how-it-works"
-                className="nav-link"
-                onClick={handleHowItWorksClick}
-              >
-                How it works
-              </a>
-            </li>
-            <li>
-              <button onClick={onSearchClick} className="nav-link nav-button">
-                Search Engine
-              </button>
-            </li>
+            {/* Hide How it works and Search for admin users */}
+            {(!adminUser || !isAdminRole(adminUser.role)) && (
+              <>
+                <li>
+                  <a
+                    href="/#how-it-works"
+                    className="nav-link"
+                    onClick={handleHowItWorksClick}
+                  >
+                    How it works
+                  </a>
+                </li>
+                <li>
+                  <button onClick={onSearchClick} className="nav-link nav-button">
+                    Search Engine
+                  </button>
+                </li>
+              </>
+            )}
             {adminUser ? (
               <li className="user-menu-container" ref={userMenuRef}>
                 <button 
@@ -96,7 +121,7 @@ export function Header({ onLoginClick, onSearchClick, adminUser, onLogout }: Hea
                   </div>
                   <div className="user-info">
                     <span className="user-name">{adminUser.name}</span>
-                    <span className="user-role">{adminUser.role}</span>
+                    <span className="user-role">{getRoleDisplayName(adminUser.role)}</span>
                   </div>
                   <span className={`dropdown-arrow ${userMenuOpen ? 'open' : ''}`}>▼</span>
                 </button>
@@ -119,7 +144,12 @@ export function Header({ onLoginClick, onSearchClick, adminUser, onLogout }: Hea
                     <div className="dropdown-divider"></div>
                     <ul className="dropdown-menu">
                       <li>
-                        <button onClick={() => { setUserMenuOpen(false); navigate(adminUser.role === 'Administrator' ? '/admin' : '/dashboard'); }}>
+                        <button onClick={() => { 
+                          setUserMenuOpen(false); 
+                          const role = adminUser.role;
+                          const isAdmin = role === 'Administrator' || role === 'Admin' || role === 1 || role === '1';
+                          navigate(isAdmin ? '/admin' : '/dashboard'); 
+                        }}>
                           📋 Dashboard
                         </button>
                       </li>
