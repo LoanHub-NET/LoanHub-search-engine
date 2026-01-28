@@ -26,7 +26,7 @@ public sealed class SendGridEmailSender : IEmailSender
     {
         var from = new EmailAddress(_options.FromEmail, _options.FromName);
         var to = new EmailAddress(message.To);
-        var mail = MailHelper.CreateSingleEmail(from, to, message.Subject, message.PlainTextBody, null);
+        var mail = MailHelper.CreateSingleEmail(from, to, message.Subject, message.PlainTextBody, message.HtmlBody);
 
         if (message.Attachments is not null)
         {

@@ -10,6 +10,7 @@ using LoanHub.Search.Core.Services.Auth;
 using LoanHub.Search.Core.Services.Notifications;
 using LoanHub.Search.Core.Services.Selections;
 using LoanHub.Search.Core.Services.Users;
+using LoanHub.Search.Core.Models.Notifications;
 using LoanHub.Search.Api.Notifications;
 using LoanHub.Search.Api.Authorization;
 using LoanHub.Search.Api.Options;
@@ -159,6 +160,7 @@ builder.Services.AddSingleton<IRealtimeNotifier, SignalRApplicationNotifier>();
 builder.Services.AddSingleton<IEmailTemplateRenderer, EmailTemplateRenderer>();
 builder.Services.AddSingleton<IContractLinkGenerator, ContractLinkGenerator>();
 builder.Services.AddSingleton<IContractDocumentGenerator, ContractDocumentGenerator>();
+builder.Services.Configure<EmailBrandingOptions>(builder.Configuration.GetSection("EmailBranding"));
 
 var sendGridOptions = builder.Configuration.GetSection("SendGrid").Get<SendGridOptions>() ?? new SendGridOptions();
 var useSendGrid = !string.IsNullOrWhiteSpace(sendGridOptions.ApiKey) &&
