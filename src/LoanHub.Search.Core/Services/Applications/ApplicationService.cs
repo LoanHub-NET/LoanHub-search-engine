@@ -19,6 +19,7 @@ public sealed class ApplicationService
     private readonly IProviderContactResolver _providerContactResolver;
     private readonly IRealtimeNotifier _realtimeNotifier;
     private readonly EmailBrandingOptions _brandingOptions;
+    private readonly EmailAttachment? _logoInlineAttachment;
 
     public ApplicationService(
         IApplicationRepository repo,
@@ -40,6 +41,7 @@ public sealed class ApplicationService
         _providerContactResolver = providerContactResolver;
         _realtimeNotifier = realtimeNotifier;
         _brandingOptions = brandingOptions.Value ?? new EmailBrandingOptions();
+        _logoInlineAttachment = BuildLogoInlineAttachment(_brandingOptions);
     }
 
     public async Task<LoanApplication> CreateAsync(LoanApplication application, CancellationToken ct)
@@ -331,7 +333,8 @@ public sealed class ApplicationService
         IReadOnlyList<EmailAttachment>? attachments,
         CancellationToken ct)
     {
-        var message = new EmailMessage(application.ApplicantEmail, subject, body, htmlBody, attachments);
+        var mergedAttachments = MergeAttachments(attachments);
+        var message = new EmailMessage(application.ApplicantEmail, subject, body, htmlBody, mergedAttachments);
         return _emailSender.SendAsync(message, ct);
     }
 
@@ -347,7 +350,8 @@ public sealed class ApplicationService
         if (string.IsNullOrWhiteSpace(email))
             return Task.CompletedTask;
 
-        var message = new EmailMessage(email, subject, body, htmlBody, attachments);
+        var mergedAttachments = MergeAttachments(attachments);
+        var message = new EmailMessage(email, subject, body, htmlBody, mergedAttachments);
         return _emailSender.SendAsync(message, ct);
     }
 
@@ -397,7 +401,11 @@ public sealed class ApplicationService
         var accentColor = string.IsNullOrWhiteSpace(_brandingOptions.AccentColor)
             ? "#2d5a87"
             : _brandingOptions.AccentColor;
-        var logoBlock = BuildLogoBlock(productName, _brandingOptions.LogoUrl, _brandingOptions.PortalUrl);
+        var logoBlock = BuildLogoBlock(
+            productName,
+            _brandingOptions.LogoUrl,
+            _brandingOptions.PortalUrl,
+            _logoInlineAttachment?.ContentId);
         var portalLinkBlock = BuildLinkBlock(_brandingOptions.PortalUrl, "Przejdź do panelu klienta", accentColor);
         var adminPortalLinkBlock = BuildLinkBlock(_brandingOptions.AdminPortalUrl, "Otwórz panel administracyjny", accentColor);
         var portalLinkLine = string.IsNullOrWhiteSpace(_brandingOptions.PortalUrl)
@@ -439,8 +447,15 @@ public sealed class ApplicationService
         };
     }
 
-    private static string BuildLogoBlock(string productName, string? logoUrl, string? portalUrl)
+    private static string BuildLogoBlock(string productName, string? logoUrl, string? portalUrl, string? inlineContentId)
     {
+        if (!string.IsNullOrWhiteSpace(inlineContentId))
+        {
+            return $"""
+<img src="cid:{inlineContentId}" alt="{productName}" style="height:32px; display:block;" />
+""";
+        }
+
         var resolvedLogoUrl = logoUrl;
         if (string.IsNullOrWhiteSpace(resolvedLogoUrl) && !string.IsNullOrWhiteSpace(portalUrl))
         {
@@ -458,6 +473,41 @@ public sealed class ApplicationService
         return $"""
 <img src="{resolvedLogoUrl}" alt="{productName}" style="height:32px; display:block;" />
 """;
+    }
+
+    private static EmailAttachment? BuildLogoInlineAttachment(EmailBrandingOptions branding)
+    {
+        if (string.IsNullOrWhiteSpace(branding.LogoInlineBase64))
+            return null;
+
+        try
+        {
+            var bytes = Convert.FromBase64String(branding.LogoInlineBase64);
+            var contentId = string.IsNullOrWhiteSpace(branding.LogoInlineContentId)
+                ? "loanhub-logo"
+                : branding.LogoInlineContentId;
+            var contentType = string.IsNullOrWhiteSpace(branding.LogoInlineContentType)
+                ? "image/png"
+                : branding.LogoInlineContentType;
+            return new EmailAttachment("loanhub-logo.png", contentType, bytes, "inline", contentId);
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+    }
+
+    private IReadOnlyList<EmailAttachment>? MergeAttachments(IReadOnlyList<EmailAttachment>? attachments)
+    {
+        if (_logoInlineAttachment is null)
+            return attachments;
+
+        if (attachments is null || attachments.Count == 0)
+            return new[] { _logoInlineAttachment };
+
+        var merged = new List<EmailAttachment>(attachments.Count + 1) { _logoInlineAttachment };
+        merged.AddRange(attachments);
+        return merged;
     }
 
     private static string BuildLinkBlock(string? url, string label, string accentColor)

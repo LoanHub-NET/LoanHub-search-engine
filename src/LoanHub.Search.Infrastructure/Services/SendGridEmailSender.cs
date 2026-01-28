@@ -33,7 +33,12 @@ public sealed class SendGridEmailSender : IEmailSender
             foreach (var attachment in message.Attachments)
             {
                 var encoded = Convert.ToBase64String(attachment.Content);
-                mail.AddAttachment(attachment.FileName, encoded, attachment.ContentType);
+                mail.AddAttachment(
+                    attachment.FileName,
+                    encoded,
+                    attachment.ContentType,
+                    attachment.Disposition,
+                    attachment.ContentId);
             }
         }
 

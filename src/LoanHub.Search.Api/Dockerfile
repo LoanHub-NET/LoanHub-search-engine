@@ -13,6 +13,8 @@ RUN dotnet publish src/LoanHub.Search.Api/LoanHub.Search.Api.csproj -c Release -
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080
+ENV EmailBranding__LogoPath=/app/assets/LoanHub_logo.png
 EXPOSE 8080
 COPY --from=build /app/publish ./
+COPY src/LoanHub.Search.Web/public/LoanHub_logo.png /app/assets/LoanHub_logo.png
 ENTRYPOINT ["dotnet", "LoanHub.Search.Api.dll"]
