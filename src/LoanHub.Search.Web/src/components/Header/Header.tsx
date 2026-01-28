@@ -62,12 +62,15 @@ export function Header({ onLoginClick, onSearchClick, adminUser, onLogout }: Hea
     navigate('/#how-it-works');
   };
 
+  // Determine logo destination based on user role
+  const logoDestination = adminUser && isAdminRole(adminUser.role) ? '/admin' : '/';
+
   return (
     <header className="header">
       <div className="header-container">
         <a
           className="logo"
-          href="/"
+          href={logoDestination}
           aria-label="LoanHub home"
           title="LoanHub home"
           style={{ backgroundImage: `url(${logo})` }}
