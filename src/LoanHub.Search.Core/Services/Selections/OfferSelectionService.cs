@@ -9,14 +9,14 @@ namespace LoanHub.Search.Core.Services.Selections;
 public sealed class OfferSelectionService
 {
     private readonly IOfferSelectionRepository _repository;
-    private readonly IReadOnlyDictionary<string, ILoanOfferProvider> _providers;
+    private readonly ILoanOfferProviderRegistry _registry;
 
     public OfferSelectionService(
         IOfferSelectionRepository repository,
-        IEnumerable<ILoanOfferProvider> providers)
+        ILoanOfferProviderRegistry registry)
     {
         _repository = repository;
-        _providers = providers.ToDictionary(provider => provider.Name, StringComparer.OrdinalIgnoreCase);
+        _registry = registry;
     }
 
     public Task<OfferSelection?> GetAsync(Guid id, CancellationToken ct)
@@ -113,7 +113,8 @@ public sealed class OfferSelectionService
         int dependents,
         CancellationToken ct)
     {
-        if (!_providers.TryGetValue(selection.SelectedOffer.Provider, out var provider))
+        var provider = await _registry.GetProviderAsync(selection.SelectedOffer.Provider, ct);
+        if (provider is null)
             return (null, $"Provider '{selection.SelectedOffer.Provider}' not found.");
 
         var query = new OfferQuery(

@@ -6,10 +6,10 @@ using System.Diagnostics;
 
 public sealed class OffersAggregator
 {
-    private readonly IReadOnlyList<ILoanOfferProvider> _providers;
+    private readonly ILoanOfferProviderRegistry _registry;
 
-    public OffersAggregator(IEnumerable<ILoanOfferProvider> providers)
-        => _providers = providers.ToList();
+    public OffersAggregator(ILoanOfferProviderRegistry registry)
+        => _registry = registry;
     record Pending(ILoanOfferProvider Provider, Task<(IReadOnlyList<OfferDto> Offers, ProviderCallResult Source)> Task);
 
     public async Task<(IReadOnlyList<OfferDto> Offers, IReadOnlyList<ProviderCallResult> Sources)> GetOffersAsync(
@@ -17,6 +17,10 @@ public sealed class OffersAggregator
       TimeSpan overallTimeout,
       CancellationToken ct)
     {
+        var providers = await _registry.GetProvidersAsync(ct);
+        if (providers.Count == 0)
+            return (Array.Empty<OfferDto>(), Array.Empty<ProviderCallResult>());
+
         // Ten CTS dalej jest przydatny: jeœli provider respektuje ct, to realnie przerwie pracê po timeout.
         using var overallCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         overallCts.CancelAfter(overallTimeout);
@@ -25,7 +29,7 @@ public sealed class OffersAggregator
         var sources = new List<ProviderCallResult>();
 
         // Startujemy wszystkie wywo³ania naraz
-        var pending = _providers
+        var pending = providers
             .Select(p => new Pending(p, CallProvider(p, query, overallCts.Token)))
             .ToList();
 

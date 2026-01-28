@@ -17,6 +17,9 @@ public sealed class UserAccount
     public decimal? LivingCosts { get; set; }
     public int? Dependents { get; set; }
     public string? IdDocumentNumber { get; set; }
+    public string? BankName { get; set; }
+    public string? BankApiEndpoint { get; set; }
+    public string? BankApiKey { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     public ICollection<ExternalIdentity> ExternalIdentities { get; set; } = new List<ExternalIdentity>();
