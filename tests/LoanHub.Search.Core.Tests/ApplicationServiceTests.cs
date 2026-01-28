@@ -1,5 +1,7 @@
 using LoanHub.Search.Core.Models.Applications;
+using LoanHub.Search.Core.Models.Notifications;
 using LoanHub.Search.Core.Services.Applications;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace LoanHub.Search.Core.Tests;
@@ -20,6 +22,7 @@ public sealed class ApplicationServiceTests
             ["ProviderA"] = "provider@example.com"
         });
         var notifier = new CapturingRealtimeNotifier();
+        var brandingOptions = Options.Create(new EmailBrandingOptions());
 
         var service = new ApplicationService(
             repository,
@@ -29,7 +32,8 @@ public sealed class ApplicationServiceTests
             emailSender,
             emailTemplateRenderer,
             resolver,
-            notifier);
+            notifier,
+            brandingOptions);
         var validUntil = DateTimeOffset.UtcNow.AddDays(10);
 
         var application = new LoanApplication
@@ -57,6 +61,7 @@ public sealed class ApplicationServiceTests
         var emailTemplateRenderer = new StubEmailTemplateRenderer();
         var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>());
         var notifier = new CapturingRealtimeNotifier();
+        var brandingOptions = Options.Create(new EmailBrandingOptions());
         var service = new ApplicationService(
             repository,
             contractStorage,
@@ -65,7 +70,8 @@ public sealed class ApplicationServiceTests
             emailSender,
             emailTemplateRenderer,
             resolver,
-            notifier);
+            notifier,
+            brandingOptions);
         var validUntil = DateTimeOffset.UtcNow.AddDays(10);
 
         var application = new LoanApplication
@@ -96,6 +102,7 @@ public sealed class ApplicationServiceTests
         var emailTemplateRenderer = new StubEmailTemplateRenderer();
         var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>());
         var notifier = new CapturingRealtimeNotifier();
+        var brandingOptions = Options.Create(new EmailBrandingOptions());
         var service = new ApplicationService(
             repository,
             contractStorage,
@@ -104,7 +111,8 @@ public sealed class ApplicationServiceTests
             emailSender,
             emailTemplateRenderer,
             resolver,
-            notifier);
+            notifier,
+            brandingOptions);
 
         var application = new LoanApplication
         {
@@ -133,6 +141,7 @@ public sealed class ApplicationServiceTests
         var emailTemplateRenderer = new StubEmailTemplateRenderer();
         var resolver = new StaticProviderContactResolver(new Dictionary<string, string?>());
         var notifier = new CapturingRealtimeNotifier();
+        var brandingOptions = Options.Create(new EmailBrandingOptions());
         var service = new ApplicationService(
             repository,
             contractStorage,
@@ -141,7 +150,8 @@ public sealed class ApplicationServiceTests
             emailSender,
             emailTemplateRenderer,
             resolver,
-            notifier);
+            notifier,
+            brandingOptions);
         var validUntil = DateTimeOffset.UtcNow.AddDays(10);
 
         var recent = new LoanApplication

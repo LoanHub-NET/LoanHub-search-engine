@@ -124,7 +124,7 @@ public sealed class ApplicationService
             return null;
 
         application.AddStatus(ApplicationStatus.PreliminarilyAccepted, null);
-        var updated = await _repo.UpdateAsync(application, ct);
+        var updated = await _repo.UpdateAsync(application, ct) ?? application;
         await NotifyStatusAsync(updated, "Wstępnie zaakceptowany", ct);
         return updated;
     }
@@ -136,7 +136,7 @@ public sealed class ApplicationService
             return null;
 
         application.AddStatus(ApplicationStatus.Accepted, null);
-        var updated = await _repo.UpdateAsync(application, ct);
+        var updated = await _repo.UpdateAsync(application, ct) ?? application;
         await NotifyStatusAsync(updated, "Zaakceptowany", ct);
         return updated;
     }
@@ -148,7 +148,7 @@ public sealed class ApplicationService
             return null;
 
         application.AddStatus(ApplicationStatus.Granted, null);
-        var updated = await _repo.UpdateAsync(application, ct);
+        var updated = await _repo.UpdateAsync(application, ct) ?? application;
         await NotifyStatusAsync(updated, "Przyznany", ct);
         return updated;
     }
@@ -161,7 +161,7 @@ public sealed class ApplicationService
 
         application.ContractReadyAt = DateTimeOffset.UtcNow;
         application.AddStatus(ApplicationStatus.ContractReady, null);
-        var updated = await _repo.UpdateAsync(application, ct);
+        var updated = await _repo.UpdateAsync(application, ct) ?? application;
         await NotifyStatusAsync(updated, "Kontrakt gotowy do podpisu", ct);
         return updated;
     }
@@ -189,7 +189,7 @@ public sealed class ApplicationService
         application.SignedContractContentType = stored.ContentType;
         application.SignedContractReceivedAt = DateTimeOffset.UtcNow;
         application.AddStatus(ApplicationStatus.SignedContractReceived, null);
-        var updated = await _repo.UpdateAsync(application, ct);
+        var updated = await _repo.UpdateAsync(application, ct) ?? application;
         await NotifyStatusAsync(updated, "Podpisany kontrakt przesłany", ct);
         return updated;
     }
@@ -202,7 +202,7 @@ public sealed class ApplicationService
 
         application.FinalApprovedAt = DateTimeOffset.UtcNow;
         application.AddStatus(ApplicationStatus.FinalApproved, null);
-        var updated = await _repo.UpdateAsync(application, ct);
+        var updated = await _repo.UpdateAsync(application, ct) ?? application;
         await NotifyStatusAsync(updated, "Finalna akceptacja", ct);
         return updated;
     }
@@ -214,7 +214,7 @@ public sealed class ApplicationService
             return null;
 
         application.AddStatus(ApplicationStatus.Rejected, reason);
-        var updated = await _repo.UpdateAsync(application, ct);
+        var updated = await _repo.UpdateAsync(application, ct) ?? application;
         await NotifyStatusAsync(updated, $"Odrzucony ({reason})", ct);
         return updated;
     }
@@ -531,7 +531,7 @@ public sealed class ApplicationService
     private async Task<CancellationResult> CancelInternalAsync(LoanApplication application, CancellationToken ct)
     {
         application.AddStatus(ApplicationStatus.Cancelled, "Anulowany przez klienta");
-        var updated = await _repo.UpdateAsync(application, ct);
+        var updated = await _repo.UpdateAsync(application, ct) ?? application;
         await NotifyStatusAsync(updated, "Anulowany przez klienta", ct);
         return new CancellationResult(
             CancellationOutcome.Cancelled,
