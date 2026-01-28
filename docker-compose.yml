@@ -44,5 +44,20 @@ services:
       retries: 10
       start_period: 5s
 
+  pgadmin:
+    image: dpage/pgadmin4:8
+    restart: unless-stopped
+    ports:
+      - "5051:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@loanhub.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin123}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+
 volumes:
   loanhub-postgres:
+  pgadmin-data:

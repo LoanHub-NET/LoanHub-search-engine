@@ -1,7 +1,7 @@
-@LoanHub.Search.Api_HostAddress = http://localhost:8080
+@LoanHub_Search_Api_HostAddress = http://localhost:8080
 # If running via docker compose, use http://localhost:8080
 
-POST {{LoanHub.Search.Api_HostAddress}}/api/search/quick
+POST {{LoanHub_Search_Api_HostAddress}}/api/search/quick
 Content-Type: application/json
 
 {
@@ -10,7 +10,7 @@ Content-Type: application/json
 }
 
 ###
-POST {{LoanHub.Search.Api_HostAddress}}/api/applications
+POST {{LoanHub_Search_Api_HostAddress}}/api/applications
 Content-Type: application/json
 
 {

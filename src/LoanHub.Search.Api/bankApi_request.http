@@ -1,0 +1,7 @@
+@baseUrl = https://loanhub-web-pw2025-d2b4b6bse4dkaaf8.westus2-01.azurewebsites.net
+@apiKey = KODlTlZIAmxAvojtwWv2zOwpZ6oz3Stxu3HRceB4rs8=
+
+### Get bank offers
+GET {{baseUrl}}/api/BankOffers
+Accept: text/plain
+X-Api-Key: {{apiKey}}
