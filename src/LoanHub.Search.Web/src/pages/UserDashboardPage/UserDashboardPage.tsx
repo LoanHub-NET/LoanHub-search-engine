@@ -21,7 +21,7 @@ import {
   listApplicationsByEmail,
   listApplicationsForCurrentUser,
 } from '../../api/applicationsApi';
-import { ApiError, getAuthSession } from '../../api/apiConfig';
+import { ApiError, clearAuthSession, getAuthSession } from '../../api/apiConfig';
 import { Header, Footer } from '../../components';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import './UserDashboardPage.css';
@@ -30,6 +30,7 @@ export function UserDashboardPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const storedProfileKeyPrefix = 'loanhub_user_profile_';
+  const [authSession, setAuthSession] = useState(getAuthSession());
   
   // State
   const [activeTab, setActiveTab] = useState<DashboardTab>(
@@ -173,6 +174,11 @@ export function UserDashboardPage() {
 
   useEffect(() => {
     const session = getAuthSession();
+    setAuthSession(session);
+    if (!session) {
+      navigate('/login');
+      return;
+    }
     if (session) {
       const storedProfileRaw =
         typeof window !== 'undefined'
@@ -267,27 +273,28 @@ export function UserDashboardPage() {
       }
     };
 
-    if (session) {
-      loadApplications();
-    } else {
-      setApplications([]);
-    }
+    loadApplications();
   }, []);
 
-  // Mock user for header
-  const mockUser = {
-    name: `${profile.firstName} ${profile.lastName}`,
-    email: profile.email,
-    role: 'User',
-  };
+  const dashboardUser = authSession
+    ? {
+        name: `${profile.firstName} ${profile.lastName}`.trim() || authSession.email,
+        email: profile.email,
+        role: 'User',
+      }
+    : undefined;
 
   return (
     <div className="dashboard-page">
       <Header 
         onLoginClick={() => navigate('/login')}
         onSearchClick={() => navigate('/search')}
-        adminUser={mockUser}
-        onLogout={() => navigate('/login')}
+        adminUser={dashboardUser}
+        onLogout={() => {
+          clearAuthSession();
+          setAuthSession(null);
+          navigate('/login');
+        }}
       />
       
       <main className="dashboard-main">

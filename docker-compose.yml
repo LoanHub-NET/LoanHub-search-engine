@@ -5,11 +5,16 @@ services:
       dockerfile: src/LoanHub.Search.Api/Dockerfile
     ports:
       - "8080:8080"
+    restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Applications: Host=db;Port=5432;Database=loanhub;Username=loanhub;Password=loanhub
+      SendGrid__ApiKey: ${SENDGRID_API_KEY:-}
+      SendGrid__FromEmail: ${SENDGRID_FROM_EMAIL:-}
+      SendGrid__FromName: ${SENDGRID_FROM_NAME:-LoanHub}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   web:
     build:
@@ -18,18 +23,41 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      - api
+      api:
+        condition: service_started
 
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: loanhub
       POSTGRES_USER: loanhub
       POSTGRES_PASSWORD: loanhub
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - loanhub-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loanhub -d loanhub"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    restart: unless-stopped
+    ports:
+      - "5051:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@loanhub.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin123}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
 
 volumes:
   loanhub-postgres:
+  pgadmin-data:

@@ -1,5 +1,6 @@
 using LoanHub.Search.Core.Abstractions.Notifications;
 using LoanHub.Search.Core.Models.Notifications;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SendGrid;
 using SendGrid.Helpers.Mail;
@@ -9,11 +10,15 @@ namespace LoanHub.Search.Infrastructure.Services;
 public sealed class SendGridEmailSender : IEmailSender
 {
     private readonly SendGridClient _client;
+    private readonly ILogger<SendGridEmailSender> _logger;
     private readonly SendGridOptions _options;
 
-    public SendGridEmailSender(IOptions<SendGridOptions> options)
+    public SendGridEmailSender(
+        IOptions<SendGridOptions> options,
+        ILogger<SendGridEmailSender> logger)
     {
         _options = options.Value;
+        _logger = logger;
         _client = new SendGridClient(_options.ApiKey);
     }
 
@@ -32,6 +37,13 @@ public sealed class SendGridEmailSender : IEmailSender
             }
         }
 
-        await _client.SendEmailAsync(mail, ct);
+        var response = await _client.SendEmailAsync(mail, ct);
+        if ((int)response.StatusCode >= 400)
+        {
+            _logger.LogError(
+                "SendGrid email send failed with status {StatusCode}. Body: {ResponseBody}",
+                (int)response.StatusCode,
+                response.Body);
+        }
     }
 }
