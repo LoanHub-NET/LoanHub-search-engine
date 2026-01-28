@@ -11,6 +11,7 @@ using LoanHub.Search.Core.Services.Notifications;
 using LoanHub.Search.Core.Services.Selections;
 using LoanHub.Search.Core.Services.Users;
 using LoanHub.Search.Api.Notifications;
+using LoanHub.Search.Api.Authorization;
 using LoanHub.Search.Api.Options;
 using LoanHub.Search.Api.Services;
 using LoanHub.Search.Infrastructure;
@@ -18,6 +19,7 @@ using LoanHub.Search.Infrastructure.Providers;
 using LoanHub.Search.Infrastructure.Repositories;
 using LoanHub.Search.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -127,9 +129,10 @@ builder.Services
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy =>
-        policy.RequireRole(UserRole.Admin.ToString())
-            .RequireClaim("is_admin", "true"));
+        policy.RequireAuthenticatedUser()
+            .AddRequirements(new AdminAccessRequirement()));
 });
+builder.Services.AddScoped<IAuthorizationHandler, AdminAccessHandler>();
 
 builder.Services.AddScoped<ILoanOfferProviderRegistry, BankApiOfferProviderRegistry>();
 builder.Services.AddScoped<OffersAggregator>();
