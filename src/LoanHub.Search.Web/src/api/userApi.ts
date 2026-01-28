@@ -24,6 +24,10 @@ export interface AuthResponse {
 export interface RegisterPayload {
   email: string;
   password: string;
+  role?: 'user' | 'admin';
+  bankName?: string | null;
+  bankApiEndpoint?: string | null;
+  bankApiKey?: string | null;
   profile: {
     firstName?: string | null;
     lastName?: string | null;
