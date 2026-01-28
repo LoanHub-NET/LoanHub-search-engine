@@ -74,10 +74,12 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          
+          {/* Loan application - guests and users allowed, admins blocked */}
           <Route 
             path="/apply" 
             element={
-              <ProtectedRoute allowedRole="User">
+              <ProtectedRoute allowedRole="notAdmin">
                 <LoanApplicationPage />
               </ProtectedRoute>
             } 
