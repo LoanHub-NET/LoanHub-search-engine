@@ -12,6 +12,9 @@ services:
       SendGrid__ApiKey: ${SENDGRID_API_KEY:-}
       SendGrid__FromEmail: ${SENDGRID_FROM_EMAIL:-}
       SendGrid__FromName: ${SENDGRID_FROM_NAME:-LoanHub}
+      EmailBranding__LogoPath: /app/assets/LoanHub_logo.png
+      EmailBranding__PortalUrl: http://localhost:5173
+      EmailBranding__AdminPortalUrl: http://localhost:5173/admin
     depends_on:
       db:
         condition: service_healthy

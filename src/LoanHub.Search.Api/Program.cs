@@ -10,6 +10,7 @@ using LoanHub.Search.Core.Services.Auth;
 using LoanHub.Search.Core.Services.Notifications;
 using LoanHub.Search.Core.Services.Selections;
 using LoanHub.Search.Core.Services.Users;
+using LoanHub.Search.Core.Models.Notifications;
 using LoanHub.Search.Api.Notifications;
 using LoanHub.Search.Api.Authorization;
 using LoanHub.Search.Api.Options;
@@ -27,6 +28,10 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using LoanHub.Search.Core.Models.Users;
+using System.IO;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Processing;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -159,6 +164,76 @@ builder.Services.AddSingleton<IRealtimeNotifier, SignalRApplicationNotifier>();
 builder.Services.AddSingleton<IEmailTemplateRenderer, EmailTemplateRenderer>();
 builder.Services.AddSingleton<IContractLinkGenerator, ContractLinkGenerator>();
 builder.Services.AddSingleton<IContractDocumentGenerator, ContractDocumentGenerator>();
+builder.Services.Configure<EmailBrandingOptions>(builder.Configuration.GetSection("EmailBranding"));
+var contentRoot = builder.Environment.ContentRootPath;
+builder.Services.PostConfigure<EmailBrandingOptions>(options =>
+{
+    if (!string.IsNullOrWhiteSpace(options.LogoInlineBase64) || string.IsNullOrWhiteSpace(options.LogoPath))
+        return;
+
+    var candidates = new[]
+    {
+        options.LogoPath,
+        Path.Combine(contentRoot, options.LogoPath),
+        Path.GetFullPath(options.LogoPath)
+    };
+
+    var resolvedPath = string.Empty;
+    foreach (var path in candidates)
+    {
+        if (File.Exists(path))
+        {
+            resolvedPath = path;
+            break;
+        }
+    }
+
+    if (string.IsNullOrWhiteSpace(resolvedPath))
+    {
+        var current = new DirectoryInfo(contentRoot);
+        while (current is not null && string.IsNullOrWhiteSpace(resolvedPath))
+        {
+            var fallbackPath = Path.Combine(current.FullName, "src", "LoanHub.Search.Web", "public", "LoanHub_logo.png");
+            if (File.Exists(fallbackPath))
+                resolvedPath = fallbackPath;
+
+            current = current.Parent;
+        }
+    }
+
+    if (string.IsNullOrWhiteSpace(resolvedPath))
+        return;
+
+    try
+    {
+        using var image = Image.Load(resolvedPath);
+        var maxWidth = options.LogoInlineMaxWidth > 0 ? options.LogoInlineMaxWidth : image.Width;
+        var maxHeight = options.LogoInlineMaxHeight > 0 ? options.LogoInlineMaxHeight : image.Height;
+        if (image.Width > maxWidth || image.Height > maxHeight)
+        {
+            var widthRatio = (double)maxWidth / image.Width;
+            var heightRatio = (double)maxHeight / image.Height;
+            var ratio = maxHeight == 0 ? widthRatio : Math.Min(widthRatio, heightRatio);
+            var newWidth = Math.Max(1, (int)Math.Round(image.Width * ratio));
+            var newHeight = Math.Max(1, (int)Math.Round(image.Height * ratio));
+            image.Mutate(ctx => ctx.Resize(newWidth, newHeight));
+        }
+
+        using var stream = new MemoryStream();
+        var encoder = new PngEncoder { CompressionLevel = PngCompressionLevel.BestCompression };
+        image.Save(stream, encoder);
+        options.LogoInlineBase64 = Convert.ToBase64String(stream.ToArray());
+        if (string.IsNullOrWhiteSpace(options.LogoInlineContentType))
+            options.LogoInlineContentType = "image/png";
+    }
+    catch
+    {
+        var bytes = File.ReadAllBytes(resolvedPath);
+        options.LogoInlineBase64 = Convert.ToBase64String(bytes);
+        if (string.IsNullOrWhiteSpace(options.LogoInlineContentType))
+            options.LogoInlineContentType = "image/png";
+    }
+});
 
 var sendGridOptions = builder.Configuration.GetSection("SendGrid").Get<SendGridOptions>() ?? new SendGridOptions();
 var useSendGrid = !string.IsNullOrWhiteSpace(sendGridOptions.ApiKey) &&
