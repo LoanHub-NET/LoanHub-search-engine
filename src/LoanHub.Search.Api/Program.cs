@@ -159,7 +159,9 @@ builder.Services.AddSingleton<IContractLinkGenerator, ContractLinkGenerator>();
 builder.Services.AddSingleton<IContractDocumentGenerator, ContractDocumentGenerator>();
 
 var sendGridOptions = builder.Configuration.GetSection("SendGrid").Get<SendGridOptions>() ?? new SendGridOptions();
-if (string.IsNullOrWhiteSpace(sendGridOptions.ApiKey))
+var useSendGrid = !string.IsNullOrWhiteSpace(sendGridOptions.ApiKey) &&
+    !string.IsNullOrWhiteSpace(sendGridOptions.FromEmail);
+if (!useSendGrid)
 {
     builder.Services.AddSingleton<IEmailSender, NullEmailSender>();
 }
@@ -170,48 +172,15 @@ else
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+app.Logger.LogInformation(
+    "Email sender configured: {EmailSender}",
+    useSendGrid ? "SendGrid" : "Disabled (NullEmailSender)");
+if (!useSendGrid)
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    dbContext.Database.EnsureCreated();
-    var databaseCreator = dbContext.Database.GetService<IRelationalDatabaseCreator>();
-    if (!databaseCreator.HasTables())
-    {
-        dbContext.Database.EnsureDeleted();
-        dbContext.Database.EnsureCreated();
-    }
-
-    dbContext.Database.ExecuteSqlRaw("""
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "RejectReason" text;
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "UserId" uuid;
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Provider" varchar(120);
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_ProviderOfferId" varchar(120);
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Installment" numeric;
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Apr" numeric;
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_TotalCost" numeric;
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Amount" numeric;
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_DurationMonths" integer;
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_ValidUntil" timestamptz;
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ContractReadyAt" timestamptz;
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractFileName" varchar(240);
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractBlobName" varchar(320);
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractContentType" varchar(160);
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractReceivedAt" timestamptz;
-        ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "FinalApprovedAt" timestamptz;
-        """);
-    dbContext.Database.ExecuteSqlRaw("""
-        UPDATE "Applications"
-        SET "OfferSnapshot_ValidUntil" = COALESCE("OfferSnapshot_ValidUntil", "CreatedAt", NOW()) + INTERVAL '7 days'
-        WHERE "OfferSnapshot_ValidUntil" IS NULL;
-        """);
-    dbContext.Database.ExecuteSqlRaw("""
-        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "Phone" varchar(40);
-        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "DateOfBirth" timestamptz;
-        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "MonthlyIncome" numeric;
-        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "LivingCosts" numeric;
-        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "Dependents" integer;
-        """);
+    app.Logger.LogInformation("Set SendGrid__ApiKey and SendGrid__FromEmail to enable outgoing email.");
 }
+
+await InitializeDatabaseAsync(app);
 
 app.UseSwagger();
 app.UseSwaggerUI();
@@ -224,3 +193,70 @@ app.MapControllers();
 app.MapHub<ApplicationsHub>("/hubs/applications");
 
 app.Run();
+
+static async Task InitializeDatabaseAsync(WebApplication app)
+{
+    const int maxAttempts = 10;
+    var retryDelay = TimeSpan.FromSeconds(2);
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        try
+        {
+            using var scope = app.Services.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            await dbContext.Database.EnsureCreatedAsync(CancellationToken.None);
+            var databaseCreator = dbContext.Database.GetService<IRelationalDatabaseCreator>();
+            if (!databaseCreator.HasTables())
+            {
+                await dbContext.Database.EnsureDeletedAsync(CancellationToken.None);
+                await dbContext.Database.EnsureCreatedAsync(CancellationToken.None);
+            }
+
+            await dbContext.Database.ExecuteSqlRawAsync("""
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "RejectReason" text;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "UserId" uuid;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Provider" varchar(120);
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_ProviderOfferId" varchar(120);
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Installment" numeric;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Apr" numeric;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_TotalCost" numeric;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Amount" numeric;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_DurationMonths" integer;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_ValidUntil" timestamptz;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ContractReadyAt" timestamptz;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractFileName" varchar(240);
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractBlobName" varchar(320);
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractContentType" varchar(160);
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractReceivedAt" timestamptz;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "FinalApprovedAt" timestamptz;
+                """, CancellationToken.None);
+            await dbContext.Database.ExecuteSqlRawAsync("""
+                UPDATE "Applications"
+                SET "OfferSnapshot_ValidUntil" = COALESCE("OfferSnapshot_ValidUntil", "CreatedAt", NOW()) + INTERVAL '7 days'
+                WHERE "OfferSnapshot_ValidUntil" IS NULL;
+                """, CancellationToken.None);
+            await dbContext.Database.ExecuteSqlRawAsync("""
+                ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "Phone" varchar(40);
+                ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "DateOfBirth" timestamptz;
+                ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "MonthlyIncome" numeric;
+                ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "LivingCosts" numeric;
+                ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "Dependents" integer;
+                """, CancellationToken.None);
+
+            app.Logger.LogInformation("Database initialized.");
+            return;
+        }
+        catch (Exception ex) when (attempt < maxAttempts)
+        {
+            app.Logger.LogWarning(
+                ex,
+                "Database initialization failed (attempt {Attempt}/{MaxAttempts}). Retrying in {DelaySeconds}s...",
+                attempt,
+                maxAttempts,
+                retryDelay.TotalSeconds);
+            await Task.Delay(retryDelay);
+        }
+    }
+}

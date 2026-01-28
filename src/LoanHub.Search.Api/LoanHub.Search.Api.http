@@ -1,6 +1,34 @@
-@LoanHub.Search.Api_HostAddress = http://localhost:5050
+@LoanHub.Search.Api_HostAddress = http://localhost:8080
+# If running via docker compose, use http://localhost:8080
 
-GET {{LoanHub.Search.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+POST {{LoanHub.Search.Api_HostAddress}}/api/search/quick
+Content-Type: application/json
+
+{
+  "amount": 10000,
+  "durationMonths": 24
+}
+
+###
+POST {{LoanHub.Search.Api_HostAddress}}/api/applications
+Content-Type: application/json
+
+{
+  "applicantEmail": "mati-kos@tlen.pl",
+  "firstName": "Test",
+  "lastName": "User",
+  "age": 30,
+  "jobTitle": "Engineer",
+  "address": "123 Test St",
+  "idDocumentNumber": "ABC123",
+  "provider": "MockBank1",
+  "providerOfferId": "TEST-123",
+  "installment": 123.45,
+  "apr": 0.12,
+  "totalCost": 4567.89,
+  "amount": 10000,
+  "durationMonths": 24,
+  "validUntil": "2030-01-01T00:00:00Z"
+}
 
 ###

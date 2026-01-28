@@ -120,4 +120,25 @@ docker compose up --build
 Services:
 - API: http://localhost:8080
 - Web: http://localhost:5173
-- Postgres: localhost:5432 (database: `loanhub`, user: `loanhub`)
+- Postgres: localhost:5433 (database: `loanhub`, user: `loanhub`)
+
+### Email (SendGrid)
+The API supports sending notification emails via SendGrid. It is disabled by default (empty API key).
+
+Setup:
+1. Create a SendGrid API key with **Mail Send** permissions.
+2. Verify a sender (Single Sender or Domain Authentication) and use that address as the "from" email.
+3. Configure using environment variables:
+   - Docker: copy `.env.example` to `.env`, fill `SENDGRID_*`, then run `docker compose up --build`.
+   - Local: set `SendGrid__ApiKey`, `SendGrid__FromEmail`, `SendGrid__FromName` (or use `dotnet user-secrets`):
+
+```bash
+cd src/LoanHub.Search.Api
+dotnet user-secrets init
+dotnet user-secrets set "SendGrid:ApiKey" "<key>"
+dotnet user-secrets set "SendGrid:FromEmail" "<verified@domain>"
+dotnet user-secrets set "SendGrid:FromName" "LoanHub"
+```
+
+Troubleshooting:
+- If the UI shows `ERR_CONNECTION_REFUSED` for `http://localhost:8080`, check `docker compose ps` and `docker compose logs api --tail 200` (the API may still be starting or may have crashed).
