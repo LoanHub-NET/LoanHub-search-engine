@@ -1,7 +1,7 @@
 export interface AuthSession {
   id: string;
   email: string;
-  role: string;
+  role: string | number;
   firstName?: string | null;
   lastName?: string | null;
   phone?: string | null;

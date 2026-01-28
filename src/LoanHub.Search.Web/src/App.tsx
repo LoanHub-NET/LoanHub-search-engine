@@ -16,6 +16,7 @@ import {
   AdminDashboardPage,
   UserDashboardPage,
 } from './pages';
+import { ProtectedRoute } from './components';
 import './App.css';
 
 function App() {
@@ -23,9 +24,27 @@ function App() {
     <BrowserRouter>
       <div className="app">
         <Routes>
+          {/* Public routes */}
           <Route path="/" element={<LandingPage />} />
-          <Route path="/search" element={<SearchPage />} />
-          <Route path="/search/results" element={<SearchResultsPage />} />
+          
+          {/* Search routes - guests and users allowed, admins blocked */}
+          <Route 
+            path="/search" 
+            element={
+              <ProtectedRoute allowedRole="notAdmin">
+                <SearchPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/search/results" 
+            element={
+              <ProtectedRoute allowedRole="notAdmin">
+                <SearchResultsPage />
+              </ProtectedRoute>
+            } 
+          />
+          
           <Route path="/careers" element={<CareersPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
@@ -35,9 +54,35 @@ function App() {
           <Route path="/cookies" element={<CookiesPage />} />
           <Route path="/gdpr" element={<GdprPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/admin" element={<AdminDashboardPage />} />
-          <Route path="/dashboard" element={<UserDashboardPage />} />
-          <Route path="/apply" element={<LoanApplicationPage />} />
+          
+          {/* Admin-only routes - regular users cannot access */}
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute allowedRole="Admin">
+                <AdminDashboardPage />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* User-only routes - admins cannot access */}
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute allowedRole="User">
+                <UserDashboardPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/apply" 
+            element={
+              <ProtectedRoute allowedRole="User">
+                <LoanApplicationPage />
+              </ProtectedRoute>
+            } 
+          />
+          
           <Route path="/search/refine" element={<RefinePlaceholder />} />
           <Route path="*" element={<NotFoundPlaceholder />} />
         </Routes>

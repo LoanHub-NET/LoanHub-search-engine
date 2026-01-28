@@ -57,7 +57,7 @@ public sealed class ApplicationsController : ControllerBase
         return Ok(ApplicationResponse.From(created));
     }
 
-    [Authorize]
+    [Authorize(Policy = "UserOnly")]
     [HttpPost("me")]
     public async Task<ActionResult<ApplicationResponse>> CreateForCurrentUser(
         [FromBody] CreateMyApplicationRequest request,
@@ -104,7 +104,7 @@ public sealed class ApplicationsController : ControllerBase
         return Ok(ApplicationResponse.From(application));
     }
 
-    [Authorize]
+    [Authorize(Policy = "UserOnly")]
     [HttpGet("me")]
     public async Task<ActionResult<IReadOnlyList<ApplicationResponse>>> ListForCurrentUser(
         [FromQuery] ApplicationStatus? status,
@@ -141,7 +141,7 @@ public sealed class ApplicationsController : ControllerBase
         return Ok(responses);
     }
 
-    [Authorize]
+    [Authorize(Policy = "UserOnly")]
     [HttpPost("{id:guid}/cancel")]
     public async Task<ActionResult<ApplicationResponse>> Cancel(Guid id, CancellationToken ct)
     {

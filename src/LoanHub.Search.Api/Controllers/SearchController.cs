@@ -1,11 +1,17 @@
 using LoanHub.Search.Core.Models;
 using LoanHub.Search.Core.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LoanHub.Search.Api.Controllers;
 
+/// <summary>
+/// Search controller for loan offers.
+/// Accessible by guests and regular users, but NOT by admins.
+/// </summary>
 [ApiController]
 [Route("api/search")]
+[Authorize(Policy = "NotAdmin")]
 public sealed class SearchController : ControllerBase
 {
     private readonly OffersAggregator _agg;
