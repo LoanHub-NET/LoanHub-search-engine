@@ -28,7 +28,7 @@ demonstrate the LoanHub user flows (anonymous search, extended search, offers, s
 EF Core creates a small set of tables that map directly to required flows:
 - `Applications` + `ApplicationStatusHistory` track loan requests and status timelines.
 - `Users` stores registered accounts and profile data.
-- `ExternalIdentities` supports Azure AD/OpenID logins by mapping external subjects.
+- `ExternalIdentities` supports OpenID Connect logins by mapping external subjects.
 - `OfferSelections` captures the offer-selection + recalculation step before an application is submitted.
 
 ## Repository Structure
