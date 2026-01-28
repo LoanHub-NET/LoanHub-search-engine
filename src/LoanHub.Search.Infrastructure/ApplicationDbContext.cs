@@ -76,6 +76,9 @@ public sealed class ApplicationDbContext : DbContext
             entity.Property(user => user.Address).HasMaxLength(320);
             entity.Property(user => user.Phone).HasMaxLength(40);
             entity.Property(user => user.IdDocumentNumber).HasMaxLength(80);
+            entity.Property(user => user.BankName).HasMaxLength(200);
+            entity.Property(user => user.BankApiEndpoint).HasMaxLength(500);
+            entity.Property(user => user.BankApiKey).HasMaxLength(500);
             entity.HasIndex(user => user.Email).IsUnique();
             entity.HasMany(user => user.ExternalIdentities)
                 .WithOne(identity => identity.UserAccount)

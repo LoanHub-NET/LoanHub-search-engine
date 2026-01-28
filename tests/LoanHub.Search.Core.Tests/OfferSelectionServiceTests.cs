@@ -12,7 +12,8 @@ public sealed class OfferSelectionServiceTests
     public async Task RecalculateAsync_ReturnsErrorWhenSelectionMissing()
     {
         var repository = new InMemoryOfferSelectionRepository();
-        var service = new OfferSelectionService(repository, Array.Empty<StubLoanOfferProvider>());
+        var registry = new StubLoanOfferProviderRegistry(Array.Empty<StubLoanOfferProvider>());
+        var service = new OfferSelectionService(repository, registry);
 
         var (selection, error) = await service.RecalculateAsync(Guid.NewGuid(), 5000m, 1500m, 1, CancellationToken.None);
 
@@ -31,7 +32,8 @@ public sealed class OfferSelectionServiceTests
         };
         await repository.AddAsync(selection, CancellationToken.None);
 
-        var service = new OfferSelectionService(repository, Array.Empty<StubLoanOfferProvider>());
+        var registry = new StubLoanOfferProviderRegistry(Array.Empty<StubLoanOfferProvider>());
+        var service = new OfferSelectionService(repository, registry);
 
         var (result, error) = await service.RecalculateAsync(selection.Id, 5000m, 1500m, 1, CancellationToken.None);
 
@@ -55,7 +57,8 @@ public sealed class OfferSelectionServiceTests
             new StubLoanOfferProvider("ProviderA", (_, _) => Task.FromResult<IReadOnlyList<OfferDto>>(Array.Empty<OfferDto>()))
         };
 
-        var service = new OfferSelectionService(repository, providers);
+        var registry = new StubLoanOfferProviderRegistry(providers);
+        var service = new OfferSelectionService(repository, registry);
 
         var (result, error) = await service.RecalculateAsync(selection.Id, 5000m, 1500m, 1, CancellationToken.None);
 
@@ -83,7 +86,8 @@ public sealed class OfferSelectionServiceTests
             }))
         };
 
-        var service = new OfferSelectionService(repository, providers);
+        var registry = new StubLoanOfferProviderRegistry(providers);
+        var service = new OfferSelectionService(repository, registry);
 
         var (updated, error) = await service.RecalculateAsync(selection.Id, 6000m, 1800m, 2, CancellationToken.None);
 
@@ -122,7 +126,8 @@ public sealed class OfferSelectionServiceTests
             }))
         };
 
-        var service = new OfferSelectionService(repository, providers);
+        var registry = new StubLoanOfferProviderRegistry(providers);
+        var service = new OfferSelectionService(repository, registry);
 
         var (result, error) = await service.RecalculateAsync(selection.Id, 6000m, 1800m, 2, CancellationToken.None);
 

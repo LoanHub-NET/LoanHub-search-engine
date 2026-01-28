@@ -29,6 +29,7 @@ export function LoginPage() {
     confirmPassword: '',
     bankName: '',
     apiEndpoint: '',
+    apiKey: '',
   });
 
   const title = useMemo(() => {
@@ -52,6 +53,10 @@ export function LoginPage() {
         await registerUser({
           email: formData.email,
           password: formData.password,
+          role,
+          bankName: role === 'admin' ? formData.bankName : null,
+          bankApiEndpoint: role === 'admin' ? formData.apiEndpoint : null,
+          bankApiKey: role === 'admin' ? formData.apiKey : null,
           profile: {
             firstName: formData.firstName || null,
             lastName: formData.lastName || null,
@@ -132,12 +137,14 @@ export function LoginPage() {
             password: 'AdminDemo123!',
             bankName: 'Summit Trust',
             apiEndpoint: 'https://api.summittrust.test/loans',
+            apiKey: '',
           }
         : {
             email: 'user@loanhub.test',
             password: 'UserDemo123!',
             bankName: '',
             apiEndpoint: '',
+            apiKey: '',
           };
 
     setFormData((prev) => ({
@@ -148,6 +155,7 @@ export function LoginPage() {
       confirmPassword: prefill?.confirmPassword ?? mock.password,
       bankName: prefill?.bankName ?? mock.bankName,
       apiEndpoint: prefill?.apiEndpoint ?? mock.apiEndpoint,
+      apiKey: prefill?.apiKey ?? mock.apiKey,
     }));
   }, [location.state, role, searchParams]);
 
@@ -358,10 +366,21 @@ export function LoginPage() {
                       id="apiEndpoint"
                       name="apiEndpoint"
                       type="url"
-                      placeholder="https://api.bank.com/loans"
+                      placeholder="@baseUrl = https://api.bank.com"
                       value={formData.apiEndpoint}
                       onChange={handleChange('apiEndpoint')}
                       required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="apiKey">Bank API key</label>
+                    <input
+                      id="apiKey"
+                      name="apiKey"
+                      type="password"
+                      placeholder="@apiKey = X-Api-Key value"
+                      value={formData.apiKey}
+                      onChange={handleChange('apiKey')}
                     />
                   </div>
                 </>

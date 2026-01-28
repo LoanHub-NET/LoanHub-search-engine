@@ -15,15 +15,28 @@ public sealed class UserService
         string email,
         string password,
         UserProfile profile,
+        UserRole role,
+        string? bankName,
+        string? bankApiEndpoint,
+        string? bankApiKey,
         CancellationToken ct)
     {
         if (await _repository.EmailExistsAsync(email, ct))
             throw new InvalidOperationException("Email already registered.");
 
+        if (role == UserRole.Admin)
+        {
+            if (string.IsNullOrWhiteSpace(bankName))
+                throw new InvalidOperationException("Bank name is required for admin accounts.");
+
+            if (string.IsNullOrWhiteSpace(bankApiEndpoint))
+                throw new InvalidOperationException("Bank API endpoint is required for admin accounts.");
+        }
+
         var user = new UserAccount
         {
             Email = email,
-            Role = UserRole.User,
+            Role = role,
             FirstName = profile.FirstName,
             LastName = profile.LastName,
             Age = profile.Age,
@@ -34,7 +47,10 @@ public sealed class UserService
             MonthlyIncome = profile.MonthlyIncome,
             LivingCosts = profile.LivingCosts,
             Dependents = profile.Dependents,
-            IdDocumentNumber = profile.IdDocumentNumber
+            IdDocumentNumber = profile.IdDocumentNumber,
+            BankName = role == UserRole.Admin ? bankName?.Trim() : null,
+            BankApiEndpoint = role == UserRole.Admin ? bankApiEndpoint?.Trim() : null,
+            BankApiKey = role == UserRole.Admin ? bankApiKey?.Trim() : null
         };
 
         user.PasswordHash = _hasher.HashPassword(user, password);

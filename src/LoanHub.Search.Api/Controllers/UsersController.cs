@@ -39,6 +39,10 @@ public sealed class UsersController : ControllerBase
                 request.Email,
                 request.Password,
                 request.Profile,
+                ParseRole(request.Role),
+                request.BankName,
+                request.BankApiEndpoint,
+                request.BankApiKey,
                 ct);
 
             return Ok(AuthResponse.From(created, _tokenService.CreateToken(created)));
@@ -176,10 +180,24 @@ public sealed class UsersController : ControllerBase
         return Ok(AuthResponse.From(user, _tokenService.CreateToken(user)));
     }
 
+    private static UserRole ParseRole(string? role)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+            return UserRole.User;
+
+        return role.Equals("admin", StringComparison.OrdinalIgnoreCase)
+            ? UserRole.Admin
+            : UserRole.User;
+    }
+
     public sealed record RegisterRequest(
         string Email,
         string Password,
-        UserService.UserProfile Profile
+        UserService.UserProfile Profile,
+        string? Role,
+        string? BankName,
+        string? BankApiEndpoint,
+        string? BankApiKey
     );
 
     public sealed record LoginRequest(string Email, string Password);
