@@ -22,7 +22,8 @@ public sealed class OffersAggregatorTests
             }))
         };
 
-        var aggregator = new OffersAggregator(providers);
+        var registry = new StubLoanOfferProviderRegistry(providers);
+        var aggregator = new OffersAggregator(registry);
 
         var (offers, sources) = await aggregator.GetOffersAsync(
             new OfferQuery(1000m, 12, 4000m, 1500m, 0),
@@ -47,7 +48,8 @@ public sealed class OffersAggregatorTests
             })
         };
 
-        var aggregator = new OffersAggregator(providers);
+        var registry = new StubLoanOfferProviderRegistry(providers);
+        var aggregator = new OffersAggregator(registry);
 
         var (offers, sources) = await aggregator.GetOffersAsync(
             new OfferQuery(1000m, 12, 4000m, 1500m, 0),

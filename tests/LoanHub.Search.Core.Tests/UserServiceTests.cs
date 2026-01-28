@@ -13,10 +13,26 @@ public sealed class UserServiceTests
         var service = new UserService(repository);
         var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", null, null, null, null, null, "ABC123");
 
-        await service.RegisterLocalAsync("jane@example.com", "Password1!", profile, CancellationToken.None);
+        await service.RegisterLocalAsync(
+            "jane@example.com",
+            "Password1!",
+            profile,
+            UserRole.User,
+            null,
+            null,
+            null,
+            CancellationToken.None);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.RegisterLocalAsync("jane@example.com", "Password1!", profile, CancellationToken.None));
+            service.RegisterLocalAsync(
+                "jane@example.com",
+                "Password1!",
+                profile,
+                UserRole.User,
+                null,
+                null,
+                null,
+                CancellationToken.None));
     }
 
     [Fact]
@@ -26,7 +42,15 @@ public sealed class UserServiceTests
         var service = new UserService(repository);
         var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", null, null, null, null, null, "ABC123");
 
-        var user = await service.RegisterLocalAsync("jane@example.com", "Password1!", profile, CancellationToken.None);
+        var user = await service.RegisterLocalAsync(
+            "jane@example.com",
+            "Password1!",
+            profile,
+            UserRole.User,
+            null,
+            null,
+            null,
+            CancellationToken.None);
 
         var result = await service.LoginAsync("jane@example.com", "Password1!", CancellationToken.None);
 
@@ -41,7 +65,15 @@ public sealed class UserServiceTests
         var service = new UserService(repository);
         var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", null, null, null, null, null, "ABC123");
 
-        var user = await service.RegisterLocalAsync("jane@example.com", "Password1!", profile, CancellationToken.None);
+        var user = await service.RegisterLocalAsync(
+            "jane@example.com",
+            "Password1!",
+            profile,
+            UserRole.User,
+            null,
+            null,
+            null,
+            CancellationToken.None);
 
         var updated = await service.RegisterExternalAsync("google", "sub-123", "jane@example.com", profile, CancellationToken.None);
 

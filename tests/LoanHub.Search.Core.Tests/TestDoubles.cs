@@ -28,6 +28,21 @@ internal sealed class StubLoanOfferProvider : ILoanOfferProvider
         => _handler(query, ct);
 }
 
+internal sealed class StubLoanOfferProviderRegistry : ILoanOfferProviderRegistry
+{
+    private readonly IReadOnlyList<ILoanOfferProvider> _providers;
+
+    public StubLoanOfferProviderRegistry(IEnumerable<ILoanOfferProvider> providers)
+        => _providers = providers.ToList();
+
+    public Task<IReadOnlyList<ILoanOfferProvider>> GetProvidersAsync(CancellationToken ct)
+        => Task.FromResult(_providers);
+
+    public Task<ILoanOfferProvider?> GetProviderAsync(string name, CancellationToken ct)
+        => Task.FromResult(_providers.FirstOrDefault(provider =>
+            provider.Name.Equals(name, StringComparison.OrdinalIgnoreCase)));
+}
+
 internal sealed class InMemoryOfferSelectionRepository : IOfferSelectionRepository
 {
     private readonly Dictionary<Guid, OfferSelection> _storage = new();
