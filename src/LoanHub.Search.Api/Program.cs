@@ -131,9 +131,8 @@ builder.Services.AddAuthorization(options =>
             .RequireClaim("is_admin", "true"));
 });
 
-builder.Services.AddSingleton<ILoanOfferProvider, MockBankOfferProvider>();
-builder.Services.AddSingleton<ILoanOfferProvider, MockBank2OfferProvider>();
-builder.Services.AddSingleton<OffersAggregator>();
+builder.Services.AddScoped<ILoanOfferProviderRegistry, BankApiOfferProviderRegistry>();
+builder.Services.AddScoped<OffersAggregator>();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Applications")));
 builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
@@ -152,7 +151,7 @@ builder.Services.AddScoped<OfferSelectionService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<IExternalTokenValidator, OidcTokenValidator>();
-builder.Services.AddSingleton<IProviderContactResolver, ProviderContactResolver>();
+builder.Services.AddScoped<IProviderContactResolver, ProviderContactResolver>();
 builder.Services.AddSingleton<IRealtimeNotifier, SignalRApplicationNotifier>();
 builder.Services.AddSingleton<IEmailTemplateRenderer, EmailTemplateRenderer>();
 builder.Services.AddSingleton<IContractLinkGenerator, ContractLinkGenerator>();
@@ -243,6 +242,9 @@ static async Task InitializeDatabaseAsync(WebApplication app)
                 ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "MonthlyIncome" numeric;
                 ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "LivingCosts" numeric;
                 ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "Dependents" integer;
+                ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "BankName" varchar(200);
+                ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "BankApiEndpoint" varchar(500);
+                ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "BankApiKey" varchar(500);
                 """, CancellationToken.None);
 
             app.Logger.LogInformation("Database initialized.");
