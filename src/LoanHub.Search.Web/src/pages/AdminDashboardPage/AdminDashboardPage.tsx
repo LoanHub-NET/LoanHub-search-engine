@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { 
   LoanApplication, 
@@ -8,42 +8,203 @@ import type {
   DashboardStats,
 } from '../../types/admin.types';
 import { ADMIN_STATUS_CONFIG, calculateSlaInfo } from '../../types/admin.types';
-import { mockApplications, calculateDashboardStats, mockProviders } from '../../data/mockAdminData';
 import { ApplicationDetailModal, DecisionModal } from '../../components/admin';
 import { Header, Footer } from '../../components';
 import type { AdminUser } from '../../components/Header/Header';
+import { clearAuthSession, getAuthSession } from '../../api/apiConfig';
+import {
+  listAdminApplications,
+  preliminarilyAcceptApplication,
+  rejectAdminApplication,
+  type AdminApplicationResponse,
+} from '../../api/adminApplicationsApi';
+import { calculateDashboardStats } from '../../utils/adminDashboard';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import './AdminDashboardPage.css';
 
 type SortKey = 'date' | 'amount' | 'status';
 
-// Mock admin user (in real app, this would come from auth context)
-const mockAdminUser: AdminUser = {
-  name: 'Admin User',
-  email: 'admin@loanhub.com',
-  role: 'Administrator',
+const toProviderId = (providerName: string) =>
+  providerName.trim().toLowerCase().replace(/\s+/g, '-');
+
+const normalizeApr = (apr: number) => (apr <= 1 ? apr * 100 : apr);
+
+const mapStatus = (status: number | string): LoanApplication['status'] => {
+  if (typeof status === 'number') {
+    switch (status) {
+      case 1:
+        return 'new';
+      case 2:
+        return 'preliminarily_accepted';
+      case 3:
+        return 'accepted';
+      case 4:
+        return 'rejected';
+      case 5:
+        return 'cancelled';
+      case 6:
+        return 'granted';
+      case 7:
+        return 'contract_ready';
+      case 8:
+        return 'signed_contract_received';
+      case 9:
+        return 'final_approved';
+      default:
+        return 'new';
+    }
+  }
+
+  const normalized = status.toString().trim();
+  const key = normalized.replace(/[^a-z]/gi, '').toLowerCase();
+  switch (key) {
+    case 'new':
+      return 'new';
+    case 'preliminarilyaccepted':
+      return 'preliminarily_accepted';
+    case 'accepted':
+      return 'accepted';
+    case 'rejected':
+      return 'rejected';
+    case 'cancelled':
+      return 'cancelled';
+    case 'granted':
+      return 'granted';
+    case 'contractready':
+      return 'contract_ready';
+    case 'signedcontractreceived':
+      return 'signed_contract_received';
+    case 'finalapproved':
+      return 'final_approved';
+    default:
+      return 'new';
+  }
+};
+
+const buildReference = (id: string) => `APP-${id.slice(0, 8).toUpperCase()}`;
+
+const mapAdminApplication = (application: AdminApplicationResponse): LoanApplication => {
+  const offerSnapshot = application.offerSnapshot;
+  const applicantDetails = application.applicantDetails;
+  const aprPercent = normalizeApr(offerSnapshot.apr);
+  const createdAt = new Date(application.createdAt);
+  const updatedAt = new Date(application.updatedAt);
+  const expiresAt = offerSnapshot.validUntil
+    ? new Date(offerSnapshot.validUntil)
+    : new Date(createdAt.getTime() + 10 * 24 * 60 * 60 * 1000);
+
+  return {
+    id: application.id,
+    referenceNumber: buildReference(application.id),
+    applicant: {
+      userId: application.userId ?? undefined,
+      email: application.applicantEmail,
+      firstName: applicantDetails?.firstName || 'Unknown',
+      lastName: applicantDetails?.lastName || '',
+      monthlyIncome: undefined,
+      livingCosts: undefined,
+      dependents: undefined,
+      isRegistered: Boolean(application.userId),
+    },
+    offer: {
+      offerId: offerSnapshot.providerOfferId,
+      amount: offerSnapshot.amount,
+      duration: offerSnapshot.durationMonths,
+      monthlyInstallment: offerSnapshot.installment,
+      interestRate: aprPercent,
+      apr: aprPercent,
+      totalRepayment: offerSnapshot.totalCost,
+    },
+    provider: {
+      id: toProviderId(offerSnapshot.provider),
+      name: offerSnapshot.provider,
+    },
+    status: mapStatus(application.status),
+    statusHistory: (application.statusHistory || []).map((entry, index) => ({
+      id: `${application.id}-status-${index}`,
+      previousStatus: null,
+      newStatus: mapStatus(entry.status),
+      changedAt: new Date(entry.changedAt),
+      changedBy: 'system',
+      reason: entry.reason ?? undefined,
+      notes: undefined,
+    })),
+    documents: [],
+    createdAt,
+    updatedAt,
+    expiresAt,
+    internalNotes: [],
+  };
 };
 
 export function AdminDashboardPage() {
   const navigate = useNavigate();
   
   // State
-  const [applications, setApplications] = useState<LoanApplication[]>(mockApplications);
+  const [applications, setApplications] = useState<LoanApplication[]>([]);
   const [filters, setFilters] = useState<ApplicationFilters>({
     status: 'all',
     searchTerm: '',
     sortBy: 'date',
     sortOrder: 'desc',
   });
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedApplication, setSelectedApplication] = useState<LoanApplication | null>(null);
   const [decisionModal, setDecisionModal] = useState<{
     application: LoanApplication;
     type: 'accept' | 'reject';
   } | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [authSession, setAuthSession] = useState(getAuthSession());
+
+  const adminUser: AdminUser | undefined = useMemo(() => {
+    if (!authSession) return undefined;
+    const name = `${authSession.firstName ?? ''} ${authSession.lastName ?? ''}`.trim() || authSession.email;
+    const roleValue = authSession.role;
+    const isAdmin = roleValue === 'Admin' || roleValue === 'Administrator' || Number(roleValue) === 1;
+    return {
+      name,
+      email: authSession.email,
+      role: isAdmin ? 'Administrator' : 'User',
+    };
+  }, [authSession]);
+
+  useEffect(() => {
+    const session = getAuthSession();
+    setAuthSession(session);
+    if (!session) {
+      navigate('/login');
+      return;
+    }
+
+    setIsLoading(true);
+    setLoadError(null);
+    listAdminApplications()
+      .then((response) => {
+        const mapped = response.items.map(mapAdminApplication);
+        setApplications(mapped);
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : 'Failed to load applications.';
+        setLoadError(message);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [navigate]);
 
   // Calculate stats
   const stats: DashboardStats = useMemo(() => {
     return calculateDashboardStats(applications);
+  }, [applications]);
+
+  const providers = useMemo(() => {
+    const map = new Map<string, LoanApplication['provider']>();
+    applications.forEach((app) => {
+      map.set(app.provider.id, app.provider);
+    });
+    return Array.from(map.values());
   }, [applications]);
 
   // Filter and sort applications
@@ -123,44 +284,24 @@ export function AdminDashboardPage() {
     }));
   };
 
-  const handleDecisionSubmit = (decision: DecisionPayload) => {
-    // Update application status
-    setApplications(prev => prev.map(app => {
-      if (app.id !== decision.applicationId) return app;
-      
-      const newStatus = decision.decision === 'accept' ? 'preliminarily_accepted' : 'rejected';
-      const newHistoryEntry = {
-        id: `hist-${Date.now()}`,
-        previousStatus: app.status,
-        newStatus,
-        changedAt: new Date(),
-        changedBy: 'current-admin@loanhub.com',
-        reason: decision.reason,
-        notes: decision.notes,
-      };
+  const handleDecisionSubmit = async (decision: DecisionPayload) => {
+    setActionError(null);
+    try {
+      const updated =
+        decision.decision === 'accept'
+          ? await preliminarilyAcceptApplication(decision.applicationId)
+          : await rejectAdminApplication(decision.applicationId, decision.reason);
 
-      return {
-        ...app,
-        status: newStatus,
-        statusHistory: [...app.statusHistory, newHistoryEntry],
-        updatedAt: new Date(),
-        internalNotes: decision.notes 
-          ? [...app.internalNotes, {
-              id: `note-${Date.now()}`,
-              content: decision.notes,
-              createdAt: new Date(),
-              createdBy: 'current-admin@loanhub.com',
-            }]
-          : app.internalNotes,
-      } as LoanApplication;
-    }));
-
-    // Close modals
-    setDecisionModal(null);
-    setSelectedApplication(null);
-
-    // Show success message (in real app, this would be a toast notification)
-    console.log(`Application ${decision.applicationId} ${decision.decision}ed. Email sent: ${decision.sendEmail}`);
+      const mapped = mapAdminApplication(updated);
+      setApplications(prev =>
+        prev.map(app => (app.id === mapped.id ? mapped : app)),
+      );
+      setDecisionModal(null);
+      setSelectedApplication(null);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update application.';
+      setActionError(message);
+    }
   };
 
   const openAcceptModal = (app: LoanApplication) => {
@@ -182,9 +323,8 @@ export function AdminDashboardPage() {
   ];
 
   const handleLogout = () => {
-    // In a real app, this would clear auth state and redirect
-    console.log('Logging out...');
-    navigate('/');
+    clearAuthSession();
+    navigate('/login');
   };
 
   return (
@@ -192,7 +332,7 @@ export function AdminDashboardPage() {
       <Header
         onLoginClick={() => navigate('/login')}
         onSearchClick={() => navigate('/search')}
-        adminUser={mockAdminUser}
+        adminUser={adminUser}
         onLogout={handleLogout}
       />
       <main className="admin-page">
@@ -282,7 +422,7 @@ export function AdminDashboardPage() {
                   onChange={handleProviderFilter}
                 >
                   <option value="">All Providers</option>
-                  {mockProviders.map(provider => (
+                  {providers.map(provider => (
                     <option key={provider.id} value={provider.id}>
                       {provider.name}
                     </option>
@@ -307,8 +447,30 @@ export function AdminDashboardPage() {
               </div>
             </div>
 
+            {loadError && (
+              <div className="empty-state">
+                <span className="empty-icon">⚠️</span>
+                <h3>Could not load applications</h3>
+                <p>{loadError}</p>
+              </div>
+            )}
+
+            {actionError && (
+              <div className="empty-state">
+                <span className="empty-icon">⚠️</span>
+                <h3>Action failed</h3>
+                <p>{actionError}</p>
+              </div>
+            )}
+
             {/* Applications Table */}
-            {filteredApplications.length === 0 ? (
+            {isLoading ? (
+              <div className="empty-state">
+                <span className="empty-icon">⏳</span>
+                <h3>Loading applications...</h3>
+                <p>Please wait while we fetch the latest data.</p>
+              </div>
+            ) : filteredApplications.length === 0 ? (
               <div className="empty-state">
                 <span className="empty-icon">📭</span>
                 <h3>No applications found</h3>

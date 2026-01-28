@@ -15,7 +15,7 @@ public sealed class AdminApplicationsController : ControllerBase
     public AdminApplicationsController(ApplicationService service) => _service = service;
 
     [HttpGet]
-    public async Task<ActionResult<PagedResponse<ApplicationSummary>>> List(
+    public async Task<ActionResult<PagedResponse<ApplicationsController.ApplicationResponse>>> List(
         [FromQuery] string? applicantEmail,
         [FromQuery] ApplicationStatus? status,
         [FromQuery] string? provider,
@@ -39,12 +39,12 @@ public sealed class AdminApplicationsController : ControllerBase
             pageSize);
 
         var applications = await _service.ListAdminAsync(query, ct);
-        var summaries = applications.Items
-            .Select(ApplicationSummary.From)
+        var responses = applications.Items
+            .Select(ApplicationsController.ApplicationResponse.From)
             .ToList();
 
-        return Ok(new PagedResponse<ApplicationSummary>(
-            summaries,
+        return Ok(new PagedResponse<ApplicationsController.ApplicationResponse>(
+            responses,
             applications.Page,
             applications.PageSize,
             applications.TotalCount,
@@ -125,30 +125,6 @@ public sealed class AdminApplicationsController : ControllerBase
     }
 
     public sealed record RejectRequest(string Reason);
-
-    public sealed record ApplicationSummary(
-        Guid Id,
-        string ApplicantEmail,
-        ApplicationStatus Status,
-        DateTimeOffset CreatedAt,
-        DateTimeOffset UpdatedAt,
-        string Provider,
-        decimal Amount,
-        string? RejectReason
-    )
-    {
-        public static ApplicationSummary From(LoanApplication application)
-            => new(
-                application.Id,
-                application.ApplicantEmail,
-                application.Status,
-                application.CreatedAt,
-                application.UpdatedAt,
-                application.OfferSnapshot.Provider,
-                application.OfferSnapshot.Amount,
-                application.RejectReason
-            );
-    }
 
     public sealed record PagedResponse<T>(
         IReadOnlyList<T> Items,
