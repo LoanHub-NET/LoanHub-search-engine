@@ -48,6 +48,18 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface GoogleOAuthConfig {
+  clientId: string;
+  redirectUri: string;
+  authorizationEndpoint: string;
+  scope: string;
+}
+
+export interface GoogleOAuthLoginPayload {
+  code: string;
+  redirectUri: string;
+}
+
 const handleAuthResponse = async (response: Response) => {
   if (!response.ok) {
     const message = await response.text();
@@ -87,6 +99,27 @@ export const registerUser = async (payload: RegisterPayload) => {
 
 export const loginUser = async (payload: LoginPayload) => {
   const response = await fetch(`${getApiBaseUrl()}/api/users/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return handleAuthResponse(response);
+};
+
+export const getGoogleOAuthConfig = async () => {
+  const response = await fetch(`${getApiBaseUrl()}/api/auth/google/config`);
+  if (!response.ok) {
+    const message = await response.text();
+    throw new ApiError(message || `OAuth config request failed with status ${response.status}.`, response.status);
+  }
+  return (await response.json()) as GoogleOAuthConfig;
+};
+
+export const loginWithGoogleOAuthCode = async (payload: GoogleOAuthLoginPayload) => {
+  const response = await fetch(`${getApiBaseUrl()}/api/auth/google/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -6,3 +6,4 @@ export { Footer } from './Footer';
 export { AdminFooter } from './AdminFooter';
 export { ProtectedRoute } from './ProtectedRoute';
 export type { AllowedRole } from './ProtectedRoute';
+export { RedirectToLandingOnReload } from './RedirectToLandingOnReload';

@@ -473,12 +473,16 @@ export function LoanApplicationPage() {
         lastName: personalInfo.lastName,
         phone: personalInfo.phone,
         dateOfBirth: personalInfo.dateOfBirth,
-        address,
+        address: personalInfo.address,
+        addressText: address,
         jobTitle: employment.position || employment.employerName || undefined,
+        employerName: employment.employerName || undefined,
         monthlyIncome: employment.monthlyIncome ? Number(employment.monthlyIncome) : undefined,
         livingCosts: employment.livingCosts ? Number(employment.livingCosts) : undefined,
         dependents: employment.dependents ? Number(employment.dependents) : undefined,
         idDocumentNumber: documents.idNumber || undefined,
+        idDocumentType: documents.idType || undefined,
+        idDocumentExpiry: documents.idExpiry || undefined,
       });
 
       return response.id;

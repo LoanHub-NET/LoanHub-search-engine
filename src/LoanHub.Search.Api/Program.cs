@@ -61,12 +61,20 @@ builder.Services.AddCors(options =>
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<OidcOptions>(builder.Configuration.GetSection("Oidc"));
+builder.Services.Configure<GoogleOAuthOptions>(builder.Configuration.GetSection("GoogleOAuth"));
 builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("SendGrid"));
 builder.Services.Configure<ProviderContactOptions>(builder.Configuration.GetSection("ProviderContacts"));
 builder.Services.Configure<ContractStorageOptions>(builder.Configuration.GetSection("ContractStorage"));
 builder.Services.Configure<ContractLinkOptions>(builder.Configuration.GetSection("ContractLinks"));
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 builder.Services.AddHttpClient();
+builder.Services.PostConfigure<GoogleOAuthOptions>(options =>
+{
+    if (string.IsNullOrWhiteSpace(options.ClientId))
+        options.ClientId = builder.Configuration["CLIENT_ID"] ?? options.ClientId;
+    if (string.IsNullOrWhiteSpace(options.ClientSecret))
+        options.ClientSecret = builder.Configuration["CLIENT_SECRET"] ?? options.ClientSecret;
+});
 builder.Services
     .AddAuthentication(options =>
     {
@@ -184,6 +192,7 @@ builder.Services.AddScoped<OfferSelectionService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<IExternalTokenValidator, OidcTokenValidator>();
+builder.Services.AddScoped<IGoogleOAuthService, GoogleOAuthService>();
 builder.Services.AddScoped<IProviderContactResolver, ProviderContactResolver>();
 builder.Services.AddSingleton<IRealtimeNotifier, SignalRApplicationNotifier>();
 builder.Services.AddSingleton<IEmailTemplateRenderer, EmailTemplateRenderer>();
