@@ -2,6 +2,7 @@ using LoanHub.Search.Core.Abstractions.Applications;
 using LoanHub.Search.Core.Models.Applications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace LoanHub.Search.Api.Controllers;
 
@@ -76,6 +77,72 @@ public sealed class DocumentsController : ControllerBase
             document.SizeBytes,
             document.UploadedAt
         ));
+    }
+
+    /// <summary>
+    /// List documents for an application (user view)
+    /// </summary>
+    [HttpGet("user")]
+    [Authorize(Policy = "UserOnly")]
+    public async Task<ActionResult<IReadOnlyList<DocumentUploadResponse>>> ListForUser(
+        Guid applicationId,
+        CancellationToken ct)
+    {
+        var application = await _applicationRepository.GetAsync(applicationId, ct);
+        if (application is null)
+            return NotFound("Application not found.");
+
+        if (!IsApplicationOwnedByCurrentUser(application))
+            return Forbid();
+
+        var documents = await _storage.ListDocumentsAsync(applicationId, ct);
+        var response = documents
+            .Select(doc => new DocumentUploadResponse(
+                doc.BlobName,
+                doc.OriginalFileName,
+                doc.ContentType,
+                doc.Type.ToString(),
+                doc.Side.ToString(),
+                doc.SizeBytes,
+                doc.UploadedAt))
+            .ToList();
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Clone documents from previous applications for reuse
+    /// </summary>
+    [HttpPost("clone")]
+    [Authorize(Policy = "UserOnly")]
+    public async Task<ActionResult<IReadOnlyList<DocumentUploadResponse>>> Clone(
+        Guid applicationId,
+        [FromBody] CloneDocumentsRequest request,
+        CancellationToken ct)
+    {
+        var application = await _applicationRepository.GetAsync(applicationId, ct);
+        if (application is null)
+            return NotFound("Application not found.");
+
+        if (!IsApplicationOwnedByCurrentUser(application))
+            return Forbid();
+
+        if (request.BlobNames is null || request.BlobNames.Count == 0)
+            return BadRequest("BlobNames are required.");
+
+        var copied = await _storage.CopyDocumentsAsync(applicationId, request.BlobNames, ct);
+        var response = copied
+            .Select(doc => new DocumentUploadResponse(
+                doc.BlobName,
+                doc.OriginalFileName,
+                doc.ContentType,
+                doc.Type.ToString(),
+                doc.Side.ToString(),
+                doc.SizeBytes,
+                doc.UploadedAt))
+            .ToList();
+
+        return Ok(response);
     }
 
     /// <summary>
@@ -208,6 +275,8 @@ public sealed class DocumentsController : ControllerBase
 
     public sealed record DocumentUploadRequest(IFormFile File, string DocumentType, string? Side);
 
+    public sealed record CloneDocumentsRequest(IReadOnlyList<string> BlobNames);
+
     public sealed record DocumentUploadResponse(
         string BlobName,
         string OriginalFileName,
@@ -219,4 +288,20 @@ public sealed class DocumentsController : ControllerBase
     );
 
     public sealed record DocumentUrlResponse(string Url, DateTimeOffset ExpiresAt);
+
+    private bool IsApplicationOwnedByCurrentUser(LoanApplication application)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) ??
+                          User.FindFirstValue("sub");
+        var emailClaim = User.FindFirstValue(ClaimTypes.Email) ??
+                         User.FindFirstValue("email");
+
+        if (application.UserId.HasValue && Guid.TryParse(userIdClaim, out var userId))
+            return application.UserId.Value == userId;
+
+        if (!string.IsNullOrWhiteSpace(emailClaim))
+            return string.Equals(application.ApplicantEmail, emailClaim, StringComparison.OrdinalIgnoreCase);
+
+        return false;
+    }
 }

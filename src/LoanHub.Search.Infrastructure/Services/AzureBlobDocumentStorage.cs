@@ -117,6 +117,54 @@ public sealed class AzureBlobDocumentStorage : IDocumentStorage
         return results;
     }
 
+    public async Task<IReadOnlyList<StoredDocument>> CopyDocumentsAsync(
+        Guid targetApplicationId,
+        IReadOnlyList<string> sourceBlobNames,
+        CancellationToken ct)
+    {
+        var copied = new List<StoredDocument>();
+
+        foreach (var sourceBlobName in sourceBlobNames.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var sourceBlob = _container.GetBlobClient(sourceBlobName);
+            if (!await sourceBlob.ExistsAsync(ct))
+                continue;
+
+            var sourceProperties = await sourceBlob.GetPropertiesAsync(cancellationToken: ct);
+            var sourceMetadata = sourceProperties.Value.Metadata ?? new Dictionary<string, string>();
+
+            var documentType = ParseDocumentType(sourceMetadata.TryGetValue("documentType", out var typeValue) ? typeValue : null);
+            var side = ParseDocumentSide(sourceMetadata.TryGetValue("side", out var sideValue) ? sideValue : null);
+            var originalFileName = sourceMetadata.TryGetValue("originalFileName", out var nameValue)
+                ? nameValue
+                : Path.GetFileName(sourceBlobName);
+
+            var extension = Path.GetExtension(sourceBlobName);
+            var typeFolder = documentType.ToString().ToLowerInvariant();
+            var sideFolder = side.ToString().ToLowerInvariant();
+            var targetBlobName = $"{targetApplicationId:N}/{typeFolder}/{sideFolder}/{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}{extension}";
+
+            var targetBlob = _container.GetBlobClient(targetBlobName);
+            await targetBlob.StartCopyFromUriAsync(sourceBlob.Uri, cancellationToken: ct);
+
+            // Preserve metadata
+            if (sourceMetadata.Count > 0)
+                await targetBlob.SetMetadataAsync(sourceMetadata, cancellationToken: ct);
+
+            copied.Add(new StoredDocument(
+                targetBlobName,
+                originalFileName,
+                sourceProperties.Value.ContentType ?? GetContentTypeFromExtension(extension),
+                documentType,
+                side,
+                sourceProperties.Value.ContentLength,
+                DateTimeOffset.UtcNow
+            ));
+        }
+
+        return copied;
+    }
+
     public async Task<string?> GetDocumentUrlAsync(
         string blobName,
         TimeSpan validFor,

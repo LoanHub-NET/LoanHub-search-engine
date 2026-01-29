@@ -39,7 +39,12 @@ public sealed class ApplicationsController : ControllerBase
                 request.Age,
                 request.JobTitle,
                 request.Address,
-                request.IdDocumentNumber
+                request.IdDocumentNumber,
+                request.MonthlyIncome,
+                request.LivingCosts,
+                request.Dependents,
+                request.Phone,
+                request.DateOfBirth
             ),
             OfferSnapshot = new OfferSnapshot(
                 request.Provider,
@@ -216,6 +221,11 @@ public sealed class ApplicationsController : ControllerBase
         string JobTitle,
         string Address,
         string IdDocumentNumber,
+        decimal? MonthlyIncome,
+        decimal? LivingCosts,
+        int? Dependents,
+        string? Phone,
+        DateTime? DateOfBirth,
         string Provider,
         string ProviderOfferId,
         decimal Installment,
@@ -328,7 +338,12 @@ public sealed class ApplicationsController : ControllerBase
             user.Age!.Value,
             user.JobTitle!,
             user.Address!,
-            user.IdDocumentNumber!);
+            user.IdDocumentNumber!,
+            user.MonthlyIncome,
+            user.LivingCosts,
+            user.Dependents,
+            user.Phone,
+            user.DateOfBirth);
 
         return true;
     }

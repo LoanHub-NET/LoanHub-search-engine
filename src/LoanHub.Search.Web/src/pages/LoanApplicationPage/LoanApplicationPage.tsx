@@ -4,6 +4,7 @@ import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
 import { createApplication, createApplicationForCurrentUser } from '../../api/applicationsApi';
 import { uploadApplicationDocument } from '../../api/documentsApi';
+import { cloneUserApplicationDocuments } from '../../api/userDocumentsApi';
 import {
   ApiError,
   clearAuthSession,
@@ -60,6 +61,7 @@ const MOCK_PROVIDERS = [
 ];
 
 const storedProfileKeyPrefix = 'loanhub_user_profile_';
+const storedUserDocumentsKeyPrefix = 'loanhub_user_documents_';
 
 const getStoredProfile = (userId?: string | null): Partial<UserProfile> | null => {
   if (!userId || typeof window === 'undefined') return null;
@@ -380,6 +382,11 @@ export function LoanApplicationPage() {
         jobTitle: employment.position || employment.employerName || 'Applicant',
         address,
         idDocumentNumber: documents.idNumber,
+        monthlyIncome: employment.monthlyIncome ? Number(employment.monthlyIncome) : null,
+        livingCosts: employment.livingCosts ? Number(employment.livingCosts) : null,
+        dependents: employment.dependents ? Number(employment.dependents) : null,
+        phone: personalInfo.phone || null,
+        dateOfBirth: personalInfo.dateOfBirth || null,
         provider: offer.providerName,
         providerOfferId: offer.id,
         installment: offer.monthlyInstallment,
@@ -411,15 +418,56 @@ export function LoanApplicationPage() {
       const { idFrontFile, idBackFile } = formData.documents;
 
       const uploads: Array<Promise<unknown>> = [];
+      const uploadedBlobNames: string[] = [];
       if (idFrontFile) {
-        uploads.push(uploadApplicationDocument(applicationId, idFrontFile, 'IdDocument', 'Front'));
+        uploads.push(
+          uploadApplicationDocument(applicationId, idFrontFile, 'IdDocument', 'Front').then((res) => {
+            uploadedBlobNames.push(res.blobName);
+          }),
+        );
       }
       if (idBackFile) {
-        uploads.push(uploadApplicationDocument(applicationId, idBackFile, 'IdDocument', 'Back'));
+        uploads.push(
+          uploadApplicationDocument(applicationId, idBackFile, 'IdDocument', 'Back').then((res) => {
+            uploadedBlobNames.push(res.blobName);
+          }),
+        );
       }
 
       if (uploads.length > 0) {
         await Promise.all(uploads);
+
+        if (typeof window !== 'undefined' && authSession?.id) {
+          const key = `${storedUserDocumentsKeyPrefix}${authSession.id}`;
+          const payload = {
+            applicationId,
+            uploadedAt: new Date().toISOString(),
+            blobNames: uploadedBlobNames,
+          };
+          window.localStorage.setItem(key, JSON.stringify(payload));
+        }
+      }
+    };
+
+    const reuseLastDocuments = async (applicationId: string) => {
+      if (!authSession?.id || typeof window === 'undefined') return;
+
+      const key = `${storedUserDocumentsKeyPrefix}${authSession.id}`;
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return;
+
+      try {
+        const parsed = JSON.parse(raw) as { blobNames: string[] } | null;
+        if (!parsed?.blobNames?.length) return;
+        const cloned = await cloneUserApplicationDocuments(applicationId, parsed.blobNames);
+        const updated = {
+          applicationId,
+          uploadedAt: new Date().toISOString(),
+          blobNames: cloned.map((doc) => doc.blobName),
+        };
+        window.localStorage.setItem(key, JSON.stringify(updated));
+      } catch {
+        // ignore invalid cache
       }
     };
 
@@ -503,7 +551,11 @@ export function LoanApplicationPage() {
         referenceId = await submitAsGuest();
       }
 
-      await uploadIdDocuments(referenceId);
+      if (formData.documents.idFrontFile || formData.documents.idBackFile) {
+        await uploadIdDocuments(referenceId);
+      } else {
+        await reuseLastDocuments(referenceId);
+      }
 
       setSubmissionResult({
         success: true,

@@ -99,6 +99,52 @@ public sealed class LocalFileDocumentStorage : IDocumentStorage
         return Task.FromResult<IReadOnlyList<StoredDocument>>(results);
     }
 
+    public Task<IReadOnlyList<StoredDocument>> CopyDocumentsAsync(
+        Guid targetApplicationId,
+        IReadOnlyList<string> sourceBlobNames,
+        CancellationToken ct)
+    {
+        var copied = new List<StoredDocument>();
+
+        foreach (var sourceBlobName in sourceBlobNames.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var sourcePath = Path.Combine(_basePath, sourceBlobName);
+            if (!File.Exists(sourcePath))
+                continue;
+
+            var extension = Path.GetExtension(sourcePath);
+            var segments = sourceBlobName.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var documentType = segments.Length > 1 ? ParseDocumentType(segments[1]) : DocumentType.Other;
+            var side = segments.Length > 2 ? ParseDocumentSide(segments[2]) : DocumentSide.Unknown;
+
+            var typeFolder = documentType.ToString().ToLowerInvariant();
+            var sideFolder = side.ToString().ToLowerInvariant();
+            var targetRelativePath = Path.Combine(
+                targetApplicationId.ToString("N"),
+                typeFolder,
+                sideFolder,
+                $"{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}{extension}"
+            );
+            var targetPath = Path.Combine(_basePath, targetRelativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+
+            File.Copy(sourcePath, targetPath, overwrite: true);
+
+            var fileInfo = new FileInfo(targetPath);
+            copied.Add(new StoredDocument(
+                targetRelativePath,
+                Path.GetFileName(sourcePath),
+                GetContentTypeFromExtension(extension),
+                documentType,
+                side,
+                fileInfo.Length,
+                DateTimeOffset.UtcNow
+            ));
+        }
+
+        return Task.FromResult<IReadOnlyList<StoredDocument>>(copied);
+    }
+
     public Task<string?> GetDocumentUrlAsync(
         string blobName,
         TimeSpan validFor,

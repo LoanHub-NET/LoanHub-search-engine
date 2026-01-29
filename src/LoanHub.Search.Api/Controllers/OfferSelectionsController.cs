@@ -137,7 +137,12 @@ public sealed class OfferSelectionsController : ControllerBase
                 request.Age,
                 request.JobTitle,
                 request.Address,
-                request.IdDocumentNumber
+                request.IdDocumentNumber,
+                request.MonthlyIncome,
+                request.LivingCosts,
+                request.Dependents,
+                request.Phone,
+                request.DateOfBirth
             ),
             OfferSnapshot = offer!
         };
@@ -173,7 +178,12 @@ public sealed class OfferSelectionsController : ControllerBase
         int Age,
         string JobTitle,
         string Address,
-        string IdDocumentNumber);
+        string IdDocumentNumber,
+        decimal? MonthlyIncome,
+        decimal? LivingCosts,
+        int? Dependents,
+        string? Phone,
+        DateTime? DateOfBirth);
 
     public sealed record OfferSelectionResponse(
         Guid Id,
@@ -201,5 +211,6 @@ public sealed class OfferSelectionsController : ControllerBase
                 selection.AppliedAt,
                 selection.CreatedAt,
                 selection.UpdatedAt);
+
     }
 }

@@ -21,6 +21,7 @@ import {
   listApplicationsByEmail,
   listApplicationsForCurrentUser,
 } from '../../api/applicationsApi';
+import { listUserApplicationDocuments } from '../../api/userDocumentsApi';
 import { ApiError, clearAuthSession, getAuthSession } from '../../api/apiConfig';
 import { Header, Footer } from '../../components';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -58,6 +59,9 @@ export function UserDashboardPage() {
   const [showCancelModal, setShowCancelModal] = useState<UserApplication | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [latestDocuments, setLatestDocuments] = useState<UserDocumentView[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [documentsError, setDocumentsError] = useState<string | null>(null);
   
   // Stats
   const stats = useMemo(() => calculateUserDashboardStats(applications), [applications]);
@@ -276,6 +280,31 @@ export function UserDashboardPage() {
     loadApplications();
   }, []);
 
+  useEffect(() => {
+    const lastApplication = applications
+      .slice()
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+
+    if (!lastApplication) {
+      setLatestDocuments([]);
+      return;
+    }
+
+    setDocumentsLoading(true);
+    setDocumentsError(null);
+    listUserApplicationDocuments(lastApplication.id)
+      .then((docs) => {
+        const mapped = docs.map(mapUserDocument);
+        setLatestDocuments(mapped);
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : 'Unable to load documents.';
+        setDocumentsError(message);
+        setLatestDocuments([]);
+      })
+      .finally(() => setDocumentsLoading(false));
+  }, [applications]);
+
   const dashboardUser = authSession
     ? {
         name: `${profile.firstName} ${profile.lastName}`.trim() || authSession.email,
@@ -415,6 +444,9 @@ export function UserDashboardPage() {
                 <DocumentsSection
                   applications={applications}
                   profile={profile}
+                  latestDocuments={latestDocuments}
+                  documentsLoading={documentsLoading}
+                  documentsError={documentsError}
                 />
               )}
               
@@ -1146,12 +1178,50 @@ function ProfileSection({ profile, isEditing, onEdit, onSave, onCancel }: Profil
 // =====================================================
 // Documents Section Component
 // =====================================================
+interface UserDocumentView {
+  id: string;
+  name: string;
+  type: string;
+  side: string;
+  uploadedAt: Date;
+  size: number;
+  status: 'pending' | 'verified' | 'rejected';
+}
+
+const mapUserDocument = (doc: {
+  blobName: string;
+  originalFileName: string;
+  documentType: string;
+  documentSide: string;
+  sizeBytes: number;
+  uploadedAt: string;
+}): UserDocumentView => {
+  return {
+    id: doc.blobName,
+    name: doc.originalFileName,
+    type: doc.documentType,
+    side: doc.documentSide,
+    uploadedAt: new Date(doc.uploadedAt),
+    size: doc.sizeBytes,
+    status: 'pending',
+  };
+};
+
 interface DocumentsSectionProps {
   applications: UserApplication[];
   profile: UserProfile;
+  latestDocuments: UserDocumentView[];
+  documentsLoading: boolean;
+  documentsError: string | null;
 }
 
-function DocumentsSection({ applications, profile }: DocumentsSectionProps) {
+function DocumentsSection({
+  applications,
+  profile,
+  latestDocuments,
+  documentsLoading,
+  documentsError,
+}: DocumentsSectionProps) {
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
   
   // Get all required documents across applications
@@ -1162,15 +1232,6 @@ function DocumentsSection({ applications, profile }: DocumentsSectionProps) {
         .filter(doc => doc.status === 'pending')
         .map(doc => ({ ...doc, applicationRef: app.referenceNumber, applicationId: app.id }))
     );
-  
-  // Get all submitted documents
-  const submittedDocuments = applications.flatMap(app => 
-    app.documentsSubmitted.map(doc => ({ 
-      ...doc, 
-      applicationRef: app.referenceNumber,
-      applicationId: app.id,
-    }))
-  );
   
   const handleUpload = (docType: string, applicationId: string) => {
     // In real app, this would open file picker and upload
@@ -1243,50 +1304,49 @@ function DocumentsSection({ applications, profile }: DocumentsSectionProps) {
         </div>
       )}
       
-      {/* Submitted Documents */}
+      {/* Latest Application Documents */}
       <div className="documents-list-section">
-        <h3>Submitted Documents</h3>
-        {submittedDocuments.length === 0 ? (
+        <h3>Documents from Last Application</h3>
+        {documentsLoading ? (
           <div className="empty-state small">
-            <p>No documents submitted yet.</p>
+            <p>Loading documents...</p>
+          </div>
+        ) : documentsError ? (
+          <div className="empty-state small">
+            <p>{documentsError}</p>
+          </div>
+        ) : latestDocuments.length === 0 ? (
+          <div className="empty-state small">
+            <p>No documents submitted for the latest application.</p>
           </div>
         ) : (
           <table className="documents-table">
             <thead>
               <tr>
                 <th>Document</th>
-                <th>Application</th>
+                <th>Side</th>
                 <th>Uploaded</th>
                 <th>Status</th>
-                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {submittedDocuments.map(doc => (
-                <tr key={`${doc.id}-${doc.applicationId}`}>
+              {latestDocuments.map(doc => (
+                <tr key={doc.id}>
                   <td>
                     <div className="doc-cell">
                       <span className="doc-icon-small">📄</span>
                       <div>
                         <span className="doc-name">{doc.name}</span>
-                        <span className="doc-filename">{doc.fileName}</span>
+                        <span className="doc-filename">{doc.type.replace(/_/g, ' ')}</span>
                       </div>
                     </div>
                   </td>
-                  <td>{doc.applicationRef}</td>
+                  <td>{doc.side?.toUpperCase?.() ?? 'N/A'}</td>
                   <td>{formatDate(doc.uploadedAt)}</td>
                   <td>
                     <span className={`doc-status-badge ${doc.status}`}>
                       {doc.status === 'verified' ? '✅ Verified' : doc.status === 'rejected' ? '❌ Rejected' : '⏳ Pending'}
                     </span>
-                  </td>
-                  <td>
-                    <div className="doc-actions">
-                      <button className="btn-icon" title="Download">📥</button>
-                      {doc.status !== 'verified' && (
-                        <button className="btn-icon" title="Replace">🔄</button>
-                      )}
-                    </div>
                   </td>
                 </tr>
               ))}

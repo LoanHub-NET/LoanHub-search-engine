@@ -27,6 +27,14 @@ public interface IDocumentStorage
         CancellationToken ct);
 
     /// <summary>
+    /// Copies documents to a new application (reuse previously uploaded docs)
+    /// </summary>
+    Task<IReadOnlyList<StoredDocument>> CopyDocumentsAsync(
+        Guid targetApplicationId,
+        IReadOnlyList<string> sourceBlobNames,
+        CancellationToken ct);
+
+    /// <summary>
     /// Gets a document download URL (SAS URL for Azure Blob)
     /// </summary>
     Task<string?> GetDocumentUrlAsync(
