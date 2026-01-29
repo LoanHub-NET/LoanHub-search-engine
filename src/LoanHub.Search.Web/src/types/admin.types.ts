@@ -130,6 +130,8 @@ export interface ApplicationDocument {
   name: string;
   type: DocumentType;
   url: string;
+  blobName?: string;
+  side?: DocumentSide;
   uploadedAt: Date;
   uploadedBy: 'applicant' | 'admin' | 'provider';
   size: number;
@@ -139,10 +141,14 @@ export interface ApplicationDocument {
 export type DocumentType = 
   | 'id_document'
   | 'proof_of_income'
+  | 'proof_of_address'
   | 'bank_statement'
+  | 'employment_contract'
   | 'contract'
   | 'signed_contract'
   | 'other';
+
+export type DocumentSide = 'front' | 'back' | 'unknown';
 
 export type DocumentStatus = 
   | 'pending'

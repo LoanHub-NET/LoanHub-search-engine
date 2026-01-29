@@ -137,7 +137,12 @@ public sealed class OfferSelectionsController : ControllerBase
                 request.Age,
                 request.JobTitle,
                 request.Address,
-                request.IdDocumentNumber
+                request.IdDocumentNumber,
+                request.MonthlyIncome,
+                request.LivingCosts,
+                request.Dependents,
+                request.Phone,
+                NormalizeDateTime(request.DateOfBirth)
             ),
             OfferSnapshot = offer!
         };
@@ -173,7 +178,12 @@ public sealed class OfferSelectionsController : ControllerBase
         int Age,
         string JobTitle,
         string Address,
-        string IdDocumentNumber);
+        string IdDocumentNumber,
+        decimal? MonthlyIncome,
+        decimal? LivingCosts,
+        int? Dependents,
+        string? Phone,
+        DateTime? DateOfBirth);
 
     public sealed record OfferSelectionResponse(
         Guid Id,
@@ -201,5 +211,19 @@ public sealed class OfferSelectionsController : ControllerBase
                 selection.AppliedAt,
                 selection.CreatedAt,
                 selection.UpdatedAt);
+    }
+
+    private static DateTime? NormalizeDateTime(DateTime? value)
+    {
+        if (!value.HasValue)
+            return null;
+
+        var date = value.Value;
+        return date.Kind switch
+        {
+            DateTimeKind.Utc => date,
+            DateTimeKind.Local => date.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(date, DateTimeKind.Utc)
+        };
     }
 }

@@ -21,6 +21,8 @@ import {
   listApplicationsByEmail,
   listApplicationsForCurrentUser,
 } from '../../api/applicationsApi';
+import { getUserApplicationDocumentUrl, listUserApplicationDocuments } from '../../api/userDocumentsApi';
+import { uploadApplicationDocument } from '../../api/documentsApi';
 import { ApiError, clearAuthSession, getAuthSession } from '../../api/apiConfig';
 import { Header, Footer } from '../../components';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -58,6 +60,10 @@ export function UserDashboardPage() {
   const [showCancelModal, setShowCancelModal] = useState<UserApplication | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [latestDocuments, setLatestDocuments] = useState<UserDocumentView[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [documentsError, setDocumentsError] = useState<string | null>(null);
+  const [latestApplicationId, setLatestApplicationId] = useState<string | null>(null);
   
   // Stats
   const stats = useMemo(() => calculateUserDashboardStats(applications), [applications]);
@@ -235,13 +241,17 @@ export function UserDashboardPage() {
         const data = await listApplicationsForCurrentUser();
         const mapped = mapApplications(data);
 
-        if (mapped.length === 0 && session?.email) {
-          const guestData = await listApplicationsByEmail(session.email);
-          const guestMapped = mapApplications(guestData);
-          const combined = new Map<string, UserApplication>();
-          mapped.forEach((item) => combined.set(item.id, item));
-          guestMapped.forEach((item) => combined.set(item.id, item));
-          setApplications(Array.from(combined.values()));
+        if (session?.email) {
+          try {
+            const guestData = await listApplicationsByEmail(session.email);
+            const guestMapped = mapApplications(guestData);
+            const combined = new Map<string, UserApplication>();
+            mapped.forEach((item) => combined.set(item.id, item));
+            guestMapped.forEach((item) => combined.set(item.id, item));
+            setApplications(Array.from(combined.values()));
+          } catch {
+            setApplications(mapped);
+          }
         } else {
           setApplications(mapped);
         }
@@ -275,6 +285,34 @@ export function UserDashboardPage() {
 
     loadApplications();
   }, []);
+
+  useEffect(() => {
+    const lastApplication = applications
+      .slice()
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+
+    if (!lastApplication) {
+      setLatestDocuments([]);
+      setLatestApplicationId(null);
+      return;
+    }
+
+    setLatestApplicationId(lastApplication.id);
+
+    setDocumentsLoading(true);
+    setDocumentsError(null);
+    listUserApplicationDocuments(lastApplication.id)
+      .then((docs) => {
+        const mapped = docs.map(mapUserDocument);
+        setLatestDocuments(mapped);
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : 'Unable to load documents.';
+        setDocumentsError(message);
+        setLatestDocuments([]);
+      })
+      .finally(() => setDocumentsLoading(false));
+  }, [applications]);
 
   const dashboardUser = authSession
     ? {
@@ -415,6 +453,10 @@ export function UserDashboardPage() {
                 <DocumentsSection
                   applications={applications}
                   profile={profile}
+                  latestDocuments={latestDocuments}
+                  documentsLoading={documentsLoading}
+                  documentsError={documentsError}
+                  latestApplicationId={latestApplicationId}
                 />
               )}
               
@@ -1146,13 +1188,62 @@ function ProfileSection({ profile, isEditing, onEdit, onSave, onCancel }: Profil
 // =====================================================
 // Documents Section Component
 // =====================================================
+interface UserDocumentView {
+  id: string;
+  name: string;
+  type: string;
+  side: string;
+  uploadedAt: Date;
+  size: number;
+  status: 'pending' | 'verified' | 'rejected';
+}
+
+const mapUserDocument = (doc: {
+  blobName: string;
+  originalFileName: string;
+  documentType: string;
+  documentSide: string;
+  sizeBytes: number;
+  uploadedAt: string;
+}): UserDocumentView => {
+  return {
+    id: doc.blobName,
+    name: doc.originalFileName,
+    type: doc.documentType,
+    side: doc.documentSide,
+    uploadedAt: new Date(doc.uploadedAt),
+    size: doc.sizeBytes,
+    status: 'pending',
+  };
+};
+
 interface DocumentsSectionProps {
   applications: UserApplication[];
   profile: UserProfile;
+  latestDocuments: UserDocumentView[];
+  documentsLoading: boolean;
+  documentsError: string | null;
+  latestApplicationId: string | null;
 }
 
-function DocumentsSection({ applications, profile }: DocumentsSectionProps) {
+function DocumentsSection({
+  applications,
+  profile,
+  latestDocuments,
+  documentsLoading,
+  documentsError,
+  latestApplicationId,
+}: DocumentsSectionProps) {
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadFrontFile, setUploadFrontFile] = useState<File | null>(null);
+  const [uploadBackFile, setUploadBackFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadingDocuments, setUploadingDocuments] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<UserDocumentView | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   
   // Get all required documents across applications
   const pendingDocuments = applications
@@ -1163,19 +1254,83 @@ function DocumentsSection({ applications, profile }: DocumentsSectionProps) {
         .map(doc => ({ ...doc, applicationRef: app.referenceNumber, applicationId: app.id }))
     );
   
-  // Get all submitted documents
-  const submittedDocuments = applications.flatMap(app => 
-    app.documentsSubmitted.map(doc => ({ 
-      ...doc, 
-      applicationRef: app.referenceNumber,
-      applicationId: app.id,
-    }))
-  );
-  
   const handleUpload = (docType: string, applicationId: string) => {
-    // In real app, this would open file picker and upload
     setUploadingFor(`${docType}-${applicationId}`);
-    setTimeout(() => setUploadingFor(null), 2000); // Simulate upload
+    setUploadModalOpen(true);
+  };
+
+  const refreshLatestDocuments = async () => {
+    if (!latestApplicationId) return;
+    const docs = await listUserApplicationDocuments(latestApplicationId);
+    const mapped = docs.map(mapUserDocument);
+    setLatestDocumentsState(mapped);
+  };
+
+  const [latestDocumentsState, setLatestDocumentsState] = useState<UserDocumentView[]>(latestDocuments);
+
+  useEffect(() => {
+    setLatestDocumentsState(latestDocuments);
+  }, [latestDocuments]);
+
+  const handleUploadDocuments = async () => {
+    if (!latestApplicationId) {
+      setUploadError('No application found. Submit an application first.');
+      return;
+    }
+
+    if (!uploadFrontFile && !uploadBackFile) {
+      setUploadError('Please select at least one file.');
+      return;
+    }
+
+    setUploadingDocuments(true);
+    setUploadError(null);
+
+    try {
+      const uploadedBlobNames: string[] = [];
+      const uploads: Array<Promise<void>> = [];
+
+      if (uploadFrontFile) {
+        uploads.push(
+          uploadApplicationDocument(latestApplicationId, uploadFrontFile, 'IdDocument', 'Front')
+            .then((res) => {
+              uploadedBlobNames.push(res.blobName);
+            }),
+        );
+      }
+      if (uploadBackFile) {
+        uploads.push(
+          uploadApplicationDocument(latestApplicationId, uploadBackFile, 'IdDocument', 'Back')
+            .then((res) => {
+              uploadedBlobNames.push(res.blobName);
+            }),
+        );
+      }
+
+      await Promise.all(uploads);
+
+      if (typeof window !== 'undefined' && profile.id) {
+        const key = `loanhub_user_documents_${profile.id}`;
+        const payload = {
+          applicationId: latestApplicationId,
+          uploadedAt: new Date().toISOString(),
+          blobNames: uploadedBlobNames,
+        };
+        window.localStorage.setItem(key, JSON.stringify(payload));
+      }
+
+      await refreshLatestDocuments();
+
+      setUploadModalOpen(false);
+      setUploadFrontFile(null);
+      setUploadBackFile(null);
+      setUploadingFor(null);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unable to upload documents.';
+      setUploadError(message);
+    } finally {
+      setUploadingDocuments(false);
+    }
   };
 
   return (
@@ -1209,7 +1364,9 @@ function DocumentsSection({ applications, profile }: DocumentsSectionProps) {
         ) : (
           <div className="no-id">
             <p>No ID document on file. Upload your ID to verify your identity.</p>
-            <button className="btn btn-primary">Upload ID Document</button>
+            <button className="btn btn-primary" onClick={() => setUploadModalOpen(true)}>
+              Upload ID Document
+            </button>
           </div>
         )}
       </div>
@@ -1243,37 +1400,45 @@ function DocumentsSection({ applications, profile }: DocumentsSectionProps) {
         </div>
       )}
       
-      {/* Submitted Documents */}
+      {/* Latest Application Documents */}
       <div className="documents-list-section">
-        <h3>Submitted Documents</h3>
-        {submittedDocuments.length === 0 ? (
+        <h3>Documents from Last Application</h3>
+        {documentsLoading ? (
           <div className="empty-state small">
-            <p>No documents submitted yet.</p>
+            <p>Loading documents...</p>
+          </div>
+        ) : documentsError ? (
+          <div className="empty-state small">
+            <p>{documentsError}</p>
+          </div>
+        ) : latestDocumentsState.length === 0 ? (
+          <div className="empty-state small">
+            <p>No documents submitted for the latest application.</p>
           </div>
         ) : (
           <table className="documents-table">
             <thead>
               <tr>
                 <th>Document</th>
-                <th>Application</th>
+                <th>Side</th>
                 <th>Uploaded</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {submittedDocuments.map(doc => (
-                <tr key={`${doc.id}-${doc.applicationId}`}>
+              {latestDocumentsState.map(doc => (
+                <tr key={doc.id}>
                   <td>
                     <div className="doc-cell">
                       <span className="doc-icon-small">📄</span>
                       <div>
                         <span className="doc-name">{doc.name}</span>
-                        <span className="doc-filename">{doc.fileName}</span>
+                        <span className="doc-filename">{doc.type.replace(/_/g, ' ')}</span>
                       </div>
                     </div>
                   </td>
-                  <td>{doc.applicationRef}</td>
+                  <td>{doc.side?.toUpperCase?.() ?? 'N/A'}</td>
                   <td>{formatDate(doc.uploadedAt)}</td>
                   <td>
                     <span className={`doc-status-badge ${doc.status}`}>
@@ -1281,18 +1446,143 @@ function DocumentsSection({ applications, profile }: DocumentsSectionProps) {
                     </span>
                   </td>
                   <td>
-                    <div className="doc-actions">
-                      <button className="btn-icon" title="Download">📥</button>
-                      {doc.status !== 'verified' && (
-                        <button className="btn-icon" title="Replace">🔄</button>
-                      )}
-                    </div>
+                    <button
+                      className="btn-icon"
+                      title="View"
+                      onClick={async () => {
+                        if (!latestApplicationId) {
+                          setPreviewError('No application found for document preview.');
+                          return;
+                        }
+                        setPreviewDoc(doc);
+                        setPreviewUrl(null);
+                        setPreviewError(null);
+                        setPreviewLoading(true);
+                        try {
+                          const url = await getUserApplicationDocumentUrl(latestApplicationId, doc.id);
+                          setPreviewUrl(url);
+                        } catch (err: unknown) {
+                          const message = err instanceof Error ? err.message : 'Unable to load document preview.';
+                          setPreviewError(message);
+                        } finally {
+                          setPreviewLoading(false);
+                        }
+                      }}
+                    >
+                      👁️
+                    </button>
+                    <button
+                      className="btn-icon"
+                      title="Replace"
+                      onClick={() => setUploadModalOpen(true)}
+                    >
+                      🔄
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
+      </div>
+
+      {uploadModalOpen && (
+        <div className="upload-overlay" onClick={() => setUploadModalOpen(false)}>
+          <div className="upload-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="upload-header">
+              <h3>Upload ID Documents</h3>
+              <button className="upload-close" onClick={() => setUploadModalOpen(false)}>×</button>
+            </div>
+            <div className="upload-body">
+              <div className="upload-field">
+                <label>Front Side</label>
+                <input type="file" accept="image/*,.pdf" onChange={(e) => setUploadFrontFile(e.target.files?.[0] ?? null)} />
+              </div>
+              <div className="upload-field">
+                <label>Back Side</label>
+                <input type="file" accept="image/*,.pdf" onChange={(e) => setUploadBackFile(e.target.files?.[0] ?? null)} />
+              </div>
+              {uploadError && <div className="upload-error">{uploadError}</div>}
+            </div>
+            <div className="upload-actions">
+              <button className="btn btn-secondary" onClick={() => setUploadModalOpen(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleUploadDocuments} disabled={uploadingDocuments}>
+                {uploadingDocuments ? 'Uploading...' : 'Upload'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {previewDoc && (
+        <UserDocumentPreviewModal
+          document={previewDoc}
+          url={previewUrl}
+          isLoading={previewLoading}
+          error={previewError}
+          onClose={() => {
+            setPreviewDoc(null);
+            setPreviewUrl(null);
+            setPreviewError(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function UserDocumentPreviewModal({
+  document,
+  url,
+  isLoading,
+  error,
+  onClose,
+}: {
+  document: UserDocumentView;
+  url: string | null;
+  isLoading: boolean;
+  error: string | null;
+  onClose: () => void;
+}) {
+  const fileExtension = document.name.split('.').pop()?.toLowerCase();
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '');
+  const isPdf = fileExtension === 'pdf';
+
+  return (
+    <div className="preview-overlay" onClick={onClose}>
+      <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="preview-header">
+          <div>
+            <h3 className="preview-title">{document.name}</h3>
+            <p className="preview-subtitle">{document.type.replace(/_/g, ' ')}</p>
+          </div>
+          <button className="preview-close" onClick={onClose}>×</button>
+        </div>
+        <div className="preview-body">
+          {isLoading && (
+            <div className="preview-loading">Loading document...</div>
+          )}
+          {!isLoading && error && (
+            <div className="preview-error">{error}</div>
+          )}
+          {!isLoading && !error && url && (
+            <div className="preview-content">
+              {isImage && (
+                <img src={url} alt={document.name} className="preview-image" />
+              )}
+              {isPdf && (
+                <iframe title={document.name} src={url} className="preview-frame" />
+              )}
+              {!isImage && !isPdf && (
+                <a className="preview-download" href={url} target="_blank" rel="noreferrer">
+                  Download file
+                </a>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { 
   LoanApplication, 
   ApplicationDocument, 
@@ -7,6 +7,7 @@ import type {
 } from '../../types/admin.types';
 import { ADMIN_STATUS_CONFIG, calculateSlaInfo } from '../../types/admin.types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+import { getApplicationDocumentUrl, listApplicationDocuments } from '../../api/adminDocumentsApi';
 import './ApplicationDetailModal.css';
 
 interface ApplicationDetailModalProps {
@@ -25,8 +26,35 @@ export function ApplicationDetailModal({
   onReject,
 }: ApplicationDetailModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [documents, setDocuments] = useState<ApplicationDocument[]>(application.documents);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [documentsError, setDocumentsError] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<ApplicationDocument | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const slaInfo = calculateSlaInfo(application);
   const statusConfig = ADMIN_STATUS_CONFIG[application.status];
+
+  const mappedDocuments = useMemo(() => documents, [documents]);
+
+  useEffect(() => {
+    setDocumentsLoading(true);
+    setDocumentsError(null);
+    listApplicationDocuments(application.id)
+      .then((docs) => {
+        const mapped = docs.map((doc) => mapApiDocument(doc));
+        setDocuments(mapped.length > 0 ? mapped : application.documents);
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : 'Failed to load documents.';
+        setDocumentsError(message);
+        setDocuments(application.documents);
+      })
+      .finally(() => {
+        setDocumentsLoading(false);
+      });
+  }, [application.id, application.documents]);
 
   const tabs: { id: TabId; label: string; icon: string }[] = [
     { id: 'overview', label: 'Overview', icon: '📋' },
@@ -84,7 +112,27 @@ export function ApplicationDetailModal({
             <ApplicantTab application={application} />
           )}
           {activeTab === 'documents' && (
-            <DocumentsTab documents={application.documents} />
+            <DocumentsTab
+              documents={mappedDocuments}
+              isLoading={documentsLoading}
+              error={documentsError}
+              onView={async (doc) => {
+                if (!doc.blobName) return;
+                setPreviewDoc(doc);
+                setPreviewUrl(null);
+                setPreviewError(null);
+                setPreviewLoading(true);
+                try {
+                  const url = await getApplicationDocumentUrl(application.id, doc.blobName);
+                  setPreviewUrl(url);
+                } catch (err: unknown) {
+                  const message = err instanceof Error ? err.message : 'Unable to load document preview.';
+                  setPreviewError(message);
+                } finally {
+                  setPreviewLoading(false);
+                }
+              }}
+            />
           )}
           {activeTab === 'history' && (
             <HistoryTab history={application.statusHistory} notes={application.internalNotes} />
@@ -93,6 +141,20 @@ export function ApplicationDetailModal({
             <ProviderTab application={application} />
           )}
         </div>
+
+        {previewDoc && (
+          <DocumentPreviewModal
+            document={previewDoc}
+            url={previewUrl}
+            isLoading={previewLoading}
+            error={previewError}
+            onClose={() => {
+              setPreviewDoc(null);
+              setPreviewUrl(null);
+              setPreviewError(null);
+            }}
+          />
+        )}
 
         {/* Footer Actions */}
         <div className="modal-footer">
@@ -376,12 +438,24 @@ function ApplicantTab({ application }: { application: LoanApplication }) {
 }
 
 // Documents Tab
-function DocumentsTab({ documents }: { documents: ApplicationDocument[] }) {
+function DocumentsTab({
+  documents,
+  onView,
+  isLoading,
+  error,
+}: {
+  documents: ApplicationDocument[];
+  onView: (doc: ApplicationDocument) => void;
+  isLoading: boolean;
+  error: string | null;
+}) {
   const getDocTypeLabel = (type: ApplicationDocument['type']): string => {
     const labels: Record<ApplicationDocument['type'], string> = {
       id_document: 'ID Document',
       proof_of_income: 'Proof of Income',
+      proof_of_address: 'Proof of Address',
       bank_statement: 'Bank Statement',
+      employment_contract: 'Employment Contract',
       contract: 'Contract',
       signed_contract: 'Signed Contract',
       other: 'Other',
@@ -407,7 +481,17 @@ function DocumentsTab({ documents }: { documents: ApplicationDocument[] }) {
 
   return (
     <div className="tab-content documents-tab">
-      {documents.length === 0 ? (
+      {isLoading ? (
+        <div className="empty-state">
+          <span className="empty-icon">⏳</span>
+          <p>Loading documents...</p>
+        </div>
+      ) : error ? (
+        <div className="empty-state">
+          <span className="empty-icon">⚠️</span>
+          <p>{error}</p>
+        </div>
+      ) : documents.length === 0 ? (
         <div className="empty-state">
           <span className="empty-icon">📄</span>
           <p>No documents uploaded</p>
@@ -416,13 +500,14 @@ function DocumentsTab({ documents }: { documents: ApplicationDocument[] }) {
         <div className="documents-list">
           {documents.map(doc => {
             const statusBadge = getStatusBadge(doc.status);
+            const sideLabel = doc.side ? ` · ${doc.side.toUpperCase()}` : '';
             return (
               <div key={doc.id} className="document-card">
                 <div className="document-icon">📄</div>
                 <div className="document-info">
                   <div className="document-name">{doc.name}</div>
                   <div className="document-meta">
-                    <span className="document-type">{getDocTypeLabel(doc.type)}</span>
+                    <span className="document-type">{getDocTypeLabel(doc.type)}{sideLabel}</span>
                     <span className="document-size">{formatFileSize(doc.size)}</span>
                     <span className="document-date">{formatDate(doc.uploadedAt)}</span>
                     <span className="document-uploader">by {doc.uploadedBy}</span>
@@ -430,7 +515,9 @@ function DocumentsTab({ documents }: { documents: ApplicationDocument[] }) {
                 </div>
                 <div className="document-actions">
                   <span className={`badge ${statusBadge.class}`}>{statusBadge.label}</span>
-                  <button className="btn btn-sm btn-secondary">View</button>
+                  <button className="btn btn-sm btn-secondary" onClick={() => onView(doc)}>
+                    View
+                  </button>
                   {doc.status === 'pending' && (
                     <>
                       <button className="btn btn-sm btn-success">✓</button>
@@ -443,6 +530,117 @@ function DocumentsTab({ documents }: { documents: ApplicationDocument[] }) {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function mapApiDocument(doc: {
+  blobName: string;
+  originalFileName: string;
+  contentType: string;
+  documentType: string;
+  documentSide: string;
+  sizeBytes: number;
+  uploadedAt: string;
+}): ApplicationDocument {
+  const type = mapDocumentType(doc.documentType);
+  const side = mapDocumentSide(doc.documentSide);
+
+  return {
+    id: doc.blobName,
+    name: doc.originalFileName,
+    type,
+    url: '',
+    blobName: doc.blobName,
+    side,
+    uploadedAt: new Date(doc.uploadedAt),
+    uploadedBy: 'applicant',
+    size: doc.sizeBytes,
+    status: 'pending',
+  };
+}
+
+function mapDocumentType(value: string): ApplicationDocument['type'] {
+  const normalized = value.toLowerCase();
+  switch (normalized) {
+    case 'iddocument':
+    case 'id_document':
+      return 'id_document';
+    case 'proofofincome':
+    case 'proof_of_income':
+      return 'proof_of_income';
+    case 'proofofaddress':
+    case 'proof_of_address':
+      return 'proof_of_address';
+    case 'bankstatement':
+    case 'bank_statement':
+      return 'bank_statement';
+    case 'employmentcontract':
+    case 'employment_contract':
+      return 'employment_contract';
+    default:
+      return 'other';
+  }
+}
+
+function mapDocumentSide(value: string): ApplicationDocument['side'] {
+  const normalized = value.toLowerCase();
+  if (normalized === 'front') return 'front';
+  if (normalized === 'back') return 'back';
+  return 'unknown';
+}
+
+function DocumentPreviewModal({
+  document,
+  url,
+  isLoading,
+  error,
+  onClose,
+}: {
+  document: ApplicationDocument;
+  url: string | null;
+  isLoading: boolean;
+  error: string | null;
+  onClose: () => void;
+}) {
+  const fileExtension = document.name.split('.').pop()?.toLowerCase();
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '');
+  const isPdf = fileExtension === 'pdf';
+
+  return (
+    <div className="preview-overlay" onClick={onClose}>
+      <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="preview-header">
+          <div>
+            <h3 className="preview-title">{document.name}</h3>
+            <p className="preview-subtitle">{document.type.replace(/_/g, ' ')}</p>
+          </div>
+          <button className="preview-close" onClick={onClose}>×</button>
+        </div>
+        <div className="preview-body">
+          {isLoading && (
+            <div className="preview-loading">Loading document...</div>
+          )}
+          {!isLoading && error && (
+            <div className="preview-error">{error}</div>
+          )}
+          {!isLoading && !error && url && (
+            <div className="preview-content">
+              {isImage && (
+                <img src={url} alt={document.name} className="preview-image" />
+              )}
+              {isPdf && (
+                <iframe title={document.name} src={url} className="preview-frame" />
+              )}
+              {!isImage && !isPdf && (
+                <a className="preview-download" href={url} target="_blank" rel="noreferrer">
+                  Download file
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

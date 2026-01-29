@@ -6,5 +6,10 @@ public sealed record ApplicantDetails(
     int Age,
     string JobTitle,
     string Address,
-    string IdDocumentNumber
+    string IdDocumentNumber,
+    decimal? MonthlyIncome,
+    decimal? LivingCosts,
+    int? Dependents,
+    string? Phone,
+    DateTime? DateOfBirth
 );

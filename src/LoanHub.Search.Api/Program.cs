@@ -154,6 +154,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Applications")));
 builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
 builder.Services.AddScoped<ApplicationService>();
+
+// Contract storage configuration (for signed contracts)
+builder.Services.Configure<ContractStorageOptions>(builder.Configuration.GetSection("ContractStorage"));
 var contractStorageOptions = builder.Configuration.GetSection("ContractStorage").Get<ContractStorageOptions>() ?? new ContractStorageOptions();
 if (string.IsNullOrWhiteSpace(contractStorageOptions.ConnectionString))
 {
@@ -163,6 +166,19 @@ else
 {
     builder.Services.AddSingleton<IContractStorage, AzureBlobContractStorage>();
 }
+
+// Document storage configuration (for ID documents, proof of income, etc.)
+builder.Services.Configure<DocumentStorageOptions>(builder.Configuration.GetSection("DocumentStorage"));
+var documentStorageOptions = builder.Configuration.GetSection("DocumentStorage").Get<DocumentStorageOptions>() ?? new DocumentStorageOptions();
+if (string.IsNullOrWhiteSpace(documentStorageOptions.ConnectionString))
+{
+    builder.Services.AddSingleton<IDocumentStorage, LocalFileDocumentStorage>();
+}
+else
+{
+    builder.Services.AddSingleton<IDocumentStorage, AzureBlobDocumentStorage>();
+}
+
 builder.Services.AddScoped<IOfferSelectionRepository, OfferSelectionRepository>();
 builder.Services.AddScoped<OfferSelectionService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -311,6 +327,11 @@ static async Task InitializeDatabaseAsync(WebApplication app)
                 ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Amount" numeric;
                 ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_DurationMonths" integer;
                 ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_ValidUntil" timestamptz;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ApplicantDetails_MonthlyIncome" numeric;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ApplicantDetails_LivingCosts" numeric;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ApplicantDetails_Dependents" integer;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ApplicantDetails_Phone" varchar(40);
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ApplicantDetails_DateOfBirth" timestamptz;
                 ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "ContractReadyAt" timestamptz;
                 ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractFileName" varchar(240);
                 ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "SignedContractBlobName" varchar(320);

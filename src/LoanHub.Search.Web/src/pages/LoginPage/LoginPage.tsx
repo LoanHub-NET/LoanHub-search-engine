@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Header, Footer } from '../../components';
 import { loginUser, registerUser } from '../../api/userApi';
 import { ApiError, clearPendingProfile, getPendingProfile } from '../../api/apiConfig';
+import type { UserProfile } from '../../types/dashboard.types';
 import './LoginPage.css';
 
 type Mode = 'login' | 'register';
@@ -20,6 +21,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [pendingProfile] = useState(getPendingProfile());
+  const storedProfileKeyPrefix = 'loanhub_user_profile_';
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -39,6 +41,30 @@ export function LoginPage() {
     return role === 'admin' ? 'Register bank admin' : 'Create your account';
   }, [mode, role]);
 
+  const buildAddressText = (address?: UserProfile['address'], fallback?: string | null) => {
+    if (!address) return fallback ?? null;
+    const parts = [
+      address.street,
+      address.apartment ? `Apt ${address.apartment}` : null,
+      address.postalCode && address.city ? `${address.postalCode} ${address.city}` : address.city,
+      address.country,
+    ].filter(Boolean);
+    return parts.length ? parts.join(', ') : fallback ?? null;
+  };
+
+  const computeAge = (dateOfBirth?: string | null) => {
+    if (!dateOfBirth) return null;
+    const parsed = new Date(dateOfBirth);
+    if (Number.isNaN(parsed.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - parsed.getFullYear();
+    const monthDiff = today.getMonth() - parsed.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < parsed.getDate())) {
+      age -= 1;
+    }
+    return Math.max(0, age);
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
@@ -50,7 +76,19 @@ export function LoginPage() {
         const pendingProfileForEmail =
           pendingProfile && pendingProfile.email === formData.email ? pendingProfile : null;
 
-        await registerUser({
+        const pendingAddressObject =
+          pendingProfileForEmail && typeof pendingProfileForEmail.address === 'object'
+            ? (pendingProfileForEmail.address as UserProfile['address'])
+            : undefined;
+        const pendingAddressText = buildAddressText(
+          pendingAddressObject,
+          pendingProfileForEmail?.addressText ??
+            (typeof pendingProfileForEmail?.address === 'string'
+              ? pendingProfileForEmail.address
+              : null),
+        );
+
+        const authResponse = await registerUser({
           email: formData.email,
           password: formData.password,
           role,
@@ -60,9 +98,9 @@ export function LoginPage() {
           profile: {
             firstName: formData.firstName || null,
             lastName: formData.lastName || null,
-            age: null,
+            age: computeAge(pendingProfileForEmail?.dateOfBirth ?? null),
             jobTitle: pendingProfileForEmail?.jobTitle || null,
-            address: pendingProfileForEmail?.address || null,
+            address: pendingAddressText,
             phone: pendingProfileForEmail?.phone || null,
             dateOfBirth: pendingProfileForEmail?.dateOfBirth || null,
             monthlyIncome: pendingProfileForEmail?.monthlyIncome ?? null,
@@ -71,6 +109,50 @@ export function LoginPage() {
             idDocumentNumber: pendingProfileForEmail?.idDocumentNumber || null,
           },
         });
+
+        if (role === 'user' && pendingProfileForEmail) {
+          const storedProfile: UserProfile = {
+            id: authResponse.id,
+            email: authResponse.email,
+            firstName: pendingProfileForEmail.firstName ?? authResponse.firstName ?? 'User',
+            lastName: pendingProfileForEmail.lastName ?? authResponse.lastName ?? '',
+            phone: pendingProfileForEmail.phone,
+            dateOfBirth: pendingProfileForEmail.dateOfBirth
+              ? new Date(pendingProfileForEmail.dateOfBirth)
+              : undefined,
+            address: pendingAddressObject,
+            employment: pendingProfileForEmail.jobTitle || pendingProfileForEmail.employerName
+              ? {
+                  status: 'employed',
+                  employerName: pendingProfileForEmail.employerName,
+                  position: pendingProfileForEmail.jobTitle,
+                }
+              : undefined,
+            monthlyIncome: pendingProfileForEmail.monthlyIncome,
+            livingCosts: pendingProfileForEmail.livingCosts,
+            dependents: pendingProfileForEmail.dependents,
+            idDocument: pendingProfileForEmail.idDocumentNumber
+              ? {
+                  type: pendingProfileForEmail.idDocumentType ?? 'national_id',
+                  number: pendingProfileForEmail.idDocumentNumber,
+                  expiryDate: pendingProfileForEmail.idDocumentExpiry
+                    ? new Date(pendingProfileForEmail.idDocumentExpiry)
+                    : undefined,
+                  verified: false,
+                }
+              : undefined,
+            emailNotifications: true,
+            smsNotifications: false,
+            completionPercentage: 0,
+          };
+
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(
+              `${storedProfileKeyPrefix}${authResponse.id}`,
+              JSON.stringify(storedProfile),
+            );
+          }
+        }
         clearPendingProfile();
         setMessage('Registration successful. Redirecting...');
       } else {

@@ -1010,6 +1010,174 @@
   border-collapse: collapse;
 }
 
+.preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 1.5rem;
+}
+
+.preview-modal {
+  background: #0f172a;
+  color: #e2e8f0;
+  width: min(1000px, 96vw);
+  max-height: 90vh;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: 0 25px 80px rgba(15, 23, 42, 0.55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.preview-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.preview-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.preview-subtitle {
+  margin: 0.25rem 0 0;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.preview-close {
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.preview-body {
+  padding: 1.5rem;
+  overflow: auto;
+  flex: 1;
+}
+
+.preview-loading,
+.preview-error {
+  padding: 2rem;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.preview-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 70vh;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.45);
+}
+
+.preview-frame {
+  width: 100%;
+  height: 70vh;
+  border: none;
+  border-radius: 12px;
+  background: #1e293b;
+}
+
+.preview-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.upload-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 1.5rem;
+}
+
+.upload-modal {
+  background: #0f172a;
+  color: #e2e8f0;
+  width: min(520px, 92vw);
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.45);
+  overflow: hidden;
+}
+
+.upload-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.upload-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.upload-close {
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.upload-body {
+  padding: 1.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.upload-field {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.upload-field input {
+  color: #e2e8f0;
+}
+
+.upload-error {
+  color: #f87171;
+  font-size: 0.9rem;
+}
+
+.upload-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0 1.5rem 1.5rem;
+}
+
 .documents-table th,
 .documents-table td {
   padding: 0.75rem 1rem;
