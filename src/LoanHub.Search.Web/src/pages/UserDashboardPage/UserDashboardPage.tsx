@@ -241,13 +241,17 @@ export function UserDashboardPage() {
         const data = await listApplicationsForCurrentUser();
         const mapped = mapApplications(data);
 
-        if (mapped.length === 0 && session?.email) {
-          const guestData = await listApplicationsByEmail(session.email);
-          const guestMapped = mapApplications(guestData);
-          const combined = new Map<string, UserApplication>();
-          mapped.forEach((item) => combined.set(item.id, item));
-          guestMapped.forEach((item) => combined.set(item.id, item));
-          setApplications(Array.from(combined.values()));
+        if (session?.email) {
+          try {
+            const guestData = await listApplicationsByEmail(session.email);
+            const guestMapped = mapApplications(guestData);
+            const combined = new Map<string, UserApplication>();
+            mapped.forEach((item) => combined.set(item.id, item));
+            guestMapped.forEach((item) => combined.set(item.id, item));
+            setApplications(Array.from(combined.values()));
+          } catch {
+            setApplications(mapped);
+          }
         } else {
           setApplications(mapped);
         }
