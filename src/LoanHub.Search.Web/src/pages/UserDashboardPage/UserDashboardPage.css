@@ -1109,6 +1109,75 @@
   font-weight: 600;
 }
 
+.upload-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 1.5rem;
+}
+
+.upload-modal {
+  background: #0f172a;
+  color: #e2e8f0;
+  width: min(520px, 92vw);
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.45);
+  overflow: hidden;
+}
+
+.upload-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.upload-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.upload-close {
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.upload-body {
+  padding: 1.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.upload-field {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.upload-field input {
+  color: #e2e8f0;
+}
+
+.upload-error {
+  color: #f87171;
+  font-size: 0.9rem;
+}
+
+.upload-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0 1.5rem 1.5rem;
+}
+
 .documents-table th,
 .documents-table td {
   padding: 0.75rem 1rem;

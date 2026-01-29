@@ -22,6 +22,7 @@ import {
   listApplicationsForCurrentUser,
 } from '../../api/applicationsApi';
 import { getUserApplicationDocumentUrl, listUserApplicationDocuments } from '../../api/userDocumentsApi';
+import { uploadApplicationDocument } from '../../api/documentsApi';
 import { ApiError, clearAuthSession, getAuthSession } from '../../api/apiConfig';
 import { Header, Footer } from '../../components';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -1230,6 +1231,11 @@ function DocumentsSection({
   latestApplicationId,
 }: DocumentsSectionProps) {
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadFrontFile, setUploadFrontFile] = useState<File | null>(null);
+  const [uploadBackFile, setUploadBackFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadingDocuments, setUploadingDocuments] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<UserDocumentView | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -1245,9 +1251,82 @@ function DocumentsSection({
     );
   
   const handleUpload = (docType: string, applicationId: string) => {
-    // In real app, this would open file picker and upload
     setUploadingFor(`${docType}-${applicationId}`);
-    setTimeout(() => setUploadingFor(null), 2000); // Simulate upload
+    setUploadModalOpen(true);
+  };
+
+  const refreshLatestDocuments = async () => {
+    if (!latestApplicationId) return;
+    const docs = await listUserApplicationDocuments(latestApplicationId);
+    const mapped = docs.map(mapUserDocument);
+    setLatestDocumentsState(mapped);
+  };
+
+  const [latestDocumentsState, setLatestDocumentsState] = useState<UserDocumentView[]>(latestDocuments);
+
+  useEffect(() => {
+    setLatestDocumentsState(latestDocuments);
+  }, [latestDocuments]);
+
+  const handleUploadDocuments = async () => {
+    if (!latestApplicationId) {
+      setUploadError('No application found. Submit an application first.');
+      return;
+    }
+
+    if (!uploadFrontFile && !uploadBackFile) {
+      setUploadError('Please select at least one file.');
+      return;
+    }
+
+    setUploadingDocuments(true);
+    setUploadError(null);
+
+    try {
+      const uploadedBlobNames: string[] = [];
+      const uploads: Array<Promise<void>> = [];
+
+      if (uploadFrontFile) {
+        uploads.push(
+          uploadApplicationDocument(latestApplicationId, uploadFrontFile, 'IdDocument', 'Front')
+            .then((res) => {
+              uploadedBlobNames.push(res.blobName);
+            }),
+        );
+      }
+      if (uploadBackFile) {
+        uploads.push(
+          uploadApplicationDocument(latestApplicationId, uploadBackFile, 'IdDocument', 'Back')
+            .then((res) => {
+              uploadedBlobNames.push(res.blobName);
+            }),
+        );
+      }
+
+      await Promise.all(uploads);
+
+      if (typeof window !== 'undefined' && profile.id) {
+        const key = `loanhub_user_documents_${profile.id}`;
+        const payload = {
+          applicationId: latestApplicationId,
+          uploadedAt: new Date().toISOString(),
+          blobNames: uploadedBlobNames,
+        };
+        window.localStorage.setItem(key, JSON.stringify(payload));
+      }
+
+      await refreshLatestDocuments();
+
+      setUploadModalOpen(false);
+      setUploadFrontFile(null);
+      setUploadBackFile(null);
+      setUploadingFor(null);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unable to upload documents.';
+      setUploadError(message);
+    } finally {
+      setUploadingDocuments(false);
+    }
   };
 
   return (
@@ -1281,7 +1360,9 @@ function DocumentsSection({
         ) : (
           <div className="no-id">
             <p>No ID document on file. Upload your ID to verify your identity.</p>
-            <button className="btn btn-primary">Upload ID Document</button>
+            <button className="btn btn-primary" onClick={() => setUploadModalOpen(true)}>
+              Upload ID Document
+            </button>
           </div>
         )}
       </div>
@@ -1326,7 +1407,7 @@ function DocumentsSection({
           <div className="empty-state small">
             <p>{documentsError}</p>
           </div>
-        ) : latestDocuments.length === 0 ? (
+        ) : latestDocumentsState.length === 0 ? (
           <div className="empty-state small">
             <p>No documents submitted for the latest application.</p>
           </div>
@@ -1342,7 +1423,7 @@ function DocumentsSection({
               </tr>
             </thead>
             <tbody>
-              {latestDocuments.map(doc => (
+              {latestDocumentsState.map(doc => (
                 <tr key={doc.id}>
                   <td>
                     <div className="doc-cell">
@@ -1386,6 +1467,13 @@ function DocumentsSection({
                     >
                       👁️
                     </button>
+                    <button
+                      className="btn-icon"
+                      title="Replace"
+                      onClick={() => setUploadModalOpen(true)}
+                    >
+                      🔄
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -1393,6 +1481,36 @@ function DocumentsSection({
           </table>
         )}
       </div>
+
+      {uploadModalOpen && (
+        <div className="upload-overlay" onClick={() => setUploadModalOpen(false)}>
+          <div className="upload-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="upload-header">
+              <h3>Upload ID Documents</h3>
+              <button className="upload-close" onClick={() => setUploadModalOpen(false)}>×</button>
+            </div>
+            <div className="upload-body">
+              <div className="upload-field">
+                <label>Front Side</label>
+                <input type="file" accept="image/*,.pdf" onChange={(e) => setUploadFrontFile(e.target.files?.[0] ?? null)} />
+              </div>
+              <div className="upload-field">
+                <label>Back Side</label>
+                <input type="file" accept="image/*,.pdf" onChange={(e) => setUploadBackFile(e.target.files?.[0] ?? null)} />
+              </div>
+              {uploadError && <div className="upload-error">{uploadError}</div>}
+            </div>
+            <div className="upload-actions">
+              <button className="btn btn-secondary" onClick={() => setUploadModalOpen(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleUploadDocuments} disabled={uploadingDocuments}>
+                {uploadingDocuments ? 'Uploading...' : 'Upload'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {previewDoc && (
         <UserDocumentPreviewModal
