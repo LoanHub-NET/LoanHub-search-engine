@@ -1,5 +1,7 @@
 namespace LoanHub.Search.Core.Models.Users;
 
+using LoanHub.Search.Core.Models.Banks;
+
 public sealed class UserAccount
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -23,4 +25,5 @@ public sealed class UserAccount
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     public ICollection<ExternalIdentity> ExternalIdentities { get; set; } = new List<ExternalIdentity>();
+    public ICollection<BankAdmin> BankAdmins { get; set; } = new List<BankAdmin>();
 }

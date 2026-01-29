@@ -239,6 +239,12 @@ function OverviewTab({ application, slaInfo }: { application: LoanApplication; s
       <section className="detail-section">
         <h3>📊 Application Summary</h3>
         <div className="detail-grid">
+          {application.assignedAdminId && (
+            <div className="detail-item">
+              <span className="detail-label">Assigned Admin</span>
+              <span className="detail-value">{application.assignedAdminId}</span>
+            </div>
+          )}
           <div className="detail-item">
             <span className="detail-label">Submitted</span>
             <span className="detail-value">{formatDate(application.createdAt)}</span>

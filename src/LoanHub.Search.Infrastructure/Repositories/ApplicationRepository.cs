@@ -14,6 +14,19 @@ public sealed class ApplicationRepository : IApplicationRepository
 
     public async Task<LoanApplication> AddAsync(LoanApplication application, CancellationToken ct)
     {
+        if (!application.BankId.HasValue && !string.IsNullOrWhiteSpace(application.OfferSnapshot?.Provider))
+        {
+            var provider = application.OfferSnapshot.Provider.Trim();
+            if (!string.IsNullOrWhiteSpace(provider))
+            {
+                var bank = await _dbContext.Banks
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(current => EF.Functions.ILike(current.Name, provider), ct);
+                if (bank is not null)
+                    application.BankId = bank.Id;
+            }
+        }
+
         _dbContext.Applications.Add(application);
         await _dbContext.SaveChangesAsync(ct);
         return application;

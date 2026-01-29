@@ -96,6 +96,7 @@ const mapAdminApplication = (application: AdminApplicationResponse): LoanApplica
   return {
     id: application.id,
     referenceNumber: buildReference(application.id),
+    assignedAdminId: application.assignedAdminId ?? undefined,
     applicant: {
       userId: application.userId ?? undefined,
       email: application.applicantEmail,

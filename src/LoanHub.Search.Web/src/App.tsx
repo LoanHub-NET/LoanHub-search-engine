@@ -16,12 +16,13 @@ import {
   AdminDashboardPage,
   UserDashboardPage,
 } from './pages';
-import { ProtectedRoute } from './components';
+import { ProtectedRoute, RedirectToLandingOnReload } from './components';
 import './App.css';
 
 function App() {
   return (
     <BrowserRouter>
+      <RedirectToLandingOnReload />
       <div className="app">
         <Routes>
           {/* Public routes */}

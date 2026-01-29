@@ -215,6 +215,8 @@ export function UserDashboardPage() {
         return {
         id: app.id,
         referenceNumber: app.id,
+        assignedAdminId: app.assignedAdminId ?? undefined,
+        assignedAdmin: app.assignedAdmin ?? undefined,
         provider: {
           id: app.offerSnapshot.provider,
           name: app.offerSnapshot.provider,
@@ -817,6 +819,26 @@ function ApplicationDetails({ application, onClose, onResign, onContinue }: Appl
                   </span>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {application.assignedAdmin && (
+          <div className="details-section">
+            <h4>Assigned Advisor</h4>
+            <div className="offer-summary">
+              <div className="summary-row">
+                <span>Name</span>
+                <span>{application.assignedAdmin.displayName}</span>
+              </div>
+              <div className="summary-row">
+                <span>Email</span>
+                <span>{application.assignedAdmin.email}</span>
+              </div>
+              <div className="summary-row">
+                <span>Admin ID</span>
+                <span>{application.assignedAdmin.id}</span>
+              </div>
             </div>
           </div>
         )}

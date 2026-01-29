@@ -12,6 +12,14 @@ services:
       SendGrid__ApiKey: ${SENDGRID_API_KEY:-}
       SendGrid__FromEmail: ${SENDGRID_FROM_EMAIL:-}
       SendGrid__FromName: ${SENDGRID_FROM_NAME:-LoanHub}
+      GoogleOAuth__ClientId: ${CLIENT_ID:-}
+      GoogleOAuth__ClientSecret: ${CLIENT_SECRET:-}
+      GoogleOAuth__RedirectUri: ${GOOGLE_REDIRECT_URI:-http://localhost:5173/login}
+      Oidc__Audience: ${CLIENT_ID:-}
+      Oidc__Authority: https://accounts.google.com
+      Oidc__Provider: google
+      Oidc__ValidIssuers__0: https://accounts.google.com
+      Oidc__ValidIssuers__1: accounts.google.com
       # Azure Blob Storage for documents and contracts
       ContractStorage__ConnectionString: ${AZURE_STORAGE_CONNECTION_STRING:-}
       DocumentStorage__ConnectionString: ${AZURE_STORAGE_CONNECTION_STRING:-}

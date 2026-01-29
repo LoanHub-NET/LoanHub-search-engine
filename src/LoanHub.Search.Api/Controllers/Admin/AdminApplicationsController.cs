@@ -1,7 +1,9 @@
 using LoanHub.Search.Core.Models.Applications;
 using LoanHub.Search.Core.Services.Applications;
+using LoanHub.Search.Core.Services.Users;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace LoanHub.Search.Api.Controllers.Admin;
 
@@ -11,8 +13,13 @@ namespace LoanHub.Search.Api.Controllers.Admin;
 public sealed class AdminApplicationsController : ControllerBase
 {
     private readonly ApplicationService _service;
+    private readonly UserService _userService;
 
-    public AdminApplicationsController(ApplicationService service) => _service = service;
+    public AdminApplicationsController(ApplicationService service, UserService userService)
+    {
+        _service = service;
+        _userService = userService;
+    }
 
     [HttpGet]
     public async Task<ActionResult<PagedResponse<ApplicationsController.ApplicationResponse>>> List(
@@ -39,8 +46,11 @@ public sealed class AdminApplicationsController : ControllerBase
             pageSize);
 
         var applications = await _service.ListAdminAsync(query, ct);
+        var adminSummaries = await LoadAssignedAdminsAsync(applications.Items, ct);
         var responses = applications.Items
-            .Select(ApplicationsController.ApplicationResponse.From)
+            .Select(application => ApplicationsController.ApplicationResponse.From(
+                application,
+                TryGetAdminSummary(application, adminSummaries)))
             .ToList();
 
         return Ok(new PagedResponse<ApplicationsController.ApplicationResponse>(
@@ -58,57 +68,63 @@ public sealed class AdminApplicationsController : ControllerBase
         if (application is null)
             return NotFound();
 
-        return Ok(ApplicationsController.ApplicationResponse.From(application));
+        var adminSummary = await GetAssignedAdminSummaryAsync(application.AssignedAdminId, ct);
+        return Ok(ApplicationsController.ApplicationResponse.From(application, adminSummary));
     }
 
     [HttpPost("{id:guid}/accept")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> Accept(Guid id, CancellationToken ct)
     {
-        var application = await _service.AcceptAsync(id, ct);
+        var application = await _service.AcceptAsync(id, GetAdminId(), ct);
         if (application is null)
             return NotFound();
 
-        return Ok(ApplicationsController.ApplicationResponse.From(application));
+        var adminSummary = await GetAssignedAdminSummaryAsync(application.AssignedAdminId, ct);
+        return Ok(ApplicationsController.ApplicationResponse.From(application, adminSummary));
     }
 
     [HttpPost("{id:guid}/preliminary-accept")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> PreliminarilyAccept(Guid id, CancellationToken ct)
     {
-        var application = await _service.PreliminarilyAcceptAsync(id, ct);
+        var application = await _service.PreliminarilyAcceptAsync(id, GetAdminId(), ct);
         if (application is null)
             return NotFound();
 
-        return Ok(ApplicationsController.ApplicationResponse.From(application));
+        var adminSummary = await GetAssignedAdminSummaryAsync(application.AssignedAdminId, ct);
+        return Ok(ApplicationsController.ApplicationResponse.From(application, adminSummary));
     }
 
     [HttpPost("{id:guid}/grant")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> Grant(Guid id, CancellationToken ct)
     {
-        var application = await _service.GrantAsync(id, ct);
+        var application = await _service.GrantAsync(id, GetAdminId(), ct);
         if (application is null)
             return NotFound();
 
-        return Ok(ApplicationsController.ApplicationResponse.From(application));
+        var adminSummary = await GetAssignedAdminSummaryAsync(application.AssignedAdminId, ct);
+        return Ok(ApplicationsController.ApplicationResponse.From(application, adminSummary));
     }
 
     [HttpPost("{id:guid}/contract-ready")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> ContractReady(Guid id, CancellationToken ct)
     {
-        var application = await _service.MarkContractReadyAsync(id, ct);
+        var application = await _service.MarkContractReadyAsync(id, GetAdminId(), ct);
         if (application is null)
             return NotFound();
 
-        return Ok(ApplicationsController.ApplicationResponse.From(application));
+        var adminSummary = await GetAssignedAdminSummaryAsync(application.AssignedAdminId, ct);
+        return Ok(ApplicationsController.ApplicationResponse.From(application, adminSummary));
     }
 
     [HttpPost("{id:guid}/final-approve")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> FinalApprove(Guid id, CancellationToken ct)
     {
-        var application = await _service.FinalApproveAsync(id, ct);
+        var application = await _service.FinalApproveAsync(id, GetAdminId(), ct);
         if (application is null)
             return NotFound();
 
-        return Ok(ApplicationsController.ApplicationResponse.From(application));
+        var adminSummary = await GetAssignedAdminSummaryAsync(application.AssignedAdminId, ct);
+        return Ok(ApplicationsController.ApplicationResponse.From(application, adminSummary));
     }
 
     [HttpPost("{id:guid}/reject")]
@@ -117,11 +133,12 @@ public sealed class AdminApplicationsController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Reason))
             return BadRequest("Reason is required.");
 
-        var application = await _service.RejectAsync(id, request.Reason, ct);
+        var application = await _service.RejectAsync(id, request.Reason, GetAdminId(), ct);
         if (application is null)
             return NotFound();
 
-        return Ok(ApplicationsController.ApplicationResponse.From(application));
+        var adminSummary = await GetAssignedAdminSummaryAsync(application.AssignedAdminId, ct);
+        return Ok(ApplicationsController.ApplicationResponse.From(application, adminSummary));
     }
 
     public sealed record RejectRequest(string Reason);
@@ -132,4 +149,51 @@ public sealed class AdminApplicationsController : ControllerBase
         int PageSize,
         int TotalCount,
         int TotalPages);
+
+    private Guid? GetAdminId()
+    {
+        var subject = User.FindFirstValue("sub")
+                      ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(subject, out var userId) ? userId : null;
+    }
+
+    private async Task<ApplicationsController.AssignedAdminSummary?> GetAssignedAdminSummaryAsync(
+        Guid? adminId,
+        CancellationToken ct)
+    {
+        if (!adminId.HasValue)
+            return null;
+
+        var admin = await _userService.GetAsync(adminId.Value, ct);
+        return admin is null ? null : ApplicationsController.AssignedAdminSummary.From(admin);
+    }
+
+    private async Task<IReadOnlyDictionary<Guid, ApplicationsController.AssignedAdminSummary>> LoadAssignedAdminsAsync(
+        IEnumerable<LoanApplication> applications,
+        CancellationToken ct)
+    {
+        var adminIds = applications
+            .Where(application => application.AssignedAdminId.HasValue)
+            .Select(application => application.AssignedAdminId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (adminIds.Count == 0)
+            return new Dictionary<Guid, ApplicationsController.AssignedAdminSummary>();
+
+        var admins = await _userService.GetByIdsAsync(adminIds, ct);
+        return admins.ToDictionary(admin => admin.Id, ApplicationsController.AssignedAdminSummary.From);
+    }
+
+    private static ApplicationsController.AssignedAdminSummary? TryGetAdminSummary(
+        LoanApplication application,
+        IReadOnlyDictionary<Guid, ApplicationsController.AssignedAdminSummary> summaries)
+    {
+        if (!application.AssignedAdminId.HasValue)
+            return null;
+
+        return summaries.TryGetValue(application.AssignedAdminId.Value, out var summary)
+            ? summary
+            : null;
+    }
 }

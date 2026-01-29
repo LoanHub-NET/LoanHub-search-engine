@@ -1,10 +1,12 @@
 using LoanHub.Search.Core.Abstractions;
 using LoanHub.Search.Core.Abstractions.Applications;
+using LoanHub.Search.Core.Abstractions.Banks;
 using LoanHub.Search.Core.Abstractions.Notifications;
 using LoanHub.Search.Core.Abstractions.Selections;
 using LoanHub.Search.Core.Abstractions.Users;
 using LoanHub.Search.Core.Models;
 using LoanHub.Search.Core.Models.Applications;
+using LoanHub.Search.Core.Models.Banks;
 using LoanHub.Search.Core.Models.Notifications;
 using LoanHub.Search.Core.Models.Pagination;
 using LoanHub.Search.Core.Models.Selections;
@@ -88,6 +90,15 @@ internal sealed class InMemoryUserRepository : IUserRepository
         return Task.FromResult(user);
     }
 
+    public Task<IReadOnlyList<UserAccount>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct)
+    {
+        var idSet = new HashSet<Guid>(ids);
+        IReadOnlyList<UserAccount> users = _users.Values
+            .Where(user => idSet.Contains(user.Id))
+            .ToList();
+        return Task.FromResult(users);
+    }
+
     public Task<UserAccount> AddAsync(UserAccount user, CancellationToken ct)
     {
         _users[user.Id] = user;
@@ -96,6 +107,29 @@ internal sealed class InMemoryUserRepository : IUserRepository
 
     public Task<UserAccount?> UpdateAsync(UserAccount user, CancellationToken ct)
     {
+        _users[user.Id] = user;
+        return Task.FromResult<UserAccount?>(user);
+    }
+
+    public Task<UserAccount?> AddExternalIdentityAsync(Guid userId, string provider, string subject, CancellationToken ct)
+    {
+        if (!_users.TryGetValue(userId, out var user))
+            return Task.FromResult<UserAccount?>(null);
+
+        if (user.ExternalIdentities.Any(identity =>
+            identity.Provider.Equals(provider, StringComparison.OrdinalIgnoreCase) &&
+            identity.Subject.Equals(subject, StringComparison.OrdinalIgnoreCase)))
+        {
+            return Task.FromResult<UserAccount?>(user);
+        }
+
+        user.ExternalIdentities.Add(new ExternalIdentity
+        {
+            Provider = provider,
+            Subject = subject,
+            UserAccountId = user.Id
+        });
+
         _users[user.Id] = user;
         return Task.FromResult<UserAccount?>(user);
     }
@@ -113,6 +147,54 @@ internal sealed class InMemoryUserRepository : IUserRepository
             identity.Subject.Equals(subject, StringComparison.OrdinalIgnoreCase)));
         return Task.FromResult(exists);
     }
+}
+
+internal sealed class InMemoryBankRepository : IBankRepository
+{
+    private readonly Dictionary<Guid, Bank> _banks = new();
+    private readonly List<BankAdmin> _admins = new();
+
+    public Task<Bank?> GetByIdAsync(Guid id, CancellationToken ct)
+        => Task.FromResult(_banks.GetValueOrDefault(id));
+
+    public Task<Bank?> GetByNameAsync(string name, CancellationToken ct)
+    {
+        var bank = _banks.Values.FirstOrDefault(b =>
+            b.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(bank);
+    }
+
+    public Task<Bank?> GetByProviderNameAsync(string providerName, CancellationToken ct)
+        => GetByNameAsync(providerName, ct);
+
+    public Task<Bank> UpsertAsync(Bank bank, CancellationToken ct)
+    {
+        var existing = _banks.Values.FirstOrDefault(b =>
+            b.Name.Equals(bank.Name, StringComparison.OrdinalIgnoreCase));
+        if (existing is null)
+        {
+            _banks[bank.Id] = bank;
+            return Task.FromResult(bank);
+        }
+
+        existing.ApiBaseUrl = bank.ApiBaseUrl;
+        existing.ApiKey = bank.ApiKey;
+        return Task.FromResult(existing);
+    }
+
+    public Task<BankAdmin?> AddAdminAsync(Guid bankId, Guid userId, CancellationToken ct)
+    {
+        var existing = _admins.FirstOrDefault(a => a.BankId == bankId && a.UserAccountId == userId);
+        if (existing is not null)
+            return Task.FromResult<BankAdmin?>(existing);
+
+        var admin = new BankAdmin { BankId = bankId, UserAccountId = userId };
+        _admins.Add(admin);
+        return Task.FromResult<BankAdmin?>(admin);
+    }
+
+    public Task<bool> IsAdminAsync(Guid userId, CancellationToken ct)
+        => Task.FromResult(_admins.Any(admin => admin.UserAccountId == userId));
 }
 
 internal sealed class InMemoryApplicationRepository : IApplicationRepository
@@ -247,8 +329,14 @@ internal sealed class StaticProviderContactResolver : IProviderContactResolver
         _emails = emails;
     }
 
-    public string? GetContactEmail(string provider)
-        => _emails.TryGetValue(provider, out var email) ? email : null;
+    public string? GetContactEmail(LoanApplication application)
+    {
+        if (application is null)
+            return null;
+
+        var provider = application.OfferSnapshot.Provider;
+        return _emails.TryGetValue(provider, out var email) ? email : null;
+    }
 }
 
 internal sealed class CapturingRealtimeNotifier : IRealtimeNotifier

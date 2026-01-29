@@ -10,7 +10,8 @@ public sealed class UserServiceTests
     public async Task RegisterLocalAsync_ThrowsWhenEmailExists()
     {
         var repository = new InMemoryUserRepository();
-        var service = new UserService(repository);
+        var bankRepository = new InMemoryBankRepository();
+        var service = new UserService(repository, bankRepository);
         var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", null, null, null, null, null, "ABC123");
 
         await service.RegisterLocalAsync(
@@ -39,7 +40,8 @@ public sealed class UserServiceTests
     public async Task LoginAsync_ReturnsUserWhenPasswordMatches()
     {
         var repository = new InMemoryUserRepository();
-        var service = new UserService(repository);
+        var bankRepository = new InMemoryBankRepository();
+        var service = new UserService(repository, bankRepository);
         var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", null, null, null, null, null, "ABC123");
 
         var user = await service.RegisterLocalAsync(
@@ -62,7 +64,8 @@ public sealed class UserServiceTests
     public async Task RegisterExternalAsync_AddsIdentityToExistingUser()
     {
         var repository = new InMemoryUserRepository();
-        var service = new UserService(repository);
+        var bankRepository = new InMemoryBankRepository();
+        var service = new UserService(repository, bankRepository);
         var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", null, null, null, null, null, "ABC123");
 
         var user = await service.RegisterLocalAsync(
@@ -86,7 +89,8 @@ public sealed class UserServiceTests
     public async Task RegisterExternalAsync_ThrowsWhenIdentityAlreadyExists()
     {
         var repository = new InMemoryUserRepository();
-        var service = new UserService(repository);
+        var bankRepository = new InMemoryBankRepository();
+        var service = new UserService(repository, bankRepository);
         var profile = new UserService.UserProfile("Jane", "Doe", 30, "Engineer", "Main St", null, null, null, null, null, "ABC123");
 
         await service.RegisterExternalAsync("google", "sub-123", "jane@example.com", profile, CancellationToken.None);

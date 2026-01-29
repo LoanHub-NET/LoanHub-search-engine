@@ -25,6 +25,8 @@ export type UserStatusFilter = UserApplicationStatus | 'all';
 export interface UserApplication {
   id: string;
   referenceNumber: string;
+  assignedAdminId?: string;
+  assignedAdmin?: AssignedAdminSummary;
   
   // Offer details
   provider: {
@@ -56,6 +58,12 @@ export interface UserApplication {
   canResign: boolean;
   canContinue: boolean;
   nextStep?: string;
+}
+
+export interface AssignedAdminSummary {
+  id: string;
+  email: string;
+  displayName: string;
 }
 
 /**

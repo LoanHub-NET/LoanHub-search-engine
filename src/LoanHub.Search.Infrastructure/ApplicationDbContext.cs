@@ -3,6 +3,7 @@ namespace LoanHub.Search.Infrastructure;
 using LoanHub.Search.Core.Models.Applications;
 using LoanHub.Search.Core.Models.Selections;
 using LoanHub.Search.Core.Models.Users;
+using LoanHub.Search.Core.Models.Banks;
 using Microsoft.EntityFrameworkCore;
 
 public sealed class ApplicationDbContext : DbContext
@@ -16,6 +17,8 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<UserAccount> Users => Set<UserAccount>();
     public DbSet<ExternalIdentity> ExternalIdentities => Set<ExternalIdentity>();
     public DbSet<OfferSelection> OfferSelections => Set<OfferSelection>();
+    public DbSet<Bank> Banks => Set<Bank>();
+    public DbSet<BankAdmin> BankAdmins => Set<BankAdmin>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,6 +31,18 @@ public sealed class ApplicationDbContext : DbContext
                 .HasForeignKey(application => application.UserId)
                 .OnDelete(DeleteBehavior.SetNull);
             entity.HasIndex(application => application.UserId);
+
+            entity.HasOne<Bank>()
+                .WithMany()
+                .HasForeignKey(application => application.BankId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(application => application.BankId);
+
+            entity.HasOne<UserAccount>()
+                .WithMany()
+                .HasForeignKey(application => application.AssignedAdminId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(application => application.AssignedAdminId);
 
             entity.Property(application => application.Status)
                 .HasConversion<int>();
@@ -89,6 +104,29 @@ public sealed class ApplicationDbContext : DbContext
                 .WithOne(identity => identity.UserAccount)
                 .HasForeignKey(identity => identity.UserAccountId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(user => user.BankAdmins)
+                .WithOne(admin => admin.UserAccount)
+                .HasForeignKey(admin => admin.UserAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Bank>(entity =>
+        {
+            entity.HasKey(bank => bank.Id);
+            entity.Property(bank => bank.Name).HasMaxLength(200).IsRequired();
+            entity.Property(bank => bank.ApiBaseUrl).HasMaxLength(500).IsRequired();
+            entity.Property(bank => bank.ApiKey).HasMaxLength(500);
+            entity.HasIndex(bank => bank.Name).IsUnique();
+            entity.HasMany(bank => bank.Admins)
+                .WithOne(admin => admin.Bank)
+                .HasForeignKey(admin => admin.BankId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BankAdmin>(entity =>
+        {
+            entity.HasKey(admin => admin.Id);
+            entity.HasIndex(admin => new { admin.BankId, admin.UserAccountId }).IsUnique();
         });
 
         modelBuilder.Entity<ExternalIdentity>(entity =>

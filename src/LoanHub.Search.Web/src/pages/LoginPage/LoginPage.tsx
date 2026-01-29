@@ -2,7 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Header, Footer } from '../../components';
-import { loginUser, registerUser } from '../../api/userApi';
+import {
+  getGoogleOAuthConfig,
+  loginUser,
+  loginWithGoogleOAuthCode,
+  registerUser,
+} from '../../api/userApi';
 import { ApiError, clearPendingProfile, getPendingProfile } from '../../api/apiConfig';
 import type { UserProfile } from '../../types/dashboard.types';
 import './LoginPage.css';
@@ -22,6 +27,7 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [pendingProfile] = useState(getPendingProfile());
   const storedProfileKeyPrefix = 'loanhub_user_profile_';
+  const oauthStateKey = 'loanhub_google_oauth_state';
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -186,16 +192,43 @@ export function LoginPage() {
     setIsSubmitting(false);
   };
 
-  const handleOAuth = (provider: string) => {
+  const handleGoogleOAuth = async () => {
     setIsSubmitting(true);
     setMessage(null);
-    setTimeout(() => {
+    setError(null);
+
+    try {
+      const config = await getGoogleOAuthConfig();
+      const state = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(oauthStateKey, state);
+      }
+
+      const redirectUri =
+        config.redirectUri?.trim() || `${window.location.origin}/login`;
+
+      const params = new URLSearchParams({
+        client_id: config.clientId,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: config.scope,
+        state,
+        include_granted_scopes: 'true',
+        prompt: 'select_account',
+      });
+
+      const authUrl = `${config.authorizationEndpoint}?${params.toString()}`;
+      setMessage('Redirecting to Google...');
+      window.location.assign(authUrl);
+    } catch (err: unknown) {
+      const messageText =
+        err instanceof Error ? err.message : 'We could not start Google login.';
+      setError(messageText);
       setIsSubmitting(false);
-      setMessage(`OAuth login via ${provider} (mock). Redirecting...`);
-      setTimeout(() => {
-        navigate('/');
-      }, 900);
-    }, 900);
+    }
   };
 
   const handleChange =
@@ -240,6 +273,65 @@ export function LoginPage() {
       apiKey: prefill?.apiKey ?? mock.apiKey,
     }));
   }, [location.state, role, searchParams]);
+
+  useEffect(() => {
+    const oauthError = searchParams.get('error');
+    if (oauthError) {
+      const description = searchParams.get('error_description');
+      setError(description ? `${oauthError}: ${description}` : oauthError);
+      return;
+    }
+
+    const code = searchParams.get('code');
+    if (!code) return;
+
+    const returnedState = searchParams.get('state');
+    const expectedState =
+      typeof window !== 'undefined'
+        ? window.sessionStorage.getItem(oauthStateKey)
+        : null;
+
+    if (!expectedState || returnedState !== expectedState) {
+      setError('OAuth state mismatch. Please try again.');
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(oauthStateKey);
+    }
+
+    setMode('login');
+    setRole('user');
+    setIsSubmitting(true);
+    setMessage('Signing you in with Google...');
+    setError(null);
+
+    const redirectUri = `${window.location.origin}${window.location.pathname}`;
+
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete('code');
+    cleanUrl.searchParams.delete('state');
+    cleanUrl.searchParams.delete('scope');
+    cleanUrl.searchParams.delete('authuser');
+    cleanUrl.searchParams.delete('prompt');
+    window.history.replaceState({}, document.title, cleanUrl.toString());
+
+    loginWithGoogleOAuthCode({ code, redirectUri })
+      .then(() => {
+        setMessage('Login successful. Redirecting...');
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 900);
+      })
+      .catch((err: unknown) => {
+        const messageText =
+          err instanceof Error ? err.message : 'OAuth login failed.';
+        setError(messageText);
+      })
+      .finally(() => {
+        setIsSubmitting(false);
+      });
+  }, [navigate, searchParams]);
 
   return (
     <>
@@ -294,7 +386,7 @@ export function LoginPage() {
                   <button
                     type="button"
                     className="oauth-btn"
-                    onClick={() => handleOAuth('Google')}
+                    onClick={handleGoogleOAuth}
                     disabled={isSubmitting}
                   >
                     <span className="oauth-icon">
@@ -306,35 +398,6 @@ export function LoginPage() {
                       </svg>
                     </span>
                     Google
-                  </button>
-                  <button
-                    type="button"
-                    className="oauth-btn"
-                    onClick={() => handleOAuth('Microsoft')}
-                    disabled={isSubmitting}
-                  >
-                    <span className="oauth-icon">
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path fill="#F25022" d="M1 1h10v10H1z"/>
-                        <path fill="#7FBA00" d="M13 1h10v10H13z"/>
-                        <path fill="#00A4EF" d="M1 13h10v10H1z"/>
-                        <path fill="#FFB900" d="M13 13h10v10H13z"/>
-                      </svg>
-                    </span>
-                    Microsoft
-                  </button>
-                  <button
-                    type="button"
-                    className="oauth-btn"
-                    onClick={() => handleOAuth('Facebook')}
-                    disabled={isSubmitting}
-                  >
-                    <span className="oauth-icon">
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path fill="#1877F2" d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.43H7.08V12.1h3.05V9.43c0-3.03 1.8-4.7 4.55-4.7 1.32 0 2.7.23 2.7.23v2.98H16.1c-1.5 0-1.96.94-1.96 1.9v2.28h3.33l-.53 3.47h-2.8V24C19.61 23.1 24 18.1 24 12.07Z"/>
-                      </svg>
-                    </span>
-                    Facebook
                   </button>
                 </div>
               </div>
