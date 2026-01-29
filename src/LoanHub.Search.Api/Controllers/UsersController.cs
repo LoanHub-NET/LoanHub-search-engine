@@ -2,6 +2,7 @@ using LoanHub.Search.Core.Abstractions.Auth;
 using LoanHub.Search.Core.Models.Users;
 using LoanHub.Search.Core.Services.Users;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LoanHub.Search.Api.Controllers;
@@ -70,49 +71,14 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpPost("external/register")]
-    public async Task<ActionResult<AuthResponse>> RegisterExternal([FromBody] ExternalRegisterRequest request, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(request.Provider))
-            return BadRequest("Provider is required.");
-
-        if (string.IsNullOrWhiteSpace(request.Subject))
-            return BadRequest("Subject is required.");
-
-        if (string.IsNullOrWhiteSpace(request.Email))
-            return BadRequest("Email is required.");
-
-        try
-        {
-            var created = await _service.RegisterExternalAsync(
-                request.Provider,
-                request.Subject,
-                request.Email,
-                request.Profile,
-                ct);
-
-            return Ok(AuthResponse.From(created, _tokenService.CreateToken(created)));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(ex.Message);
-        }
-    }
+    public ActionResult<AuthResponse> RegisterExternal([FromBody] ExternalRegisterRequest request)
+        => StatusCode(StatusCodes.Status410Gone,
+            "Direct external registration is disabled. Use the OAuth login endpoint.");
 
     [HttpPost("external/login")]
-    public async Task<ActionResult<AuthResponse>> LoginExternal([FromBody] ExternalLoginRequest request, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(request.Provider))
-            return BadRequest("Provider is required.");
-
-        if (string.IsNullOrWhiteSpace(request.Subject))
-            return BadRequest("Subject is required.");
-
-        var user = await _service.LoginExternalAsync(request.Provider, request.Subject, ct);
-        if (user is null)
-            return Unauthorized();
-
-        return Ok(AuthResponse.From(user, _tokenService.CreateToken(user)));
-    }
+    public ActionResult<AuthResponse> LoginExternal([FromBody] ExternalLoginRequest request)
+        => StatusCode(StatusCodes.Status410Gone,
+            "Direct external login is disabled. Use the OAuth login endpoint.");
 
     [HttpPost("external/oidc/login")]
     public async Task<ActionResult<AuthResponse>> LoginOidc([FromBody] OidcLoginRequest request, CancellationToken ct)

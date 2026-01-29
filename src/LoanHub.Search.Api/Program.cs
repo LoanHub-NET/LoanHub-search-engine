@@ -1,5 +1,6 @@
 using LoanHub.Search.Core.Abstractions;
 using LoanHub.Search.Core.Abstractions.Applications;
+using LoanHub.Search.Core.Abstractions.Banks;
 using LoanHub.Search.Core.Abstractions.Auth;
 using LoanHub.Search.Core.Abstractions.Notifications;
 using LoanHub.Search.Core.Abstractions.Selections;
@@ -32,6 +33,12 @@ using System.IO;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Processing;
+
+LoadEnvironmentFileIfPresent(".env", onlyIfMissing: true);
+if (IsDevelopmentEnvironment())
+{
+    LoadEnvironmentFileIfPresent(".env.example", onlyIfMissing: true);
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -190,6 +197,7 @@ else
 builder.Services.AddScoped<IOfferSelectionRepository, OfferSelectionRepository>();
 builder.Services.AddScoped<OfferSelectionService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IBankRepository, BankRepository>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<IExternalTokenValidator, OidcTokenValidator>();
 builder.Services.AddScoped<IGoogleOAuthService, GoogleOAuthService>();
@@ -328,6 +336,8 @@ static async Task InitializeDatabaseAsync(WebApplication app)
             await dbContext.Database.ExecuteSqlRawAsync("""
                 ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "RejectReason" text;
                 ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "UserId" uuid;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "BankId" uuid;
+                ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "AssignedAdminId" uuid;
                 ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Provider" varchar(120);
                 ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_ProviderOfferId" varchar(120);
                 ALTER TABLE "Applications" ADD COLUMN IF NOT EXISTS "OfferSnapshot_Installment" numeric;
@@ -364,7 +374,33 @@ static async Task InitializeDatabaseAsync(WebApplication app)
                 ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "BankApiKey" varchar(500);
                 """, CancellationToken.None);
 
+            await dbContext.Database.ExecuteSqlRawAsync("""
+                CREATE TABLE IF NOT EXISTS "Banks" (
+                    "Id" uuid NOT NULL,
+                    "Name" varchar(200) NOT NULL,
+                    "ApiBaseUrl" varchar(500) NOT NULL,
+                    "ApiKey" varchar(500),
+                    "CreatedByUserId" uuid,
+                    "CreatedAt" timestamptz NOT NULL,
+                    "UpdatedAt" timestamptz NOT NULL,
+                    CONSTRAINT "PK_Banks" PRIMARY KEY ("Id")
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_Banks_Name" ON "Banks" ("Name");
+                """, CancellationToken.None);
+
+            await dbContext.Database.ExecuteSqlRawAsync("""
+                CREATE TABLE IF NOT EXISTS "BankAdmins" (
+                    "Id" uuid NOT NULL,
+                    "BankId" uuid NOT NULL,
+                    "UserAccountId" uuid NOT NULL,
+                    "AssignedAt" timestamptz NOT NULL,
+                    CONSTRAINT "PK_BankAdmins" PRIMARY KEY ("Id")
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_BankAdmins_BankId_UserAccountId" ON "BankAdmins" ("BankId", "UserAccountId");
+                """, CancellationToken.None);
+
             app.Logger.LogInformation("Database initialized.");
+            await BackfillBanksAsync(dbContext, CancellationToken.None);
             return;
         }
         catch (Exception ex) when (attempt < maxAttempts)
@@ -378,4 +414,167 @@ static async Task InitializeDatabaseAsync(WebApplication app)
             await Task.Delay(retryDelay);
         }
     }
+}
+
+static async Task BackfillBanksAsync(ApplicationDbContext dbContext, CancellationToken ct)
+{
+    var legacyAdmins = await dbContext.Users
+        .AsNoTracking()
+        .Where(user => user.Role == UserRole.Admin &&
+            user.BankName != null &&
+            user.BankApiEndpoint != null)
+        .Select(user => new
+        {
+            user.Id,
+            user.BankName,
+            user.BankApiEndpoint,
+            user.BankApiKey
+        })
+        .ToListAsync(ct);
+
+    foreach (var admin in legacyAdmins)
+    {
+        var bankName = admin.BankName?.Trim();
+        if (string.IsNullOrWhiteSpace(bankName))
+            continue;
+
+        var baseUrl = BankApiDescriptorParser.ExtractBaseUrl(admin.BankApiEndpoint);
+        if (string.IsNullOrWhiteSpace(baseUrl))
+            continue;
+
+        var apiKey = BankApiDescriptorParser.NormalizeApiKey(
+            BankApiDescriptorParser.ExtractApiKey(admin.BankApiKey));
+
+        var bank = await dbContext.Banks
+            .FirstOrDefaultAsync(current => EF.Functions.ILike(current.Name, bankName), ct);
+
+        if (bank is null)
+        {
+            bank = new LoanHub.Search.Core.Models.Banks.Bank
+            {
+                Name = bankName,
+                ApiBaseUrl = baseUrl,
+                ApiKey = apiKey,
+                CreatedByUserId = admin.Id,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            dbContext.Banks.Add(bank);
+            await dbContext.SaveChangesAsync(ct);
+        }
+        else
+        {
+            var updated = false;
+            if (string.IsNullOrWhiteSpace(bank.ApiBaseUrl) && !string.IsNullOrWhiteSpace(baseUrl))
+            {
+                bank.ApiBaseUrl = baseUrl;
+                updated = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(bank.ApiKey) && !string.IsNullOrWhiteSpace(apiKey))
+            {
+                bank.ApiKey = apiKey;
+                updated = true;
+            }
+
+            if (updated)
+            {
+                bank.UpdatedAt = DateTimeOffset.UtcNow;
+                await dbContext.SaveChangesAsync(ct);
+            }
+        }
+
+        var adminExists = await dbContext.BankAdmins
+            .AnyAsync(current => current.BankId == bank.Id && current.UserAccountId == admin.Id, ct);
+        if (!adminExists)
+        {
+            dbContext.BankAdmins.Add(new LoanHub.Search.Core.Models.Banks.BankAdmin
+            {
+                BankId = bank.Id,
+                UserAccountId = admin.Id,
+                AssignedAt = DateTimeOffset.UtcNow
+            });
+            await dbContext.SaveChangesAsync(ct);
+        }
+    }
+
+    var bankLookup = await dbContext.Banks
+        .AsNoTracking()
+        .Select(bank => new { bank.Id, bank.Name })
+        .ToListAsync(ct);
+
+    var applications = await dbContext.Applications
+        .Where(app => app.BankId == null)
+        .ToListAsync(ct);
+
+    foreach (var application in applications)
+    {
+        if (string.IsNullOrWhiteSpace(application.OfferSnapshot.Provider))
+            continue;
+
+        var match = bankLookup.FirstOrDefault(bank =>
+            bank.Name.Equals(application.OfferSnapshot.Provider, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+            continue;
+
+        application.BankId = match.Id;
+        application.UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    if (applications.Count > 0)
+        await dbContext.SaveChangesAsync(ct);
+}
+
+static bool IsDevelopmentEnvironment()
+{
+    var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+    return string.Equals(environment, "Development", StringComparison.OrdinalIgnoreCase);
+}
+
+static void LoadEnvironmentFileIfPresent(string fileName, bool onlyIfMissing)
+{
+    var path = FindEnvFile(fileName);
+    if (string.IsNullOrWhiteSpace(path))
+        return;
+
+    foreach (var rawLine in File.ReadAllLines(path))
+    {
+        var line = rawLine.Trim();
+        if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
+            continue;
+
+        var separatorIndex = line.IndexOf('=');
+        if (separatorIndex <= 0)
+            continue;
+
+        var key = line[..separatorIndex].Trim();
+        if (string.IsNullOrWhiteSpace(key))
+            continue;
+
+        if (onlyIfMissing && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(key)))
+            continue;
+
+        var value = line[(separatorIndex + 1)..].Trim();
+        if (value.Length >= 2 && ((value.StartsWith('"') && value.EndsWith('"')) || (value.StartsWith('\'') && value.EndsWith('\''))))
+        {
+            value = value[1..^1];
+        }
+
+        Environment.SetEnvironmentVariable(key, value);
+    }
+}
+
+static string? FindEnvFile(string fileName)
+{
+    var current = new DirectoryInfo(Directory.GetCurrentDirectory());
+    while (current is not null)
+    {
+        var candidate = Path.Combine(current.FullName, fileName);
+        if (File.Exists(candidate))
+            return candidate;
+
+        current = current.Parent;
+    }
+
+    return null;
 }

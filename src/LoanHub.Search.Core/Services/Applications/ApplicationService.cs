@@ -41,7 +41,9 @@ public sealed class ApplicationService
         _providerContactResolver = providerContactResolver;
         _realtimeNotifier = realtimeNotifier;
         _brandingOptions = brandingOptions.Value ?? new EmailBrandingOptions();
-        _logoInlineAttachment = BuildLogoInlineAttachment(_brandingOptions);
+        _logoInlineAttachment = _brandingOptions.DisableInlineLogo
+            ? null
+            : BuildLogoInlineAttachment(_brandingOptions);
     }
 
     public async Task<LoanApplication> CreateAsync(LoanApplication application, CancellationToken ct)
@@ -117,48 +119,52 @@ public sealed class ApplicationService
         };
     }
 
-    public async Task<LoanApplication?> PreliminarilyAcceptAsync(Guid id, CancellationToken ct)
+    public async Task<LoanApplication?> PreliminarilyAcceptAsync(Guid id, Guid? adminId, CancellationToken ct)
     {
         var application = await _repo.GetAsync(id, ct);
         if (application is null)
             return null;
 
+        AssignAdminIfMissing(application, adminId);
         application.AddStatus(ApplicationStatus.PreliminarilyAccepted, null);
         var updated = await _repo.UpdateAsync(application, ct) ?? application;
         await NotifyStatusAsync(updated, "Wstępnie zaakceptowany", ct);
         return updated;
     }
 
-    public async Task<LoanApplication?> AcceptAsync(Guid id, CancellationToken ct)
+    public async Task<LoanApplication?> AcceptAsync(Guid id, Guid? adminId, CancellationToken ct)
     {
         var application = await _repo.GetAsync(id, ct);
         if (application is null)
             return null;
 
+        AssignAdminIfMissing(application, adminId);
         application.AddStatus(ApplicationStatus.Accepted, null);
         var updated = await _repo.UpdateAsync(application, ct) ?? application;
         await NotifyStatusAsync(updated, "Zaakceptowany", ct);
         return updated;
     }
 
-    public async Task<LoanApplication?> GrantAsync(Guid id, CancellationToken ct)
+    public async Task<LoanApplication?> GrantAsync(Guid id, Guid? adminId, CancellationToken ct)
     {
         var application = await _repo.GetAsync(id, ct);
         if (application is null)
             return null;
 
+        AssignAdminIfMissing(application, adminId);
         application.AddStatus(ApplicationStatus.Granted, null);
         var updated = await _repo.UpdateAsync(application, ct) ?? application;
         await NotifyStatusAsync(updated, "Przyznany", ct);
         return updated;
     }
 
-    public async Task<LoanApplication?> MarkContractReadyAsync(Guid id, CancellationToken ct)
+    public async Task<LoanApplication?> MarkContractReadyAsync(Guid id, Guid? adminId, CancellationToken ct)
     {
         var application = await _repo.GetAsync(id, ct);
         if (application is null)
             return null;
 
+        AssignAdminIfMissing(application, adminId);
         application.ContractReadyAt = DateTimeOffset.UtcNow;
         application.AddStatus(ApplicationStatus.ContractReady, null);
         var updated = await _repo.UpdateAsync(application, ct) ?? application;
@@ -194,12 +200,13 @@ public sealed class ApplicationService
         return updated;
     }
 
-    public async Task<LoanApplication?> FinalApproveAsync(Guid id, CancellationToken ct)
+    public async Task<LoanApplication?> FinalApproveAsync(Guid id, Guid? adminId, CancellationToken ct)
     {
         var application = await _repo.GetAsync(id, ct);
         if (application is null)
             return null;
 
+        AssignAdminIfMissing(application, adminId);
         application.FinalApprovedAt = DateTimeOffset.UtcNow;
         application.AddStatus(ApplicationStatus.FinalApproved, null);
         var updated = await _repo.UpdateAsync(application, ct) ?? application;
@@ -207,12 +214,13 @@ public sealed class ApplicationService
         return updated;
     }
 
-    public async Task<LoanApplication?> RejectAsync(Guid id, string reason, CancellationToken ct)
+    public async Task<LoanApplication?> RejectAsync(Guid id, string reason, Guid? adminId, CancellationToken ct)
     {
         var application = await _repo.GetAsync(id, ct);
         if (application is null)
             return null;
 
+        AssignAdminIfMissing(application, adminId);
         application.AddStatus(ApplicationStatus.Rejected, reason);
         var updated = await _repo.UpdateAsync(application, ct) ?? application;
         await NotifyStatusAsync(updated, $"Odrzucony ({reason})", ct);
@@ -282,7 +290,10 @@ public sealed class ApplicationService
         var htmlProvider = _emailTemplateRenderer.Render(ApplicationEmailTemplates.SubmittedHtmlProvider, tokens);
 
         await SendToApplicantAsync(application, subjectApplicant, bodyApplicant, htmlApplicant, null, ct);
-        await SendToProviderAsync(application, subjectProvider, bodyProvider, htmlProvider, null, ct);
+        if (ShouldNotifyProvider(application))
+        {
+            await SendToProviderAsync(application, subjectProvider, bodyProvider, htmlProvider, null, ct);
+        }
     }
 
     private async Task NotifyStatusAsync(LoanApplication application, string statusLabel, CancellationToken ct)
@@ -307,12 +318,18 @@ public sealed class ApplicationService
                 ["ContractLink"] = _contractLinkGenerator.GetContractLink(application.Id)
             };
             await NotifyPreliminaryAcceptedAsync(application, preliminaryTokens, ct);
-            await NotifyStatusForProviderAsync(application, tokens, ct);
+            if (ShouldNotifyProvider(application))
+            {
+                await NotifyStatusForProviderAsync(application, tokens, ct);
+            }
         }
         else
         {
             await NotifyStatusForApplicantAsync(application, tokens, ct);
-            await NotifyStatusForProviderAsync(application, tokens, ct);
+            if (ShouldNotifyProvider(application))
+            {
+                await NotifyStatusForProviderAsync(application, tokens, ct);
+            }
         }
 
         await _realtimeNotifier.NotifyApplicantAsync(
@@ -333,8 +350,14 @@ public sealed class ApplicationService
         IReadOnlyList<EmailAttachment>? attachments,
         CancellationToken ct)
     {
-        var mergedAttachments = MergeAttachments(attachments);
-        var message = new EmailMessage(application.ApplicantEmail, subject, body, htmlBody, mergedAttachments);
+        var useHtml = ShouldUseHtml(application.ApplicantEmail);
+        var mergedAttachments = MergeAttachments(attachments, useHtml);
+        var message = new EmailMessage(
+            application.ApplicantEmail,
+            subject,
+            body,
+            useHtml ? htmlBody : null,
+            mergedAttachments);
         return _emailSender.SendAsync(message, ct);
     }
 
@@ -346,12 +369,18 @@ public sealed class ApplicationService
         IReadOnlyList<EmailAttachment>? attachments,
         CancellationToken ct)
     {
-        var email = _providerContactResolver.GetContactEmail(application.OfferSnapshot.Provider);
+        var email = _providerContactResolver.GetContactEmail(application);
         if (string.IsNullOrWhiteSpace(email))
             return Task.CompletedTask;
 
-        var mergedAttachments = MergeAttachments(attachments);
-        var message = new EmailMessage(email, subject, body, htmlBody, mergedAttachments);
+        var useHtml = ShouldUseHtml(email);
+        var mergedAttachments = MergeAttachments(attachments, useHtml);
+        var message = new EmailMessage(
+            email,
+            subject,
+            body,
+            useHtml ? htmlBody : null,
+            mergedAttachments);
         return _emailSender.SendAsync(message, ct);
     }
 
@@ -377,6 +406,18 @@ public sealed class ApplicationService
         return SendToProviderAsync(application, subject, body, html, null, ct);
     }
 
+    private bool ShouldNotifyProvider(LoanApplication application)
+    {
+        var providerEmail = _providerContactResolver.GetContactEmail(application);
+        if (string.IsNullOrWhiteSpace(providerEmail))
+            return false;
+
+        if (string.IsNullOrWhiteSpace(application.ApplicantEmail))
+            return true;
+
+        return !string.Equals(providerEmail, application.ApplicantEmail, StringComparison.OrdinalIgnoreCase);
+    }
+
     private Task NotifyPreliminaryAcceptedAsync(
         LoanApplication application,
         IReadOnlyDictionary<string, string> tokens,
@@ -391,6 +432,18 @@ public sealed class ApplicationService
             new(contract.FileName, contract.ContentType, contract.Content)
         };
         return SendToApplicantAsync(application, subject, body, html, attachments, ct);
+    }
+
+    private static void AssignAdminIfMissing(LoanApplication application, Guid? adminId)
+    {
+        if (!adminId.HasValue)
+            return;
+
+        if (application.AssignedAdminId.HasValue)
+            return;
+
+        application.AssignedAdminId = adminId.Value;
+        application.UpdatedAt = DateTimeOffset.UtcNow;
     }
 
     private Dictionary<string, string> BuildTemplateTokens(LoanApplication application)
@@ -497,9 +550,11 @@ public sealed class ApplicationService
         }
     }
 
-    private IReadOnlyList<EmailAttachment>? MergeAttachments(IReadOnlyList<EmailAttachment>? attachments)
+    private IReadOnlyList<EmailAttachment>? MergeAttachments(
+        IReadOnlyList<EmailAttachment>? attachments,
+        bool includeInlineLogo)
     {
-        if (_logoInlineAttachment is null)
+        if (!includeInlineLogo || _logoInlineAttachment is null)
             return attachments;
 
         if (attachments is null || attachments.Count == 0)
@@ -508,6 +563,38 @@ public sealed class ApplicationService
         var merged = new List<EmailAttachment>(attachments.Count + 1) { _logoInlineAttachment };
         merged.AddRange(attachments);
         return merged;
+    }
+
+    private bool ShouldUseHtml(string? recipientEmail)
+    {
+        if (_brandingOptions.DisableHtml)
+            return false;
+
+        if (string.IsNullOrWhiteSpace(recipientEmail))
+            return true;
+
+        var atIndex = recipientEmail.LastIndexOf('@');
+        var domain = atIndex >= 0 ? recipientEmail[(atIndex + 1)..] : recipientEmail;
+        if (string.IsNullOrWhiteSpace(domain))
+            return true;
+
+        foreach (var candidate in _brandingOptions.PlainTextDomains)
+        {
+            if (string.IsNullOrWhiteSpace(candidate))
+                continue;
+
+            var normalized = candidate.Trim().TrimStart('@');
+            if (string.IsNullOrWhiteSpace(normalized))
+                continue;
+
+            if (domain.Equals(normalized, StringComparison.OrdinalIgnoreCase) ||
+                domain.EndsWith($".{normalized}", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static string BuildLinkBlock(string? url, string label, string accentColor)

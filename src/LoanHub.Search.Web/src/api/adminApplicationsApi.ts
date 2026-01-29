@@ -34,6 +34,8 @@ export interface AdminStatusHistoryEntry {
 export interface AdminApplicationResponse {
   id: string;
   userId?: string | null;
+  bankId?: string | null;
+  assignedAdminId?: string | null;
   applicantEmail: string;
   status: number | string;
   rejectReason?: string | null;

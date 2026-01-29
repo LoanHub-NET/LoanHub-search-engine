@@ -25,6 +25,7 @@ export type UserStatusFilter = UserApplicationStatus | 'all';
 export interface UserApplication {
   id: string;
   referenceNumber: string;
+  assignedAdminId?: string;
   
   // Offer details
   provider: {

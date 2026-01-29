@@ -1,15 +1,22 @@
 namespace LoanHub.Search.Core.Services.Users;
 
 using LoanHub.Search.Core.Abstractions.Users;
+using LoanHub.Search.Core.Abstractions.Banks;
+using LoanHub.Search.Core.Models.Banks;
 using LoanHub.Search.Core.Models.Users;
 using Microsoft.AspNetCore.Identity;
 
 public sealed class UserService
 {
     private readonly IUserRepository _repository;
+    private readonly IBankRepository _bankRepository;
     private readonly PasswordHasher<UserAccount> _hasher = new();
 
-    public UserService(IUserRepository repository) => _repository = repository;
+    public UserService(IUserRepository repository, IBankRepository bankRepository)
+    {
+        _repository = repository;
+        _bankRepository = bankRepository;
+    }
 
     public async Task<UserAccount> RegisterLocalAsync(
         string email,
@@ -48,13 +55,28 @@ public sealed class UserService
             LivingCosts = profile.LivingCosts,
             Dependents = profile.Dependents,
             IdDocumentNumber = profile.IdDocumentNumber,
-            BankName = role == UserRole.Admin ? bankName?.Trim() : null,
-            BankApiEndpoint = role == UserRole.Admin ? bankApiEndpoint?.Trim() : null,
-            BankApiKey = role == UserRole.Admin ? bankApiKey?.Trim() : null
+            BankName = null,
+            BankApiEndpoint = null,
+            BankApiKey = null
         };
 
         user.PasswordHash = _hasher.HashPassword(user, password);
-        return await _repository.AddAsync(user, ct);
+        var created = await _repository.AddAsync(user, ct);
+
+        if (role == UserRole.Admin)
+        {
+            var bank = await _bankRepository.UpsertAsync(new Bank
+            {
+                Name = bankName?.Trim() ?? string.Empty,
+                ApiBaseUrl = bankApiEndpoint?.Trim() ?? string.Empty,
+                ApiKey = bankApiKey?.Trim(),
+                CreatedByUserId = created.Id
+            }, ct);
+
+            await _bankRepository.AddAdminAsync(bank.Id, created.Id, ct);
+        }
+
+        return created;
     }
 
     public async Task<UserAccount?> LoginAsync(string email, string password, CancellationToken ct)
@@ -103,15 +125,7 @@ public sealed class UserService
             user = await _repository.AddAsync(user, ct);
         }
 
-        user.ExternalIdentities.Add(new ExternalIdentity
-        {
-            Provider = provider,
-            Subject = subject,
-            UserAccountId = user.Id
-        });
-
-        user.UpdatedAt = DateTimeOffset.UtcNow;
-        return await _repository.UpdateAsync(user, ct) ?? user;
+        return await _repository.AddExternalIdentityAsync(user.Id, provider, subject, ct) ?? user;
     }
 
     public async Task<UserAccount?> LoginExternalAsync(string provider, string subject, CancellationToken ct)
@@ -170,7 +184,7 @@ public sealed class UserService
         if (user.Role == UserRole.Admin)
             return user;
 
-        if (string.IsNullOrWhiteSpace(user.BankName) || string.IsNullOrWhiteSpace(user.BankApiEndpoint))
+        if (!await _bankRepository.IsAdminAsync(user.Id, ct))
             return user;
 
         user.Role = UserRole.Admin;

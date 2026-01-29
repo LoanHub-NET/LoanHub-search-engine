@@ -44,6 +44,31 @@ public sealed class UserRepository : IUserRepository
         return user;
     }
 
+    public async Task<UserAccount?> AddExternalIdentityAsync(Guid userId, string provider, string subject, CancellationToken ct)
+    {
+        var userExists = await _dbContext.Users
+            .AsNoTracking()
+            .AnyAsync(current => current.Id == userId, ct);
+        if (!userExists)
+            return null;
+
+        var identityExists = await _dbContext.ExternalIdentities
+            .AsNoTracking()
+            .AnyAsync(identity => identity.Provider == provider && identity.Subject == subject, ct);
+        if (identityExists)
+            return await GetByIdAsync(userId, ct);
+
+        _dbContext.ExternalIdentities.Add(new ExternalIdentity
+        {
+            Provider = provider,
+            Subject = subject,
+            UserAccountId = userId
+        });
+
+        await _dbContext.SaveChangesAsync(ct);
+        return await GetByIdAsync(userId, ct);
+    }
+
     public Task<bool> EmailExistsAsync(string email, CancellationToken ct)
         => _dbContext.Users.AnyAsync(user => user.Email == email, ct);
 

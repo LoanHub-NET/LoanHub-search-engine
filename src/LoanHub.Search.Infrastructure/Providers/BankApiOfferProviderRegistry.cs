@@ -1,7 +1,7 @@
 namespace LoanHub.Search.Infrastructure.Providers;
 
 using LoanHub.Search.Core.Abstractions;
-using LoanHub.Search.Core.Models.Users;
+using LoanHub.Search.Core.Models.Banks;
 using LoanHub.Search.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -38,24 +38,21 @@ public sealed class BankApiOfferProviderRegistry : ILoanOfferProviderRegistry
 
     private async Task<IReadOnlyList<BankApiDescriptor>> LoadBankDescriptorsAsync(CancellationToken ct)
     {
-        var raw = await _dbContext.Users
+        var raw = await _dbContext.Banks
             .AsNoTracking()
-            .Where(user => user.Role == UserRole.Admin &&
-                user.BankName != null &&
-                user.BankApiEndpoint != null)
-            .OrderBy(user => user.CreatedAt)
+            .OrderBy(bank => bank.CreatedAt)
             .Select(user => new
             {
-                user.BankName,
-                user.BankApiEndpoint,
-                user.BankApiKey
+                user.Name,
+                user.ApiBaseUrl,
+                user.ApiKey
             })
             .ToListAsync(ct);
 
         var descriptors = new List<BankApiDescriptor>();
         foreach (var entry in raw)
         {
-            if (TryBuildDescriptor(entry.BankName, entry.BankApiEndpoint, entry.BankApiKey, out var descriptor))
+            if (TryBuildDescriptor(entry.Name, entry.ApiBaseUrl, entry.ApiKey, out var descriptor))
                 descriptors.Add(descriptor);
         }
 
@@ -76,90 +73,16 @@ public sealed class BankApiOfferProviderRegistry : ILoanOfferProviderRegistry
             return false;
 
         var name = bankName.Trim();
-        var baseUrl = ExtractBaseUrl(endpointRaw);
+        var baseUrl = BankApiDescriptorParser.ExtractBaseUrl(endpointRaw);
         if (string.IsNullOrWhiteSpace(baseUrl))
             return false;
 
-        var endpoint = NormalizeEndpoint(baseUrl);
+        var endpoint = BankApiDescriptorParser.NormalizeEndpoint(baseUrl);
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out _))
             return false;
 
-        var apiKey = ExtractApiKey(apiKeyRaw);
-        descriptor = new BankApiDescriptor(name, endpoint, NormalizeApiKey(apiKey));
+        var apiKey = BankApiDescriptorParser.ExtractApiKey(apiKeyRaw);
+        descriptor = new BankApiDescriptor(name, endpoint, BankApiDescriptorParser.NormalizeApiKey(apiKey));
         return true;
     }
-
-    private static string? ExtractBaseUrl(string raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw))
-            return null;
-
-        var markerIndex = raw.IndexOf("@baseUrl", StringComparison.OrdinalIgnoreCase);
-        if (markerIndex < 0)
-            return raw.Trim();
-
-        foreach (var line in raw.Split('\n'))
-        {
-            var trimmed = line.Trim();
-            if (trimmed.StartsWith("@baseUrl", StringComparison.OrdinalIgnoreCase))
-            {
-                var value = ExtractValue(trimmed);
-                return string.IsNullOrWhiteSpace(value) ? null : value;
-            }
-        }
-
-        return null;
-    }
-
-    private static string? ExtractApiKey(string? raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw))
-            return null;
-
-        var markerIndex = raw.IndexOf("@apiKey", StringComparison.OrdinalIgnoreCase);
-        if (markerIndex < 0)
-            return raw.Trim();
-
-        foreach (var line in raw.Split('\n'))
-        {
-            var trimmed = line.Trim();
-            if (trimmed.StartsWith("@apiKey", StringComparison.OrdinalIgnoreCase))
-            {
-                var value = ExtractValue(trimmed);
-                return string.IsNullOrWhiteSpace(value) ? null : value;
-            }
-        }
-
-        return null;
-    }
-
-    private static string? ExtractValue(string line)
-    {
-        var index = line.IndexOf('=', StringComparison.Ordinal);
-        if (index < 0 || index == line.Length - 1)
-            return null;
-
-        var value = line[(index + 1)..].Trim();
-        if (value.Length >= 2 &&
-            ((value.StartsWith('"') && value.EndsWith('"')) ||
-             (value.StartsWith('\'') && value.EndsWith('\''))))
-        {
-            value = value[1..^1].Trim();
-        }
-
-        return string.IsNullOrWhiteSpace(value) ? null : value;
-    }
-
-    private static string NormalizeEndpoint(string raw)
-    {
-        var trimmed = raw.Trim();
-        if (trimmed.Contains("/api/BankOffers", StringComparison.OrdinalIgnoreCase))
-            return trimmed;
-
-        trimmed = trimmed.TrimEnd('/');
-        return $"{trimmed}/api/BankOffers";
-    }
-
-    private static string? NormalizeApiKey(string? apiKey)
-        => string.IsNullOrWhiteSpace(apiKey) ? null : apiKey.Trim();
 }

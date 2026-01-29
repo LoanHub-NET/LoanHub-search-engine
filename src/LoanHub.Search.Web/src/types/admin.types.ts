@@ -16,6 +16,7 @@ export type StatusFilter = AdminApplicationStatus | 'all';
 export interface LoanApplication {
   id: string;
   referenceNumber: string;
+  assignedAdminId?: string;
   
   // Applicant info
   applicant: ApplicantInfo;

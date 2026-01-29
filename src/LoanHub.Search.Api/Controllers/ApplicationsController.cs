@@ -252,6 +252,8 @@ public sealed class ApplicationsController : ControllerBase
     public sealed record ApplicationResponse(
         Guid Id,
         Guid? UserId,
+        Guid? BankId,
+        Guid? AssignedAdminId,
         string ApplicantEmail,
         ApplicationStatus Status,
         string? RejectReason,
@@ -272,6 +274,8 @@ public sealed class ApplicationsController : ControllerBase
             => new(
                 application.Id,
                 application.UserId,
+                application.BankId,
+                application.AssignedAdminId,
                 application.ApplicantEmail,
                 application.Status,
                 application.RejectReason,

@@ -2,6 +2,7 @@ using LoanHub.Search.Core.Models.Applications;
 using LoanHub.Search.Core.Services.Applications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace LoanHub.Search.Api.Controllers.Admin;
 
@@ -64,7 +65,7 @@ public sealed class AdminApplicationsController : ControllerBase
     [HttpPost("{id:guid}/accept")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> Accept(Guid id, CancellationToken ct)
     {
-        var application = await _service.AcceptAsync(id, ct);
+        var application = await _service.AcceptAsync(id, GetAdminId(), ct);
         if (application is null)
             return NotFound();
 
@@ -74,7 +75,7 @@ public sealed class AdminApplicationsController : ControllerBase
     [HttpPost("{id:guid}/preliminary-accept")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> PreliminarilyAccept(Guid id, CancellationToken ct)
     {
-        var application = await _service.PreliminarilyAcceptAsync(id, ct);
+        var application = await _service.PreliminarilyAcceptAsync(id, GetAdminId(), ct);
         if (application is null)
             return NotFound();
 
@@ -84,7 +85,7 @@ public sealed class AdminApplicationsController : ControllerBase
     [HttpPost("{id:guid}/grant")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> Grant(Guid id, CancellationToken ct)
     {
-        var application = await _service.GrantAsync(id, ct);
+        var application = await _service.GrantAsync(id, GetAdminId(), ct);
         if (application is null)
             return NotFound();
 
@@ -94,7 +95,7 @@ public sealed class AdminApplicationsController : ControllerBase
     [HttpPost("{id:guid}/contract-ready")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> ContractReady(Guid id, CancellationToken ct)
     {
-        var application = await _service.MarkContractReadyAsync(id, ct);
+        var application = await _service.MarkContractReadyAsync(id, GetAdminId(), ct);
         if (application is null)
             return NotFound();
 
@@ -104,7 +105,7 @@ public sealed class AdminApplicationsController : ControllerBase
     [HttpPost("{id:guid}/final-approve")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> FinalApprove(Guid id, CancellationToken ct)
     {
-        var application = await _service.FinalApproveAsync(id, ct);
+        var application = await _service.FinalApproveAsync(id, GetAdminId(), ct);
         if (application is null)
             return NotFound();
 
@@ -117,7 +118,7 @@ public sealed class AdminApplicationsController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Reason))
             return BadRequest("Reason is required.");
 
-        var application = await _service.RejectAsync(id, request.Reason, ct);
+        var application = await _service.RejectAsync(id, request.Reason, GetAdminId(), ct);
         if (application is null)
             return NotFound();
 
@@ -132,4 +133,10 @@ public sealed class AdminApplicationsController : ControllerBase
         int PageSize,
         int TotalCount,
         int TotalPages);
+
+    private Guid? GetAdminId()
+    {
+        var subject = User.FindFirstValue("sub");
+        return Guid.TryParse(subject, out var userId) ? userId : null;
+    }
 }

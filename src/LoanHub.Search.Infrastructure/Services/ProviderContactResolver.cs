@@ -1,4 +1,5 @@
 using LoanHub.Search.Core.Abstractions.Notifications;
+using LoanHub.Search.Core.Models.Applications;
 using LoanHub.Search.Core.Models.Users;
 using LoanHub.Search.Infrastructure;
 using Microsoft.Extensions.Options;
@@ -17,10 +18,40 @@ public sealed class ProviderContactResolver : IProviderContactResolver
         _dbContext = dbContext;
     }
 
-    public string? GetContactEmail(string provider)
+    public string? GetContactEmail(LoanApplication application)
     {
-        if (_options.Contacts.TryGetValue(provider, out var email))
-            return email;
+        if (application is null)
+            return null;
+
+        if (application.AssignedAdminId.HasValue)
+        {
+            var assignedEmail = _dbContext.Users
+                .AsNoTracking()
+                .Where(user => user.Id == application.AssignedAdminId.Value)
+                .Select(user => user.Email)
+                .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(assignedEmail))
+                return assignedEmail;
+        }
+
+        var provider = application.OfferSnapshot.Provider;
+        if (!string.IsNullOrWhiteSpace(provider))
+        {
+            if (_options.Contacts.TryGetValue(provider, out var email))
+                return email;
+        }
+
+        if (application.BankId.HasValue)
+        {
+            var adminEmail = _dbContext.BankAdmins
+                .AsNoTracking()
+                .Where(admin => admin.BankId == application.BankId.Value)
+                .OrderBy(admin => admin.AssignedAt)
+                .Select(admin => admin.UserAccount!.Email)
+                .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(adminEmail))
+                return adminEmail;
+        }
 
         if (string.IsNullOrWhiteSpace(provider))
             return null;
@@ -29,13 +60,13 @@ public sealed class ProviderContactResolver : IProviderContactResolver
         if (normalized.Length == 0)
             return null;
 
-        var match = _dbContext.Users
+        var legacyMatch = _dbContext.Users
             .AsNoTracking()
             .FirstOrDefault(user =>
                 user.Role == UserRole.Admin &&
                 user.BankName != null &&
                 EF.Functions.ILike(user.BankName, normalized));
 
-        return match?.Email;
+        return legacyMatch?.Email;
     }
 }

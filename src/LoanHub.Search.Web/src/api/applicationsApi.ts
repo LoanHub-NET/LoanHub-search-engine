@@ -28,6 +28,8 @@ export interface ApplicationRequest extends ApplicationRequestBase {
 
 export interface ApplicationResponse {
   id: string;
+  bankId?: string | null;
+  assignedAdminId?: string | null;
   applicantEmail: string;
   status: string | number;
   createdAt: string;
