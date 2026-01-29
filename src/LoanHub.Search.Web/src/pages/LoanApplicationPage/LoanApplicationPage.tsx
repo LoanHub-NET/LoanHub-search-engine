@@ -125,10 +125,7 @@ export function LoanApplicationPage() {
   const [existingDocumentsError, setExistingDocumentsError] = useState<string | null>(null);
   const [useExistingDocuments, setUseExistingDocuments] = useState(false);
   const [selectedExistingDocuments, setSelectedExistingDocuments] = useState<string[]>([]);
-  const [previewDoc, setPreviewDoc] = useState<ExistingDocumentView | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [existingDocumentsApplicationId, setExistingDocumentsApplicationId] = useState<string | null>(null);
   
   // Load offer from URL params if not from location state
   useEffect(() => {
@@ -253,8 +250,11 @@ export function LoanApplicationPage() {
     if (!applicationId) {
       setExistingDocuments([]);
       setUseExistingDocuments(false);
+      setExistingDocumentsApplicationId(null);
       return;
     }
+
+    setExistingDocumentsApplicationId(applicationId);
 
     setExistingDocumentsLoading(true);
     setExistingDocumentsError(null);
@@ -872,26 +872,7 @@ export function LoanApplicationPage() {
                     : [...prev, blobName],
                 );
               }}
-              onPreviewExistingDocument={async (doc) => {
-                setPreviewDoc(doc);
-                setPreviewUrl(null);
-                setPreviewError(null);
-                setPreviewLoading(true);
-                try {
-                  const url = await getUserApplicationDocumentUrl(
-                    typeof window !== 'undefined' && authSession?.id
-                      ? JSON.parse(window.localStorage.getItem(`${storedUserDocumentsKeyPrefix}${authSession.id}`) || '{}')?.applicationId
-                      : '',
-                    doc.blobName,
-                  );
-                  setPreviewUrl(url);
-                } catch (err: unknown) {
-                  const message = err instanceof Error ? err.message : 'Unable to load document preview.';
-                  setPreviewError(message);
-                } finally {
-                  setPreviewLoading(false);
-                }
-              }}
+              existingDocumentsApplicationId={existingDocumentsApplicationId}
             />
           )}
           
@@ -1457,7 +1438,7 @@ interface DocumentsStepProps {
   selectedExistingDocuments: string[];
   onToggleUseExisting: (value: boolean) => void;
   onToggleExistingDocument: (blobName: string) => void;
-  onPreviewExistingDocument: (doc: ExistingDocumentView) => void;
+  existingDocumentsApplicationId: string | null;
 }
 
 function DocumentsStep({
@@ -1472,9 +1453,23 @@ function DocumentsStep({
   selectedExistingDocuments,
   onToggleUseExisting,
   onToggleExistingDocument,
-  onPreviewExistingDocument,
+  existingDocumentsApplicationId,
 }: DocumentsStepProps) {
-  const isValid = data.idType && data.idNumber;
+  const selectedDocs = selectedExistingDocuments
+    .map((blobName) => existingDocuments.find((doc) => doc.blobName === blobName))
+    .filter(Boolean) as ExistingDocumentView[];
+  const hasSelectedFront = selectedDocs.some((doc) => doc.side.toLowerCase() === 'front');
+  const hasSelectedBack = selectedDocs.some((doc) => doc.side.toLowerCase() === 'back');
+  const hasUploadedFront = Boolean(data.idFrontFile);
+  const hasUploadedBack = Boolean(data.idBackFile);
+  const documentsReady = useExistingDocuments
+    ? hasSelectedFront && hasSelectedBack
+    : hasUploadedFront && hasUploadedBack;
+  const isValid = Boolean(data.idType && data.idNumber && documentsReady);
+  const [previewDoc, setPreviewDoc] = useState<ExistingDocumentView | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   
   const handleFileChange = (field: 'idFrontFile' | 'idBackFile', file: File | undefined) => {
     onChange({ [field]: file });
@@ -1575,9 +1570,28 @@ function DocumentsStep({
                       type="button"
                       className="btn-icon"
                       title="Preview"
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        onPreviewExistingDocument(doc);
+                        if (!existingDocumentsApplicationId) {
+                          setPreviewError('No application found for document preview.');
+                          return;
+                        }
+                        setPreviewDoc(doc);
+                        setPreviewUrl(null);
+                        setPreviewError(null);
+                        setPreviewLoading(true);
+                        try {
+                          const url = await getUserApplicationDocumentUrl(
+                            existingDocumentsApplicationId,
+                            doc.blobName,
+                          );
+                          setPreviewUrl(url);
+                        } catch (err: unknown) {
+                          const message = err instanceof Error ? err.message : 'Unable to load document preview.';
+                          setPreviewError(message);
+                        } finally {
+                          setPreviewLoading(false);
+                        }
                       }}
                     >
                       👁️
@@ -1589,6 +1603,9 @@ function DocumentsStep({
                 </div>
               ))}
             </div>
+          )}
+          {useExistingDocuments && !documentsReady && (
+            <div className="hint-text error">Please select both front and back documents.</div>
           )}
           
           <div className={`upload-grid ${useExistingDocuments ? 'disabled' : ''}`}>
@@ -1624,6 +1641,9 @@ function DocumentsStep({
               </label>
             </div>
           </div>
+          {!useExistingDocuments && !documentsReady && (
+            <div className="hint-text error">Please upload both front and back documents.</div>
+          )}
           
           <div className="upload-tips">
             <h4>Tips for good quality uploads:</h4>
