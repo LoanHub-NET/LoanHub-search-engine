@@ -21,7 +21,7 @@ import {
   listApplicationsByEmail,
   listApplicationsForCurrentUser,
 } from '../../api/applicationsApi';
-import { listUserApplicationDocuments } from '../../api/userDocumentsApi';
+import { getUserApplicationDocumentUrl, listUserApplicationDocuments } from '../../api/userDocumentsApi';
 import { ApiError, clearAuthSession, getAuthSession } from '../../api/apiConfig';
 import { Header, Footer } from '../../components';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -62,6 +62,7 @@ export function UserDashboardPage() {
   const [latestDocuments, setLatestDocuments] = useState<UserDocumentView[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [documentsError, setDocumentsError] = useState<string | null>(null);
+  const [latestApplicationId, setLatestApplicationId] = useState<string | null>(null);
   
   // Stats
   const stats = useMemo(() => calculateUserDashboardStats(applications), [applications]);
@@ -287,8 +288,11 @@ export function UserDashboardPage() {
 
     if (!lastApplication) {
       setLatestDocuments([]);
+      setLatestApplicationId(null);
       return;
     }
+
+    setLatestApplicationId(lastApplication.id);
 
     setDocumentsLoading(true);
     setDocumentsError(null);
@@ -447,6 +451,7 @@ export function UserDashboardPage() {
                   latestDocuments={latestDocuments}
                   documentsLoading={documentsLoading}
                   documentsError={documentsError}
+                  latestApplicationId={latestApplicationId}
                 />
               )}
               
@@ -1213,6 +1218,7 @@ interface DocumentsSectionProps {
   latestDocuments: UserDocumentView[];
   documentsLoading: boolean;
   documentsError: string | null;
+  latestApplicationId: string | null;
 }
 
 function DocumentsSection({
@@ -1221,8 +1227,13 @@ function DocumentsSection({
   latestDocuments,
   documentsLoading,
   documentsError,
+  latestApplicationId,
 }: DocumentsSectionProps) {
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<UserDocumentView | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   
   // Get all required documents across applications
   const pendingDocuments = applications
@@ -1327,6 +1338,7 @@ function DocumentsSection({
                 <th>Side</th>
                 <th>Uploaded</th>
                 <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1348,11 +1360,107 @@ function DocumentsSection({
                       {doc.status === 'verified' ? '✅ Verified' : doc.status === 'rejected' ? '❌ Rejected' : '⏳ Pending'}
                     </span>
                   </td>
+                  <td>
+                    <button
+                      className="btn-icon"
+                      title="View"
+                      onClick={async () => {
+                        if (!latestApplicationId) {
+                          setPreviewError('No application found for document preview.');
+                          return;
+                        }
+                        setPreviewDoc(doc);
+                        setPreviewUrl(null);
+                        setPreviewError(null);
+                        setPreviewLoading(true);
+                        try {
+                          const url = await getUserApplicationDocumentUrl(latestApplicationId, doc.id);
+                          setPreviewUrl(url);
+                        } catch (err: unknown) {
+                          const message = err instanceof Error ? err.message : 'Unable to load document preview.';
+                          setPreviewError(message);
+                        } finally {
+                          setPreviewLoading(false);
+                        }
+                      }}
+                    >
+                      👁️
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
+      </div>
+
+      {previewDoc && (
+        <UserDocumentPreviewModal
+          document={previewDoc}
+          url={previewUrl}
+          isLoading={previewLoading}
+          error={previewError}
+          onClose={() => {
+            setPreviewDoc(null);
+            setPreviewUrl(null);
+            setPreviewError(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function UserDocumentPreviewModal({
+  document,
+  url,
+  isLoading,
+  error,
+  onClose,
+}: {
+  document: UserDocumentView;
+  url: string | null;
+  isLoading: boolean;
+  error: string | null;
+  onClose: () => void;
+}) {
+  const fileExtension = document.name.split('.').pop()?.toLowerCase();
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '');
+  const isPdf = fileExtension === 'pdf';
+
+  return (
+    <div className="preview-overlay" onClick={onClose}>
+      <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="preview-header">
+          <div>
+            <h3 className="preview-title">{document.name}</h3>
+            <p className="preview-subtitle">{document.type.replace(/_/g, ' ')}</p>
+          </div>
+          <button className="preview-close" onClick={onClose}>×</button>
+        </div>
+        <div className="preview-body">
+          {isLoading && (
+            <div className="preview-loading">Loading document...</div>
+          )}
+          {!isLoading && error && (
+            <div className="preview-error">{error}</div>
+          )}
+          {!isLoading && !error && url && (
+            <div className="preview-content">
+              {isImage && (
+                <img src={url} alt={document.name} className="preview-image" />
+              )}
+              {isPdf && (
+                <iframe title={document.name} src={url} className="preview-frame" />
+              )}
+              {!isImage && !isPdf && (
+                <a className="preview-download" href={url} target="_blank" rel="noreferrer">
+                  Download file
+                </a>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

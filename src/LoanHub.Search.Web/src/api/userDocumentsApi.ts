@@ -18,6 +18,15 @@ const handleListResponse = async (response: Response) => {
   return (await response.json()) as UserDocumentResponse[];
 };
 
+const handleUrlResponse = async (response: Response) => {
+  if (!response.ok) {
+    const message = await response.text();
+    throw new ApiError(message || `User document request failed with status ${response.status}.`, response.status);
+  }
+  const data = (await response.json()) as { url: string; expiresAt: string };
+  return data.url;
+};
+
 export const listUserApplicationDocuments = async (applicationId: string) => {
   const token = getAuthToken();
   if (!token) {
@@ -52,4 +61,22 @@ export const cloneUserApplicationDocuments = async (
   });
 
   return handleListResponse(response);
+};
+
+export const getUserApplicationDocumentUrl = async (applicationId: string, blobName: string) => {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('You must be logged in to view documents.');
+  }
+
+  const response = await fetch(
+    `${getApiBaseUrl()}/api/applications/${applicationId}/documents/user/url?blobName=${encodeURIComponent(blobName)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  return handleUrlResponse(response);
 };

@@ -111,6 +111,39 @@ public sealed class DocumentsController : ControllerBase
     }
 
     /// <summary>
+    /// Get a temporary download URL for a document (user view)
+    /// </summary>
+    [HttpGet("user/url")]
+    [Authorize(Policy = "UserOnly")]
+    public async Task<ActionResult<DocumentUrlResponse>> GetUrlForUser(
+        Guid applicationId,
+        [FromQuery] string blobName,
+        [FromQuery] int validMinutes = 60,
+        CancellationToken ct = default)
+    {
+        var application = await _applicationRepository.GetAsync(applicationId, ct);
+        if (application is null)
+            return NotFound("Application not found.");
+
+        if (!IsApplicationOwnedByCurrentUser(application))
+            return Forbid();
+
+        // Verify blob name belongs to this application
+        if (!blobName.StartsWith(applicationId.ToString("N"), StringComparison.OrdinalIgnoreCase))
+            return Forbid();
+
+        var url = await _storage.GetDocumentUrlAsync(
+            blobName,
+            TimeSpan.FromMinutes(Math.Min(validMinutes, 1440)),
+            ct);
+
+        if (url is null)
+            return NotFound("Document not found.");
+
+        return Ok(new DocumentUrlResponse(url, DateTimeOffset.UtcNow.AddMinutes(validMinutes)));
+    }
+
+    /// <summary>
     /// Clone documents from previous applications for reuse
     /// </summary>
     [HttpPost("clone")]
