@@ -12,6 +12,9 @@ services:
       SendGrid__ApiKey: ${SENDGRID_API_KEY:-}
       SendGrid__FromEmail: ${SENDGRID_FROM_EMAIL:-}
       SendGrid__FromName: ${SENDGRID_FROM_NAME:-LoanHub}
+      # Azure Blob Storage for documents and contracts
+      ContractStorage__ConnectionString: ${AZURE_STORAGE_CONNECTION_STRING:-}
+      DocumentStorage__ConnectionString: ${AZURE_STORAGE_CONNECTION_STRING:-}
       EmailBranding__LogoPath: /app/assets/LoanHub_logo.png
       EmailBranding__PortalUrl: http://localhost:5173
       EmailBranding__AdminPortalUrl: http://localhost:5173/admin

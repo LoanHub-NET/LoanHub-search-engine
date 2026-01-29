@@ -154,6 +154,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Applications")));
 builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
 builder.Services.AddScoped<ApplicationService>();
+
+// Contract storage configuration (for signed contracts)
+builder.Services.Configure<ContractStorageOptions>(builder.Configuration.GetSection("ContractStorage"));
 var contractStorageOptions = builder.Configuration.GetSection("ContractStorage").Get<ContractStorageOptions>() ?? new ContractStorageOptions();
 if (string.IsNullOrWhiteSpace(contractStorageOptions.ConnectionString))
 {
@@ -163,6 +166,19 @@ else
 {
     builder.Services.AddSingleton<IContractStorage, AzureBlobContractStorage>();
 }
+
+// Document storage configuration (for ID documents, proof of income, etc.)
+builder.Services.Configure<DocumentStorageOptions>(builder.Configuration.GetSection("DocumentStorage"));
+var documentStorageOptions = builder.Configuration.GetSection("DocumentStorage").Get<DocumentStorageOptions>() ?? new DocumentStorageOptions();
+if (string.IsNullOrWhiteSpace(documentStorageOptions.ConnectionString))
+{
+    builder.Services.AddSingleton<IDocumentStorage, LocalFileDocumentStorage>();
+}
+else
+{
+    builder.Services.AddSingleton<IDocumentStorage, AzureBlobDocumentStorage>();
+}
+
 builder.Services.AddScoped<IOfferSelectionRepository, OfferSelectionRepository>();
 builder.Services.AddScoped<OfferSelectionService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();

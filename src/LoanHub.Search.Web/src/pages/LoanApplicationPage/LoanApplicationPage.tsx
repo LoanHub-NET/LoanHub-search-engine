@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
 import { createApplication, createApplicationForCurrentUser } from '../../api/applicationsApi';
+import { uploadApplicationDocument } from '../../api/documentsApi';
 import {
   ApiError,
   clearAuthSession,
@@ -406,6 +407,22 @@ export function LoanApplicationPage() {
       return response.id;
     };
 
+    const uploadIdDocuments = async (applicationId: string) => {
+      const { idFrontFile, idBackFile } = formData.documents;
+
+      const uploads: Array<Promise<unknown>> = [];
+      if (idFrontFile) {
+        uploads.push(uploadApplicationDocument(applicationId, idFrontFile, 'IdDocument', 'Front'));
+      }
+      if (idBackFile) {
+        uploads.push(uploadApplicationDocument(applicationId, idBackFile, 'IdDocument', 'Back'));
+      }
+
+      if (uploads.length > 0) {
+        await Promise.all(uploads);
+      }
+    };
+
     try {
       const personalInfo = formData.personalInfo;
       const employment = formData.employment;
@@ -485,6 +502,8 @@ export function LoanApplicationPage() {
       } else {
         referenceId = await submitAsGuest();
       }
+
+      await uploadIdDocuments(referenceId);
 
       setSubmissionResult({
         success: true,
