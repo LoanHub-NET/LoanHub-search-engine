@@ -49,7 +49,7 @@ export const getApplicationDocumentUrl = async (applicationId: string, blobName:
   }
 
   const response = await fetch(
-    `${getApiBaseUrl()}/api/applications/${applicationId}/documents/${encodeURIComponent(blobName)}/url`,
+    `${getApiBaseUrl()}/api/applications/${applicationId}/documents/url?blobName=${encodeURIComponent(blobName)}`,
     {
       headers: {
         Authorization: `Bearer ${token}`,

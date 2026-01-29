@@ -109,11 +109,11 @@ public sealed class DocumentsController : ControllerBase
     /// <summary>
     /// Get a temporary download URL for a document
     /// </summary>
-    [HttpGet("{blobName}/url")]
+    [HttpGet("url")]
     [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<DocumentUrlResponse>> GetUrl(
         Guid applicationId,
-        string blobName,
+        [FromQuery] string blobName,
         [FromQuery] int validMinutes = 60,
         CancellationToken ct = default)
     {
@@ -140,7 +140,7 @@ public sealed class DocumentsController : ControllerBase
     /// <summary>
     /// Download a document directly
     /// </summary>
-    [HttpGet("{blobName}")]
+    [HttpGet("{*blobName}")]
     [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> Download(
         Guid applicationId,
@@ -169,7 +169,7 @@ public sealed class DocumentsController : ControllerBase
     /// <summary>
     /// Delete a document
     /// </summary>
-    [HttpDelete("{blobName}")]
+    [HttpDelete("{*blobName}")]
     [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> Delete(
         Guid applicationId,
