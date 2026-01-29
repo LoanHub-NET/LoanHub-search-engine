@@ -44,7 +44,7 @@ public sealed class ApplicationsController : ControllerBase
                 request.LivingCosts,
                 request.Dependents,
                 request.Phone,
-                request.DateOfBirth
+                NormalizeDateTime(request.DateOfBirth)
             ),
             OfferSnapshot = new OfferSnapshot(
                 request.Provider,
@@ -343,8 +343,22 @@ public sealed class ApplicationsController : ControllerBase
             user.LivingCosts,
             user.Dependents,
             user.Phone,
-            user.DateOfBirth);
+            NormalizeDateTime(user.DateOfBirth));
 
         return true;
+    }
+
+    private static DateTime? NormalizeDateTime(DateTime? value)
+    {
+        if (!value.HasValue)
+            return null;
+
+        var date = value.Value;
+        return date.Kind switch
+        {
+            DateTimeKind.Utc => date,
+            DateTimeKind.Local => date.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(date, DateTimeKind.Utc)
+        };
     }
 }

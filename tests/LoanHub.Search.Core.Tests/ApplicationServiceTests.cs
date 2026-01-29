@@ -46,7 +46,7 @@ public sealed class ApplicationServiceTests
         var created = await service.CreateAsync(application, CancellationToken.None);
 
         Assert.Equal(ApplicationStatus.New, created.Status);
-        Assert.Equal(1, created.StatusHistory.Count);
+        Assert.Single(created.StatusHistory);
         Assert.Equal(2, emailSender.Messages.Count);
     }
 
