@@ -29,6 +29,10 @@ export function ApplicationDetailModal({
   const [documents, setDocuments] = useState<ApplicationDocument[]>(application.documents);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [documentsError, setDocumentsError] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<ApplicationDocument | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const slaInfo = calculateSlaInfo(application);
   const statusConfig = ADMIN_STATUS_CONFIG[application.status];
 
@@ -114,8 +118,19 @@ export function ApplicationDetailModal({
               error={documentsError}
               onView={async (doc) => {
                 if (!doc.blobName) return;
-                const url = await getApplicationDocumentUrl(application.id, doc.blobName);
-                window.open(url, '_blank', 'noopener,noreferrer');
+                setPreviewDoc(doc);
+                setPreviewUrl(null);
+                setPreviewError(null);
+                setPreviewLoading(true);
+                try {
+                  const url = await getApplicationDocumentUrl(application.id, doc.blobName);
+                  setPreviewUrl(url);
+                } catch (err: unknown) {
+                  const message = err instanceof Error ? err.message : 'Unable to load document preview.';
+                  setPreviewError(message);
+                } finally {
+                  setPreviewLoading(false);
+                }
               }}
             />
           )}
@@ -126,6 +141,20 @@ export function ApplicationDetailModal({
             <ProviderTab application={application} />
           )}
         </div>
+
+        {previewDoc && (
+          <DocumentPreviewModal
+            document={previewDoc}
+            url={previewUrl}
+            isLoading={previewLoading}
+            error={previewError}
+            onClose={() => {
+              setPreviewDoc(null);
+              setPreviewUrl(null);
+              setPreviewError(null);
+            }}
+          />
+        )}
 
         {/* Footer Actions */}
         <div className="modal-footer">
@@ -559,6 +588,61 @@ function mapDocumentSide(value: string): ApplicationDocument['side'] {
   if (normalized === 'front') return 'front';
   if (normalized === 'back') return 'back';
   return 'unknown';
+}
+
+function DocumentPreviewModal({
+  document,
+  url,
+  isLoading,
+  error,
+  onClose,
+}: {
+  document: ApplicationDocument;
+  url: string | null;
+  isLoading: boolean;
+  error: string | null;
+  onClose: () => void;
+}) {
+  const fileExtension = document.name.split('.').pop()?.toLowerCase();
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '');
+  const isPdf = fileExtension === 'pdf';
+
+  return (
+    <div className="preview-overlay" onClick={onClose}>
+      <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="preview-header">
+          <div>
+            <h3 className="preview-title">{document.name}</h3>
+            <p className="preview-subtitle">{document.type.replace(/_/g, ' ')}</p>
+          </div>
+          <button className="preview-close" onClick={onClose}>×</button>
+        </div>
+        <div className="preview-body">
+          {isLoading && (
+            <div className="preview-loading">Loading document...</div>
+          )}
+          {!isLoading && error && (
+            <div className="preview-error">{error}</div>
+          )}
+          {!isLoading && !error && url && (
+            <div className="preview-content">
+              {isImage && (
+                <img src={url} alt={document.name} className="preview-image" />
+              )}
+              {isPdf && (
+                <iframe title={document.name} src={url} className="preview-frame" />
+              )}
+              {!isImage && !isPdf && (
+                <a className="preview-download" href={url} target="_blank" rel="noreferrer">
+                  Download file
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // History Tab (Audit Trail)
