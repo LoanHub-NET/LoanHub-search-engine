@@ -467,6 +467,24 @@ public sealed class ApplicationService
         var adminPortalLinkLine = string.IsNullOrWhiteSpace(_brandingOptions.AdminPortalUrl)
             ? string.Empty
             : $"Panel administracyjny: {_brandingOptions.AdminPortalUrl}";
+        var assignedAdminId = application.AssignedAdminId?.ToString() ?? string.Empty;
+        var assignedAdminEmail = application.AssignedAdminId.HasValue
+            ? _providerContactResolver.GetContactEmail(application) ?? string.Empty
+            : string.Empty;
+        var assignedAdminLine = string.IsNullOrWhiteSpace(assignedAdminId)
+            ? string.Empty
+            : string.IsNullOrWhiteSpace(assignedAdminEmail)
+                ? $"Opiekun wniosku: {assignedAdminId}\n"
+                : $"Opiekun wniosku: {assignedAdminEmail} (ID: {assignedAdminId})\n";
+        var assignedAdminBlock = string.IsNullOrWhiteSpace(assignedAdminId)
+            ? string.Empty
+            : $"""
+<div style="margin:16px 0; padding:12px 14px; border-radius:12px; background:#f1f5f9; border:1px solid #e2e8f0;">
+  <strong style="display:block; font-size:12px; text-transform:uppercase; color:#64748b; margin-bottom:6px;">Opiekun wniosku</strong>
+  <div style="font-size:13px; color:#0f172a; font-weight:600;">{(string.IsNullOrWhiteSpace(assignedAdminEmail) ? assignedAdminId : assignedAdminEmail)}</div>
+  <div style="font-size:12px; color:#64748b;">ID: {assignedAdminId}</div>
+</div>
+""";
 
         return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -496,7 +514,11 @@ public sealed class ApplicationService
             ["AdminPortalLinkBlock"] = adminPortalLinkBlock,
             ["PortalLinkLine"] = portalLinkLine,
             ["AdminPortalLinkLine"] = adminPortalLinkLine,
-            ["SupportEmail"] = _brandingOptions.SupportEmail ?? string.Empty
+            ["SupportEmail"] = _brandingOptions.SupportEmail ?? string.Empty,
+            ["AssignedAdminId"] = assignedAdminId,
+            ["AssignedAdminEmail"] = assignedAdminEmail,
+            ["AssignedAdminLine"] = assignedAdminLine,
+            ["AssignedAdminBlock"] = assignedAdminBlock
         };
     }
 

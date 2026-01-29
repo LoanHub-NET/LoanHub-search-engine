@@ -1,5 +1,6 @@
 using LoanHub.Search.Core.Models;
 using LoanHub.Search.Core.Models.Applications;
+using LoanHub.Search.Core.Models.Users;
 using LoanHub.Search.Core.Services.Applications;
 using LoanHub.Search.Core.Services.Users;
 using Microsoft.AspNetCore.Authorization;
@@ -106,7 +107,8 @@ public sealed class ApplicationsController : ControllerBase
         if (application is null)
             return NotFound();
 
-        return Ok(ApplicationResponse.From(application));
+        var adminSummary = await GetAssignedAdminSummaryAsync(application.AssignedAdminId, ct);
+        return Ok(ApplicationResponse.From(application, adminSummary));
     }
 
     [Authorize(Policy = "UserOnly")]
@@ -121,8 +123,11 @@ public sealed class ApplicationsController : ControllerBase
             return Unauthorized();
 
         var applications = await _service.ListRecentByUserIdAsync(user.Id, status, days, ct);
+        var adminSummaries = await LoadAssignedAdminsAsync(applications, ct);
         var responses = applications
-            .Select(ApplicationResponse.From)
+            .Select(application => ApplicationResponse.From(
+                application,
+                TryGetAdminSummary(application, adminSummaries)))
             .ToList();
 
         return Ok(responses);
@@ -139,8 +144,11 @@ public sealed class ApplicationsController : ControllerBase
             return BadRequest("ApplicantEmail is required.");
 
         var applications = await _service.ListRecentAsync(applicantEmail, status, days, ct);
+        var adminSummaries = await LoadAssignedAdminsAsync(applications, ct);
         var responses = applications
-            .Select(ApplicationResponse.From)
+            .Select(application => ApplicationResponse.From(
+                application,
+                TryGetAdminSummary(application, adminSummaries)))
             .ToList();
 
         return Ok(responses);
@@ -254,6 +262,7 @@ public sealed class ApplicationsController : ControllerBase
         Guid? UserId,
         Guid? BankId,
         Guid? AssignedAdminId,
+        AssignedAdminSummary? AssignedAdmin,
         string ApplicantEmail,
         ApplicationStatus Status,
         string? RejectReason,
@@ -270,12 +279,13 @@ public sealed class ApplicationsController : ControllerBase
         IReadOnlyList<StatusHistoryEntry> StatusHistory
     )
     {
-        public static ApplicationResponse From(LoanApplication application)
+        public static ApplicationResponse From(LoanApplication application, AssignedAdminSummary? assignedAdmin = null)
             => new(
                 application.Id,
                 application.UserId,
                 application.BankId,
                 application.AssignedAdminId,
+                assignedAdmin,
                 application.ApplicantEmail,
                 application.Status,
                 application.RejectReason,
@@ -293,6 +303,18 @@ public sealed class ApplicationsController : ControllerBase
             );
     }
 
+    public sealed record AssignedAdminSummary(Guid Id, string Email, string DisplayName)
+    {
+        public static AssignedAdminSummary From(UserAccount admin)
+        {
+            var displayName = $"{admin.FirstName} {admin.LastName}".Trim();
+            if (string.IsNullOrWhiteSpace(displayName))
+                displayName = admin.Email;
+
+            return new AssignedAdminSummary(admin.Id, admin.Email, displayName);
+        }
+    }
+
     private async Task<Core.Models.Users.UserAccount?> GetCurrentUserAsync(CancellationToken ct)
     {
         var userId = GetUserId();
@@ -308,8 +330,47 @@ public sealed class ApplicationsController : ControllerBase
 
     private Guid? GetUserId()
     {
-        var subject = User.FindFirstValue("sub");
+        var subject = User.FindFirstValue("sub")
+                      ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
         return Guid.TryParse(subject, out var userId) ? userId : null;
+    }
+
+    private async Task<AssignedAdminSummary?> GetAssignedAdminSummaryAsync(Guid? adminId, CancellationToken ct)
+    {
+        if (!adminId.HasValue)
+            return null;
+
+        var admin = await _userService.GetAsync(adminId.Value, ct);
+        return admin is null ? null : AssignedAdminSummary.From(admin);
+    }
+
+    private async Task<IReadOnlyDictionary<Guid, AssignedAdminSummary>> LoadAssignedAdminsAsync(
+        IEnumerable<LoanApplication> applications,
+        CancellationToken ct)
+    {
+        var adminIds = applications
+            .Where(application => application.AssignedAdminId.HasValue)
+            .Select(application => application.AssignedAdminId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (adminIds.Count == 0)
+            return new Dictionary<Guid, AssignedAdminSummary>();
+
+        var admins = await _userService.GetByIdsAsync(adminIds, ct);
+        return admins.ToDictionary(admin => admin.Id, AssignedAdminSummary.From);
+    }
+
+    private static AssignedAdminSummary? TryGetAdminSummary(
+        LoanApplication application,
+        IReadOnlyDictionary<Guid, AssignedAdminSummary> summaries)
+    {
+        if (!application.AssignedAdminId.HasValue)
+            return null;
+
+        return summaries.TryGetValue(application.AssignedAdminId.Value, out var summary)
+            ? summary
+            : null;
     }
 
     private static bool TryBuildApplicantDetails(

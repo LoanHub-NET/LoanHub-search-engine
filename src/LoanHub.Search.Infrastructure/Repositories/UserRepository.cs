@@ -26,6 +26,18 @@ public sealed class UserRepository : IUserRepository
             .FirstOrDefaultAsync(user => user.ExternalIdentities.Any(identity =>
                 identity.Provider == provider && identity.Subject == subject), ct);
 
+    public async Task<IReadOnlyList<UserAccount>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct)
+    {
+        var idList = ids.Distinct().ToList();
+        if (idList.Count == 0)
+            return Array.Empty<UserAccount>();
+
+        return await _dbContext.Users
+            .AsNoTracking()
+            .Where(user => idList.Contains(user.Id))
+            .ToListAsync(ct);
+    }
+
     public async Task<UserAccount> AddAsync(UserAccount user, CancellationToken ct)
     {
         _dbContext.Users.Add(user);

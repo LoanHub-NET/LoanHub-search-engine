@@ -26,10 +26,17 @@ export interface ApplicationRequest extends ApplicationRequestBase {
   dateOfBirth?: string | null;
 }
 
+export interface AssignedAdminSummary {
+  id: string;
+  email: string;
+  displayName: string;
+}
+
 export interface ApplicationResponse {
   id: string;
   bankId?: string | null;
   assignedAdminId?: string | null;
+  assignedAdmin?: AssignedAdminSummary | null;
   applicantEmail: string;
   status: string | number;
   createdAt: string;

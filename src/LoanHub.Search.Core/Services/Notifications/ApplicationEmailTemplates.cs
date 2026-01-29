@@ -17,6 +17,7 @@ Szczegóły wniosku:
 - Rata: {{Installment}}
 - APR: {{Apr}}
 - Identyfikator wniosku: {{ApplicationId}}
+{{AssignedAdminLine}}
 
 Co dalej?
 - Weryfikujemy wniosek po stronie banku.
@@ -85,6 +86,7 @@ Zespół {{ProductName}}
                     <td style="padding:10px 0; font-size:14px; font-weight:600; color:#0f172a; text-align:right;">{{ApplicationId}}</td>
                   </tr>
                 </table>
+                {{AssignedAdminBlock}}
                 <div style="margin:18px 0; padding:14px 16px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0;">
                   <p style="margin:0 0 8px; color:#0f172a; font-weight:600; font-size:14px;">Co dalej?</p>
                   <ul style="margin:0 0 0 18px; color:#475569; font-size:13px;">
@@ -211,6 +213,7 @@ Kwota: {{Amount}}
 Okres: {{DurationMonths}} mies.
 {{RejectReasonLine}}
 Identyfikator wniosku: {{ApplicationId}}
+{{AssignedAdminLine}}
 
 {{PortalLinkLine}}
 
@@ -262,6 +265,7 @@ Zespół {{ProductName}}
                     <td style="padding:8px 0; font-size:14px; font-weight:600; color:#0f172a; text-align:right;">{{ApplicationId}}</td>
                   </tr>
                 </table>
+                {{AssignedAdminBlock}}
                 {{PortalLinkBlock}}
               </td>
             </tr>
@@ -364,6 +368,7 @@ Możesz już zapoznać się z kontraktem:
 {{ContractLink}}
 
 W załączniku znajdziesz wstępny dokument do podpisu.
+{{AssignedAdminLine}}
 
 {{PortalLinkLine}}
 
@@ -400,6 +405,7 @@ Zespół {{ProductName}}
                 <div style="padding:14px 16px; border-radius:14px; background:#f8fafc; border:1px solid #e2e8f0; margin-bottom:16px;">
                   <p style="margin:0; color:#475569; font-size:13px;">W załączniku znajdziesz wstępny dokument do podpisu.</p>
                 </div>
+                {{AssignedAdminBlock}}
                 {{PortalLinkBlock}}
               </td>
             </tr>

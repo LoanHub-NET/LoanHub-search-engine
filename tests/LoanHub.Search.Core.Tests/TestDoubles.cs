@@ -90,6 +90,15 @@ internal sealed class InMemoryUserRepository : IUserRepository
         return Task.FromResult(user);
     }
 
+    public Task<IReadOnlyList<UserAccount>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct)
+    {
+        var idSet = new HashSet<Guid>(ids);
+        IReadOnlyList<UserAccount> users = _users.Values
+            .Where(user => idSet.Contains(user.Id))
+            .ToList();
+        return Task.FromResult(users);
+    }
+
     public Task<UserAccount> AddAsync(UserAccount user, CancellationToken ct)
     {
         _users[user.Id] = user;
