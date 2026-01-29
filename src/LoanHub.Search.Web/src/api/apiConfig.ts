@@ -21,12 +21,22 @@ export interface PendingProfile {
   lastName?: string;
   phone?: string;
   dateOfBirth?: string;
-  address?: string;
+  address?: {
+    street: string;
+    apartment?: string;
+    city: string;
+    postalCode: string;
+    country: string;
+  };
+  addressText?: string;
   jobTitle?: string;
+  employerName?: string;
   monthlyIncome?: number;
   livingCosts?: number;
   dependents?: number;
   idDocumentNumber?: string;
+  idDocumentType?: 'passport' | 'national_id' | 'drivers_license';
+  idDocumentExpiry?: string;
 }
 
 const AUTH_STORAGE_KEY = 'loanhub_auth';
