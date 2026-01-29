@@ -4,7 +4,7 @@ import { Header } from '../../components/Header';
 import { Footer } from '../../components/Footer';
 import { createApplication, createApplicationForCurrentUser } from '../../api/applicationsApi';
 import { uploadApplicationDocument } from '../../api/documentsApi';
-import { cloneUserApplicationDocuments } from '../../api/userDocumentsApi';
+import { cloneUserApplicationDocuments, listUserApplicationDocuments, getUserApplicationDocumentUrl } from '../../api/userDocumentsApi';
 import {
   ApiError,
   clearAuthSession,
@@ -63,6 +63,14 @@ const MOCK_PROVIDERS = [
 const storedProfileKeyPrefix = 'loanhub_user_profile_';
 const storedUserDocumentsKeyPrefix = 'loanhub_user_documents_';
 
+interface ExistingDocumentView {
+  name: string;
+  type: string;
+  side: string;
+  blobName: string;
+  uploadedAt: Date;
+}
+
 const getStoredProfile = (userId?: string | null): Partial<UserProfile> | null => {
   if (!userId || typeof window === 'undefined') return null;
   const raw = window.localStorage.getItem(`${storedProfileKeyPrefix}${userId}`);
@@ -112,6 +120,15 @@ export function LoanApplicationPage() {
     message: string;
   } | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [existingDocuments, setExistingDocuments] = useState<ExistingDocumentView[]>([]);
+  const [existingDocumentsLoading, setExistingDocumentsLoading] = useState(false);
+  const [existingDocumentsError, setExistingDocumentsError] = useState<string | null>(null);
+  const [useExistingDocuments, setUseExistingDocuments] = useState(false);
+  const [selectedExistingDocuments, setSelectedExistingDocuments] = useState<string[]>([]);
+  const [previewDoc, setPreviewDoc] = useState<ExistingDocumentView | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   
   // Load offer from URL params if not from location state
   useEffect(() => {
@@ -209,6 +226,59 @@ export function LoanApplicationPage() {
   useEffect(() => {
     setAuthSession(getAuthSession());
   }, []);
+
+  useEffect(() => {
+    if (!authSession?.id) {
+      setExistingDocuments([]);
+      setUseExistingDocuments(false);
+      return;
+    }
+
+    const key = `${storedUserDocumentsKeyPrefix}${authSession.id}`;
+    const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+    if (!raw) {
+      setExistingDocuments([]);
+      setUseExistingDocuments(false);
+      return;
+    }
+
+    let applicationId: string | undefined;
+    try {
+      const parsed = JSON.parse(raw) as { applicationId?: string } | null;
+      applicationId = parsed?.applicationId;
+    } catch {
+      applicationId = undefined;
+    }
+
+    if (!applicationId) {
+      setExistingDocuments([]);
+      setUseExistingDocuments(false);
+      return;
+    }
+
+    setExistingDocumentsLoading(true);
+    setExistingDocumentsError(null);
+    listUserApplicationDocuments(applicationId)
+      .then((docs) => {
+        const mapped = docs.map((doc) => ({
+          name: doc.originalFileName,
+          type: doc.documentType,
+          side: doc.documentSide,
+          blobName: doc.blobName,
+          uploadedAt: new Date(doc.uploadedAt),
+        }));
+        setExistingDocuments(mapped);
+        setUseExistingDocuments(mapped.length > 0);
+        setSelectedExistingDocuments(mapped.map((doc) => doc.blobName));
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : 'Unable to load previous documents.';
+        setExistingDocumentsError(message);
+        setExistingDocuments([]);
+        setUseExistingDocuments(false);
+      })
+      .finally(() => setExistingDocumentsLoading(false));
+  }, [authSession?.id]);
   
   // Get current step index
   const currentStepIndex = APPLICATION_STEPS.findIndex(s => s.id === currentStep);
@@ -458,8 +528,9 @@ export function LoanApplicationPage() {
 
       try {
         const parsed = JSON.parse(raw) as { blobNames: string[] } | null;
-        if (!parsed?.blobNames?.length) return;
-        const cloned = await cloneUserApplicationDocuments(applicationId, parsed.blobNames);
+        const blobNames = selectedExistingDocuments.length > 0 ? selectedExistingDocuments : parsed?.blobNames || [];
+        if (!blobNames.length) return;
+        const cloned = await cloneUserApplicationDocuments(applicationId, blobNames);
         const updated = {
           applicationId,
           uploadedAt: new Date().toISOString(),
@@ -553,7 +624,7 @@ export function LoanApplicationPage() {
 
       if (formData.documents.idFrontFile || formData.documents.idBackFile) {
         await uploadIdDocuments(referenceId);
-      } else {
+      } else if (useExistingDocuments) {
         await reuseLastDocuments(referenceId);
       }
 
@@ -783,6 +854,44 @@ export function LoanApplicationPage() {
               onChange={updateDocuments}
               onNext={goToNextStep}
               onBack={goToPrevStep}
+              existingDocuments={existingDocuments}
+              existingDocumentsLoading={existingDocumentsLoading}
+              existingDocumentsError={existingDocumentsError}
+              useExistingDocuments={useExistingDocuments}
+              selectedExistingDocuments={selectedExistingDocuments}
+              onToggleUseExisting={(value) => {
+                setUseExistingDocuments(value);
+                if (value) {
+                  updateDocuments({ idFrontFile: undefined, idBackFile: undefined });
+                }
+              }}
+              onToggleExistingDocument={(blobName) => {
+                setSelectedExistingDocuments((prev) =>
+                  prev.includes(blobName)
+                    ? prev.filter((item) => item !== blobName)
+                    : [...prev, blobName],
+                );
+              }}
+              onPreviewExistingDocument={async (doc) => {
+                setPreviewDoc(doc);
+                setPreviewUrl(null);
+                setPreviewError(null);
+                setPreviewLoading(true);
+                try {
+                  const url = await getUserApplicationDocumentUrl(
+                    typeof window !== 'undefined' && authSession?.id
+                      ? JSON.parse(window.localStorage.getItem(`${storedUserDocumentsKeyPrefix}${authSession.id}`) || '{}')?.applicationId
+                      : '',
+                    doc.blobName,
+                  );
+                  setPreviewUrl(url);
+                } catch (err: unknown) {
+                  const message = err instanceof Error ? err.message : 'Unable to load document preview.';
+                  setPreviewError(message);
+                } finally {
+                  setPreviewLoading(false);
+                }
+              }}
             />
           )}
           
@@ -1341,9 +1450,30 @@ interface DocumentsStepProps {
   onChange: (data: Partial<DocumentData>) => void;
   onNext: () => void;
   onBack: () => void;
+  existingDocuments: ExistingDocumentView[];
+  existingDocumentsLoading: boolean;
+  existingDocumentsError: string | null;
+  useExistingDocuments: boolean;
+  selectedExistingDocuments: string[];
+  onToggleUseExisting: (value: boolean) => void;
+  onToggleExistingDocument: (blobName: string) => void;
+  onPreviewExistingDocument: (doc: ExistingDocumentView) => void;
 }
 
-function DocumentsStep({ data, onChange, onNext, onBack }: DocumentsStepProps) {
+function DocumentsStep({
+  data,
+  onChange,
+  onNext,
+  onBack,
+  existingDocuments,
+  existingDocumentsLoading,
+  existingDocumentsError,
+  useExistingDocuments,
+  selectedExistingDocuments,
+  onToggleUseExisting,
+  onToggleExistingDocument,
+  onPreviewExistingDocument,
+}: DocumentsStepProps) {
   const isValid = data.idType && data.idNumber;
   
   const handleFileChange = (field: 'idFrontFile' | 'idBackFile', file: File | undefined) => {
@@ -1402,8 +1532,66 @@ function DocumentsStep({ data, onChange, onNext, onBack }: DocumentsStepProps) {
         <div className="form-section">
           <h3>Upload Documents</h3>
           <p className="section-note">Please upload clear photos or scans of your ID document</p>
+
+          <div className="existing-docs-toggle">
+            <label className="toggle-option">
+              <input
+                type="checkbox"
+                checked={useExistingDocuments}
+                onChange={(e) => onToggleUseExisting(e.target.checked)}
+                disabled={existingDocumentsLoading || existingDocuments.length === 0}
+              />
+              <span>Use previously uploaded documents</span>
+            </label>
+            {existingDocumentsLoading && <span className="hint-text">Loading documents...</span>}
+            {existingDocumentsError && <span className="hint-text error">{existingDocumentsError}</span>}
+            {!existingDocumentsLoading && existingDocuments.length === 0 && (
+              <span className="hint-text">No previous documents found</span>
+            )}
+          </div>
+
+          {useExistingDocuments && existingDocuments.length > 0 && (
+            <div className="existing-documents-list">
+              {existingDocuments.map((doc) => (
+                <div
+                  key={doc.blobName}
+                  className={`existing-document-item ${selectedExistingDocuments.includes(doc.blobName) ? 'selected' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onToggleExistingDocument(doc.blobName)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onToggleExistingDocument(doc.blobName);
+                    }
+                  }}
+                >
+                  <div className="doc-info">
+                    <span className="doc-name">{doc.name}</span>
+                    <span className="doc-meta">{doc.type} · {doc.side}</span>
+                  </div>
+                  <div className="doc-actions">
+                    <button
+                      type="button"
+                      className="btn-icon"
+                      title="Preview"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPreviewExistingDocument(doc);
+                      }}
+                    >
+                      👁️
+                    </button>
+                    <span className="doc-select">
+                      {selectedExistingDocuments.includes(doc.blobName) ? 'Selected' : 'Select'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           
-          <div className="upload-grid">
+          <div className={`upload-grid ${useExistingDocuments ? 'disabled' : ''}`}>
             <div className="upload-card">
               <div className="upload-icon">📄</div>
               <span className="upload-label">Front Side</span>
@@ -1413,6 +1601,7 @@ function DocumentsStep({ data, onChange, onNext, onBack }: DocumentsStepProps) {
                 onChange={(e) => handleFileChange('idFrontFile', e.target.files?.[0])}
                 className="upload-input"
                 id="idFront"
+                disabled={useExistingDocuments}
               />
               <label htmlFor="idFront" className="upload-btn">
                 {data.idFrontFile ? `✓ ${data.idFrontFile.name}` : 'Choose File'}
@@ -1428,6 +1617,7 @@ function DocumentsStep({ data, onChange, onNext, onBack }: DocumentsStepProps) {
                 onChange={(e) => handleFileChange('idBackFile', e.target.files?.[0])}
                 className="upload-input"
                 id="idBack"
+                disabled={useExistingDocuments}
               />
               <label htmlFor="idBack" className="upload-btn">
                 {data.idBackFile ? `✓ ${data.idBackFile.name}` : 'Choose File'}
@@ -1454,6 +1644,75 @@ function DocumentsStep({ data, onChange, onNext, onBack }: DocumentsStepProps) {
         <button className="btn-primary btn-lg" onClick={onNext} disabled={!isValid}>
           Continue to Review →
         </button>
+      </div>
+
+      {previewDoc && (
+        <UserDocumentPreviewModal
+          document={previewDoc}
+          url={previewUrl}
+          isLoading={previewLoading}
+          error={previewError}
+          onClose={() => {
+            setPreviewDoc(null);
+            setPreviewUrl(null);
+            setPreviewError(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function UserDocumentPreviewModal({
+  document,
+  url,
+  isLoading,
+  error,
+  onClose,
+}: {
+  document: ExistingDocumentView;
+  url: string | null;
+  isLoading: boolean;
+  error: string | null;
+  onClose: () => void;
+}) {
+  const fileExtension = document.name.split('.').pop()?.toLowerCase();
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '');
+  const isPdf = fileExtension === 'pdf';
+
+  return (
+    <div className="preview-overlay" onClick={onClose}>
+      <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="preview-header">
+          <div>
+            <h3 className="preview-title">{document.name}</h3>
+            <p className="preview-subtitle">{document.type.replace(/_/g, ' ')}</p>
+          </div>
+          <button className="preview-close" onClick={onClose}>×</button>
+        </div>
+        <div className="preview-body">
+          {isLoading && (
+            <div className="preview-loading">Loading document...</div>
+          )}
+          {!isLoading && error && (
+            <div className="preview-error">{error}</div>
+          )}
+          {!isLoading && !error && url && (
+            <div className="preview-content">
+              {isImage && (
+                <img src={url} alt={document.name} className="preview-image" />
+              )}
+              {isPdf && (
+                <iframe title={document.name} src={url} className="preview-frame" />
+              )}
+              {!isImage && !isPdf && (
+                <a className="preview-download" href={url} target="_blank" rel="noreferrer">
+                  Download file
+                </a>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
