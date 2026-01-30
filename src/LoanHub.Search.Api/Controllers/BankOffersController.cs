@@ -30,6 +30,7 @@ public sealed class BankOffersController : ControllerBase
         [FromHeader(Name = "X-Api-Key"), Required] string? apiKey,
         [FromQuery, Range(1, double.MaxValue)] decimal amount,
         [FromQuery, Range(1, 480)] int durationInMonths,
+        [FromQuery(Name = "durationMonths")] int? durationMonths,
         [FromQuery, Range(0, double.MaxValue)] decimal? income,
         [FromQuery, Range(0, double.MaxValue)] decimal? livingCosts,
         [FromQuery, Range(0, int.MaxValue)] int? dependents,
@@ -40,6 +41,9 @@ public sealed class BankOffersController : ControllerBase
 
         if (!await _apiKeyService.ValidateAsync(apiKey, ct))
             return Unauthorized("Invalid API key.");
+
+        if (durationInMonths <= 0 && durationMonths.HasValue)
+            durationInMonths = durationMonths.Value;
 
         if (amount <= 0 || durationInMonths <= 0)
             return BadRequest("amount and durationInMonths must be positive.");

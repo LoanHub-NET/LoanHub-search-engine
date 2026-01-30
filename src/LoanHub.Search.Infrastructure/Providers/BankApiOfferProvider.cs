@@ -92,7 +92,7 @@ public sealed class BankApiOfferProvider : ILoanOfferProvider
         var parameters = new Dictionary<string, string>
         {
             ["amount"] = query.Amount.ToString(CultureInfo.InvariantCulture),
-            ["durationMonths"] = query.DurationMonths.ToString(CultureInfo.InvariantCulture)
+            ["durationInMonths"] = query.DurationMonths.ToString(CultureInfo.InvariantCulture)
         };
 
         if (query.Income.HasValue)
