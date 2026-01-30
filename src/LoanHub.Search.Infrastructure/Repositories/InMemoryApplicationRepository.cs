@@ -43,6 +43,15 @@ public sealed class InMemoryApplicationRepository : IApplicationRepository
     public Task<PagedResult<LoanApplication>> ListAdminAsync(ApplicationAdminQuery query, CancellationToken ct)
     {
         var normalized = query.Normalize();
+        if (normalized.BankIds is { Count: 0 })
+        {
+            return Task.FromResult(new PagedResult<LoanApplication>(
+                Array.Empty<LoanApplication>(),
+                normalized.Page,
+                normalized.PageSize,
+                0));
+        }
+
         IEnumerable<LoanApplication> applications = _storage.Values;
 
         if (!string.IsNullOrWhiteSpace(normalized.ApplicantEmail))
@@ -71,6 +80,12 @@ public sealed class InMemoryApplicationRepository : IApplicationRepository
 
         if (normalized.UpdatedTo is not null)
             applications = applications.Where(application => application.UpdatedAt <= normalized.UpdatedTo);
+
+        if (normalized.BankIds is { Count: > 0 })
+        {
+            applications = applications.Where(application =>
+                application.BankId.HasValue && normalized.BankIds.Contains(application.BankId.Value));
+        }
 
         var ordered = applications.OrderByDescending(application => application.CreatedAt).ToList();
         var totalCount = ordered.Count;
