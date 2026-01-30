@@ -47,6 +47,7 @@ export function ApplicationDetailModal({
   const totalDocuments = documents.length;
   const acceptedDocumentsCount = documents.filter(doc => doc.status === 'verified').length;
   const allDocumentsAccepted = totalDocuments > 0 && acceptedDocumentsCount === totalDocuments;
+  const shouldGateAccept = activeTab === 'documents' && totalDocuments > 0;
 
   const mappedDocuments = useMemo(() => documents, [documents]);
 
@@ -249,7 +250,16 @@ export function ApplicationDetailModal({
                 ❌ Reject
               </button>
               {canMakeDecision && (
-                <button className="btn btn-success" onClick={onAccept}>
+                <button
+                  className="btn btn-success"
+                  onClick={onAccept}
+                  disabled={shouldGateAccept && !allDocumentsAccepted}
+                  title={
+                    shouldGateAccept && !allDocumentsAccepted
+                      ? 'All documents must be accepted before approval.'
+                      : undefined
+                  }
+                >
                   ✅ Accept
                 </button>
               )}
