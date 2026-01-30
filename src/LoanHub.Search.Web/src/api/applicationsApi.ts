@@ -169,3 +169,18 @@ export const cancelApplicationForCurrentUser = async (applicationId: string) => 
 
   return handleResponse(response);
 };
+
+export const uploadSignedContract = async (applicationId: string, file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(
+    `${getApiBaseUrl()}/api/applications/${applicationId}/signed-contract`,
+    {
+      method: 'POST',
+      body: formData,
+    },
+  );
+
+  return handleResponse(response);
+};

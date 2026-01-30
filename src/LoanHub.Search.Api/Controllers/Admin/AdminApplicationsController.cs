@@ -3,6 +3,7 @@ using LoanHub.Search.Core.Services.Applications;
 using LoanHub.Search.Core.Services.Users;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.IO;
 using System.Security.Claims;
 
 namespace LoanHub.Search.Api.Controllers.Admin;
@@ -116,6 +117,35 @@ public sealed class AdminApplicationsController : ControllerBase
         return Ok(ApplicationsController.ApplicationResponse.From(application, adminSummary));
     }
 
+    [HttpPost("{id:guid}/contract")]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<ApplicationsController.ApplicationResponse>> UploadContract(
+        Guid id,
+        [FromForm] ContractUploadRequest request,
+        CancellationToken ct)
+    {
+        if (request.File is null || request.File.Length == 0)
+            return BadRequest("File is required.");
+
+        var extension = Path.GetExtension(request.File.FileName).ToLowerInvariant();
+        if (extension != ".pdf")
+            return BadRequest("Only PDF contracts are supported.");
+
+        await using var stream = request.File.OpenReadStream();
+        var application = await _service.UploadContractAsync(
+            id,
+            stream,
+            request.File.FileName,
+            request.File.ContentType,
+            GetAdminId(),
+            ct);
+        if (application is null)
+            return NotFound();
+
+        var adminSummary = await GetAssignedAdminSummaryAsync(application.AssignedAdminId, ct);
+        return Ok(ApplicationsController.ApplicationResponse.From(application, adminSummary));
+    }
+
     [HttpPost("{id:guid}/final-approve")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> FinalApprove(Guid id, CancellationToken ct)
     {
@@ -142,6 +172,8 @@ public sealed class AdminApplicationsController : ControllerBase
     }
 
     public sealed record RejectRequest(string Reason);
+
+    public sealed record ContractUploadRequest(IFormFile File);
 
     public sealed record PagedResponse<T>(
         IReadOnlyList<T> Items,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { 
   LoanApplication, 
   ApplicationDocument, 
@@ -15,6 +15,8 @@ interface ApplicationDetailModalProps {
   onClose: () => void;
   onAccept: () => void;
   onReject: () => void;
+  onUploadContract: (file: File) => Promise<void>;
+  onFinalApprove: () => Promise<void>;
 }
 
 type TabId = 'overview' | 'applicant' | 'documents' | 'history' | 'provider';
@@ -24,6 +26,8 @@ export function ApplicationDetailModal({
   onClose,
   onAccept,
   onReject,
+  onUploadContract,
+  onFinalApprove,
 }: ApplicationDetailModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [documents, setDocuments] = useState<ApplicationDocument[]>(application.documents);
@@ -33,8 +37,17 @@ export function ApplicationDetailModal({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [contractUploadError, setContractUploadError] = useState<string | null>(null);
+  const [contractUploading, setContractUploading] = useState(false);
+  const [finalApproveError, setFinalApproveError] = useState<string | null>(null);
+  const [finalApproving, setFinalApproving] = useState(false);
+  const contractInputRef = useRef<HTMLInputElement | null>(null);
   const slaInfo = calculateSlaInfo(application);
   const statusConfig = ADMIN_STATUS_CONFIG[application.status];
+  const totalDocuments = documents.length;
+  const acceptedDocumentsCount = documents.filter(doc => doc.status === 'verified').length;
+  const allDocumentsAccepted = totalDocuments > 0 && acceptedDocumentsCount === totalDocuments;
+  const shouldGateAccept = activeTab === 'documents' && totalDocuments > 0;
 
   const mappedDocuments = useMemo(() => documents, [documents]);
 
@@ -65,6 +78,9 @@ export function ApplicationDetailModal({
   ];
 
   const canMakeDecision = application.status === 'new' || application.status === 'preliminarily_accepted';
+  const canSendContract = application.status === 'accepted' || application.status === 'preliminarily_accepted';
+  const canFinalApprove = application.status === 'signed_contract_received';
+  const canReject = canMakeDecision || canFinalApprove;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -132,6 +148,16 @@ export function ApplicationDetailModal({
                   setPreviewLoading(false);
                 }
               }}
+              onAccept={(doc) => {
+                setDocuments(prev =>
+                  prev.map(item => (item.id === doc.id ? { ...item, status: 'verified' } : item)),
+                );
+              }}
+              onReject={(doc) => {
+                setDocuments(prev =>
+                  prev.map(item => (item.id === doc.id ? { ...item, status: 'rejected' } : item)),
+                );
+              }}
             />
           )}
           {activeTab === 'history' && (
@@ -161,14 +187,82 @@ export function ApplicationDetailModal({
           <button className="btn btn-secondary" onClick={onClose}>
             Close
           </button>
-          {canMakeDecision && (
+          {contractUploadError && <span className="modal-error">{contractUploadError}</span>}
+          {finalApproveError && <span className="modal-error">{finalApproveError}</span>}
+          {canSendContract && (
+            <>
+              <input
+                ref={contractInputRef}
+                type="file"
+                accept="application/pdf"
+                style={{ display: 'none' }}
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  setContractUploadError(null);
+                  setContractUploading(true);
+                  try {
+                    await onUploadContract(file);
+                  } catch (err: unknown) {
+                    const message = err instanceof Error ? err.message : 'Failed to upload contract.';
+                    setContractUploadError(message);
+                  } finally {
+                    setContractUploading(false);
+                    if (contractInputRef.current) {
+                      contractInputRef.current.value = '';
+                    }
+                  }
+                }}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={() => contractInputRef.current?.click()}
+                disabled={contractUploading}
+              >
+                {contractUploading ? 'Uploading...' : '📄 Send Contract'}
+              </button>
+            </>
+          )}
+          {canFinalApprove && (
+            <button
+              className="btn btn-success"
+              onClick={async () => {
+                setFinalApproveError(null);
+                setFinalApproving(true);
+                try {
+                  await onFinalApprove();
+                } catch (err: unknown) {
+                  const message = err instanceof Error ? err.message : 'Failed to final approve.';
+                  setFinalApproveError(message);
+                } finally {
+                  setFinalApproving(false);
+                }
+              }}
+              disabled={finalApproving || !allDocumentsAccepted}
+              title={!allDocumentsAccepted ? 'All documents must be accepted before final approval.' : undefined}
+            >
+              {finalApproving ? 'Approving...' : '✅ Final Approve'}
+            </button>
+          )}
+          {canReject && (
             <>
               <button className="btn btn-danger" onClick={onReject}>
                 ❌ Reject
               </button>
-              <button className="btn btn-success" onClick={onAccept}>
-                ✅ Accept
-              </button>
+              {canMakeDecision && (
+                <button
+                  className="btn btn-success"
+                  onClick={onAccept}
+                  disabled={shouldGateAccept && !allDocumentsAccepted}
+                  title={
+                    shouldGateAccept && !allDocumentsAccepted
+                      ? 'All documents must be accepted before approval.'
+                      : undefined
+                  }
+                >
+                  ✅ Accept
+                </button>
+              )}
             </>
           )}
         </div>
@@ -257,23 +351,17 @@ function OverviewTab({ application, slaInfo }: { application: LoanApplication; s
             <span className="detail-label">Expires</span>
             <span className="detail-value">{formatDate(application.expiresAt)}</span>
           </div>
-          <div className="detail-item">
-            <span className="detail-label">Time in Queue</span>
-            <span className="detail-value">
-              {slaInfo.timeSinceSubmission < 24 
-                ? `${slaInfo.timeSinceSubmission.toFixed(1)} hours`
-                : `${Math.floor(slaInfo.timeSinceSubmission / 24)} days ${Math.round(slaInfo.timeSinceSubmission % 24)} hours`
-              }
-            </span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-label">Documents</span>
-            <span className="detail-value">{application.documents.length} uploaded</span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-label">Status Changes</span>
-            <span className="detail-value">{application.statusHistory.length}</span>
-          </div>
+          {application.status !== 'final_approved' && application.status !== 'granted' && (
+            <div className="detail-item">
+              <span className="detail-label">Time in Queue</span>
+              <span className="detail-value">
+                {slaInfo.timeSinceSubmission < 24
+                  ? `${slaInfo.timeSinceSubmission.toFixed(1)} hours`
+                  : `${Math.floor(slaInfo.timeSinceSubmission / 24)} days ${Math.round(slaInfo.timeSinceSubmission % 24)} hours`
+                }
+              </span>
+            </div>
+          )}
         </div>
       </section>
 
@@ -447,11 +535,15 @@ function ApplicantTab({ application }: { application: LoanApplication }) {
 function DocumentsTab({
   documents,
   onView,
+  onAccept,
+  onReject,
   isLoading,
   error,
 }: {
   documents: ApplicationDocument[];
   onView: (doc: ApplicationDocument) => void;
+  onAccept: (doc: ApplicationDocument) => void;
+  onReject: (doc: ApplicationDocument) => void;
   isLoading: boolean;
   error: string | null;
 }) {
@@ -469,21 +561,13 @@ function DocumentsTab({
     return labels[type];
   };
 
-  const getStatusBadge = (status: ApplicationDocument['status']) => {
-    const configs: Record<ApplicationDocument['status'], { class: string; label: string }> = {
-      pending: { class: 'badge-warning', label: 'Pending Review' },
-      verified: { class: 'badge-success', label: 'Verified' },
-      rejected: { class: 'badge-danger', label: 'Rejected' },
-      expired: { class: 'badge-neutral', label: 'Expired' },
-    };
-    return configs[status];
-  };
-
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
+
+  const acceptedCount = documents.filter(doc => doc.status === 'verified').length;
 
   return (
     <div className="tab-content documents-tab">
@@ -503,9 +587,13 @@ function DocumentsTab({
           <p>No documents uploaded</p>
         </div>
       ) : (
+        <div className="documents-summary">
+          <span>Accepted {acceptedCount}/{documents.length}</span>
+        </div>
+      )}
+      {!isLoading && !error && documents.length > 0 && (
         <div className="documents-list">
           {documents.map(doc => {
-            const statusBadge = getStatusBadge(doc.status);
             const sideLabel = doc.side ? ` · ${doc.side.toUpperCase()}` : '';
             return (
               <div key={doc.id} className="document-card">
@@ -520,14 +608,13 @@ function DocumentsTab({
                   </div>
                 </div>
                 <div className="document-actions">
-                  <span className={`badge ${statusBadge.class}`}>{statusBadge.label}</span>
                   <button className="btn btn-sm btn-secondary" onClick={() => onView(doc)}>
                     View
                   </button>
                   {doc.status === 'pending' && (
                     <>
-                      <button className="btn btn-sm btn-success">✓</button>
-                      <button className="btn btn-sm btn-danger">✗</button>
+                      <button className="btn btn-sm btn-success" onClick={() => onAccept(doc)}>✓</button>
+                      <button className="btn btn-sm btn-danger" onClick={() => onReject(doc)}>✗</button>
                     </>
                   )}
                 </div>
@@ -551,6 +638,7 @@ function mapApiDocument(doc: {
 }): ApplicationDocument {
   const type = mapDocumentType(doc.documentType);
   const side = mapDocumentSide(doc.documentSide);
+  const uploadedBy = type === 'contract' ? 'admin' : type === 'signed_contract' ? 'applicant' : 'applicant';
 
   return {
     id: doc.blobName,
@@ -560,7 +648,7 @@ function mapApiDocument(doc: {
     blobName: doc.blobName,
     side,
     uploadedAt: new Date(doc.uploadedAt),
-    uploadedBy: 'applicant',
+    uploadedBy,
     size: doc.sizeBytes,
     status: 'pending',
   };
@@ -584,6 +672,11 @@ function mapDocumentType(value: string): ApplicationDocument['type'] {
     case 'employmentcontract':
     case 'employment_contract':
       return 'employment_contract';
+    case 'contract':
+      return 'contract';
+    case 'signedcontract':
+    case 'signed_contract':
+      return 'signed_contract';
     default:
       return 'other';
   }

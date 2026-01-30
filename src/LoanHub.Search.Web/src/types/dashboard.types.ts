@@ -9,6 +9,9 @@ export type UserApplicationStatus =
   | 'new'
   | 'preliminarily_accepted'
   | 'accepted'
+  | 'contract_ready'
+  | 'signed_contract_received'
+  | 'final_approved'
   | 'granted'
   | 'rejected'
   | 'expired'
@@ -251,6 +254,27 @@ export const USER_STATUS_CONFIG: Record<UserApplicationStatus, {
     bgColor: 'rgba(16, 185, 129, 0.1)',
     icon: '✅',
     description: 'Offer accepted, awaiting contract signing',
+  },
+  contract_ready: {
+    label: 'Contract Ready',
+    color: '#0ea5e9',
+    bgColor: 'rgba(14, 165, 233, 0.1)',
+    icon: '📄',
+    description: 'Contract is ready to sign and upload',
+  },
+  signed_contract_received: {
+    label: 'Signed Contract Received',
+    color: '#6366f1',
+    bgColor: 'rgba(99, 102, 241, 0.1)',
+    icon: '✍️',
+    description: 'We received your signed contract and are verifying it',
+  },
+  final_approved: {
+    label: 'Final Approved',
+    color: '#16a34a',
+    bgColor: 'rgba(22, 163, 74, 0.1)',
+    icon: '🎉',
+    description: 'Loan approved after contract verification',
   },
   granted: {
     label: 'Granted',

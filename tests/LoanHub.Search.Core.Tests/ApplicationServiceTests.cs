@@ -13,6 +13,7 @@ public sealed class ApplicationServiceTests
     {
         var repository = new InMemoryApplicationRepository();
         var contractStorage = new StubContractStorage();
+        var documentStorage = new StubDocumentStorage();
         var contractDocumentGenerator = new StubContractDocumentGenerator();
         var contractLinkGenerator = new StubContractLinkGenerator();
         var emailSender = new CapturingEmailSender();
@@ -27,6 +28,7 @@ public sealed class ApplicationServiceTests
         var service = new ApplicationService(
             repository,
             contractStorage,
+            documentStorage,
             contractDocumentGenerator,
             contractLinkGenerator,
             emailSender,
@@ -55,6 +57,7 @@ public sealed class ApplicationServiceTests
     {
         var repository = new InMemoryApplicationRepository();
         var contractStorage = new StubContractStorage();
+        var documentStorage = new StubDocumentStorage();
         var contractDocumentGenerator = new StubContractDocumentGenerator();
         var contractLinkGenerator = new StubContractLinkGenerator();
         var emailSender = new CapturingEmailSender();
@@ -65,6 +68,7 @@ public sealed class ApplicationServiceTests
         var service = new ApplicationService(
             repository,
             contractStorage,
+            documentStorage,
             contractDocumentGenerator,
             contractLinkGenerator,
             emailSender,
@@ -96,6 +100,7 @@ public sealed class ApplicationServiceTests
     {
         var repository = new InMemoryApplicationRepository();
         var contractStorage = new StubContractStorage();
+        var documentStorage = new StubDocumentStorage();
         var contractDocumentGenerator = new StubContractDocumentGenerator();
         var contractLinkGenerator = new StubContractLinkGenerator();
         var emailSender = new CapturingEmailSender();
@@ -106,6 +111,7 @@ public sealed class ApplicationServiceTests
         var service = new ApplicationService(
             repository,
             contractStorage,
+            documentStorage,
             contractDocumentGenerator,
             contractLinkGenerator,
             emailSender,
@@ -135,6 +141,7 @@ public sealed class ApplicationServiceTests
     {
         var repository = new InMemoryApplicationRepository();
         var contractStorage = new StubContractStorage();
+        var documentStorage = new StubDocumentStorage();
         var contractDocumentGenerator = new StubContractDocumentGenerator();
         var contractLinkGenerator = new StubContractLinkGenerator();
         var emailSender = new CapturingEmailSender();
@@ -145,6 +152,7 @@ public sealed class ApplicationServiceTests
         var service = new ApplicationService(
             repository,
             contractStorage,
+            documentStorage,
             contractDocumentGenerator,
             contractLinkGenerator,
             emailSender,

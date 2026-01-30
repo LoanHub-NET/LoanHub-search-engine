@@ -294,7 +294,7 @@ export const ADMIN_STATUS_CONFIG: Record<AdminApplicationStatus, {
     icon: '🏁',
   },
   granted: {
-    label: 'Granted',
+    label: 'Final Approved',
     color: '#059669',
     bgColor: 'rgba(5, 150, 105, 0.1)',
     icon: '🎉',

@@ -302,6 +302,47 @@ internal sealed class StubContractStorage : IContractStorage
     }
 }
 
+internal sealed class StubDocumentStorage : IDocumentStorage
+{
+    public Task<StoredDocument> UploadDocumentAsync(
+        Guid applicationId,
+        Stream content,
+        string fileName,
+        string? contentType,
+        DocumentType documentType,
+        DocumentSide side,
+        CancellationToken ct)
+    {
+        var stored = new StoredDocument(
+            $"{applicationId:N}/stub-{Guid.NewGuid():N}",
+            Path.GetFileName(fileName),
+            contentType ?? "application/octet-stream",
+            documentType,
+            side,
+            0,
+            DateTimeOffset.UtcNow);
+        return Task.FromResult(stored);
+    }
+
+    public Task<IReadOnlyList<StoredDocument>> ListDocumentsAsync(Guid applicationId, CancellationToken ct)
+        => Task.FromResult<IReadOnlyList<StoredDocument>>(Array.Empty<StoredDocument>());
+
+    public Task<IReadOnlyList<StoredDocument>> CopyDocumentsAsync(
+        Guid targetApplicationId,
+        IReadOnlyList<string> sourceBlobNames,
+        CancellationToken ct)
+        => Task.FromResult<IReadOnlyList<StoredDocument>>(Array.Empty<StoredDocument>());
+
+    public Task<string?> GetDocumentUrlAsync(string blobName, TimeSpan validFor, CancellationToken ct)
+        => Task.FromResult<string?>(null);
+
+    public Task<Stream?> DownloadDocumentAsync(string blobName, CancellationToken ct)
+        => Task.FromResult<Stream?>(null);
+
+    public Task<bool> DeleteDocumentAsync(string blobName, CancellationToken ct)
+        => Task.FromResult(false);
+}
+
 internal sealed class StubContractDocumentGenerator : IContractDocumentGenerator
 {
     public ContractDocument GeneratePreliminaryContract(LoanApplication application)

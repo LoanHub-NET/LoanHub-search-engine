@@ -63,6 +63,10 @@ const MOCK_PROVIDERS = [
 const storedProfileKeyPrefix = 'loanhub_user_profile_';
 const storedUserDocumentsKeyPrefix = 'loanhub_user_documents_';
 
+type EmploymentStatus = NonNullable<UserProfile['employment']>['status'];
+type EmploymentContractType = NonNullable<UserProfile['employment']>['contractType'];
+type IdDocumentType = NonNullable<UserProfile['idDocument']>['type'];
+
 interface ExistingDocumentView {
   name: string;
   type: string;
@@ -89,6 +93,18 @@ const normalizeDateInput = (value?: string | Date | null) => {
     return typeof value === 'string' ? value : '';
   }
   return dateValue.toISOString().split('T')[0];
+};
+
+const parseDate = (value?: string | Date | null): Date | undefined => {
+  if (!value) return undefined;
+  const parsed = typeof value === 'string' ? new Date(value) : value;
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+};
+
+const parseNumber = (value?: string | number | null): number | undefined => {
+  if (value === null || value === undefined || value === '') return undefined;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isNaN(parsed) ? undefined : parsed;
 };
 
 export function LoanApplicationPage() {
@@ -126,6 +142,77 @@ export function LoanApplicationPage() {
   const [useExistingDocuments, setUseExistingDocuments] = useState(false);
   const [selectedExistingDocuments, setSelectedExistingDocuments] = useState<string[]>([]);
   const [existingDocumentsApplicationId, setExistingDocumentsApplicationId] = useState<string | null>(null);
+
+  const persistProfileDraft = (nextFormData: ApplicationFormData) => {
+    if (!authSession?.id || typeof window === 'undefined') return;
+    const existing = getStoredProfile(authSession.id);
+    const verified = existing?.idDocument?.verified ?? false;
+
+    const employmentHasData = Boolean(
+      nextFormData.employment.employerName ||
+      nextFormData.employment.position ||
+      nextFormData.employment.employedSince ||
+      nextFormData.employment.contractType ||
+      nextFormData.employment.status,
+    );
+
+    const employment = employmentHasData || existing?.employment
+      ? {
+          status:
+            (nextFormData.employment.status as EmploymentStatus) ||
+            existing?.employment?.status ||
+            'employed',
+          employerName: nextFormData.employment.employerName || existing?.employment?.employerName,
+          position: nextFormData.employment.position || existing?.employment?.position,
+          startDate: parseDate(nextFormData.employment.employedSince) || existing?.employment?.startDate,
+          contractType:
+            (nextFormData.employment.contractType as EmploymentContractType) ||
+            existing?.employment?.contractType,
+        }
+      : undefined;
+
+    const idDocumentHasData = Boolean(
+      nextFormData.documents.idType ||
+      nextFormData.documents.idNumber ||
+      nextFormData.documents.idExpiry ||
+      verified,
+    );
+
+    const idDocument = idDocumentHasData
+      ? {
+          type:
+            (nextFormData.documents.idType as IdDocumentType) ||
+            existing?.idDocument?.type ||
+            'national_id',
+          number: nextFormData.documents.idNumber || existing?.idDocument?.number || '',
+          expiryDate: parseDate(nextFormData.documents.idExpiry) || existing?.idDocument?.expiryDate,
+          verified,
+        }
+      : existing?.idDocument;
+
+    const profileDraft: Partial<UserProfile> = {
+      id: authSession.id,
+      email: authSession.email ?? existing?.email ?? '',
+      firstName: nextFormData.personalInfo.firstName || existing?.firstName || '',
+      lastName: nextFormData.personalInfo.lastName || existing?.lastName || '',
+      phone: nextFormData.personalInfo.phone || existing?.phone,
+      dateOfBirth: parseDate(nextFormData.personalInfo.dateOfBirth) || existing?.dateOfBirth,
+      address: nextFormData.personalInfo.address || existing?.address,
+      employment,
+      monthlyIncome: parseNumber(nextFormData.employment.monthlyIncome) ?? existing?.monthlyIncome,
+      livingCosts: parseNumber(nextFormData.employment.livingCosts) ?? existing?.livingCosts,
+      dependents: parseNumber(nextFormData.employment.dependents) ?? existing?.dependents,
+      idDocument,
+      emailNotifications: existing?.emailNotifications ?? true,
+      smsNotifications: existing?.smsNotifications ?? false,
+      completionPercentage: existing?.completionPercentage ?? 0,
+    };
+
+    window.localStorage.setItem(
+      `${storedProfileKeyPrefix}${authSession.id}`,
+      JSON.stringify(profileDraft),
+    );
+  };
   
   // Load offer from URL params if not from location state
   useEffect(() => {
@@ -314,24 +401,27 @@ export function LoanApplicationPage() {
   
   // Update form data
   const updatePersonalInfo = (data: Partial<PersonalInfoData>) => {
-    setFormData(prev => ({
-      ...prev,
-      personalInfo: { ...prev.personalInfo, ...data },
-    }));
+    setFormData(prev => {
+      const next = { ...prev, personalInfo: { ...prev.personalInfo, ...data } };
+      persistProfileDraft(next);
+      return next;
+    });
   };
   
   const updateEmployment = (data: Partial<EmploymentData>) => {
-    setFormData(prev => ({
-      ...prev,
-      employment: { ...prev.employment, ...data },
-    }));
+    setFormData(prev => {
+      const next = { ...prev, employment: { ...prev.employment, ...data } };
+      persistProfileDraft(next);
+      return next;
+    });
   };
   
   const updateDocuments = (data: Partial<DocumentData>) => {
-    setFormData(prev => ({
-      ...prev,
-      documents: { ...prev.documents, ...data },
-    }));
+    setFormData(prev => {
+      const next = { ...prev, documents: { ...prev.documents, ...data } };
+      persistProfileDraft(next);
+      return next;
+    });
   };
   
   const updatePersonalization = (data: Partial<PersonalizationData>) => {

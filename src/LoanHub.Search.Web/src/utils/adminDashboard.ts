@@ -29,6 +29,7 @@ export const calculateDashboardStats = (applications: LoanApplication[]): Dashbo
         stats.accepted++;
         break;
       case 'granted':
+      case 'final_approved':
         stats.granted++;
         break;
       case 'rejected':

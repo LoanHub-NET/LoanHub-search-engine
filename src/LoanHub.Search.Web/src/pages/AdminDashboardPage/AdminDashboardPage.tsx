@@ -16,6 +16,8 @@ import {
   listAdminApplications,
   preliminarilyAcceptApplication,
   rejectAdminApplication,
+  uploadApplicationContract,
+  finalApproveApplication,
   type AdminApplicationResponse,
 } from '../../api/adminApplicationsApi';
 import { calculateDashboardStats } from '../../utils/adminDashboard';
@@ -43,7 +45,7 @@ const mapStatus = (status: number | string): LoanApplication['status'] => {
       case 5:
         return 'cancelled';
       case 6:
-        return 'granted';
+        return 'final_approved';
       case 7:
         return 'contract_ready';
       case 8:
@@ -69,7 +71,7 @@ const mapStatus = (status: number | string): LoanApplication['status'] => {
     case 'cancelled':
       return 'cancelled';
     case 'granted':
-      return 'granted';
+      return 'final_approved';
     case 'contractready':
       return 'contract_ready';
     case 'signedcontractreceived':
@@ -315,13 +317,29 @@ export function AdminDashboardPage() {
     setDecisionModal({ application: app, type: 'reject' });
   };
 
+  const handleUploadContract = async (applicationId: string, file: File) => {
+    setActionError(null);
+    const updated = await uploadApplicationContract(applicationId, file);
+    const mapped = mapAdminApplication(updated);
+    setApplications(prev => prev.map(app => (app.id === mapped.id ? mapped : app)));
+    setSelectedApplication(prev => (prev && prev.id === mapped.id ? mapped : prev));
+  };
+
+  const handleFinalApprove = async (applicationId: string) => {
+    setActionError(null);
+    const updated = await finalApproveApplication(applicationId);
+    const mapped = mapAdminApplication(updated);
+    setApplications(prev => prev.map(app => (app.id === mapped.id ? mapped : app)));
+    setSelectedApplication(prev => (prev && prev.id === mapped.id ? mapped : prev));
+  };
+
   // Status filter options
   const statusOptions: { value: StatusFilter; label: string; count: number }[] = [
     { value: 'all', label: 'All', count: stats.total },
     { value: 'new', label: 'New', count: stats.new },
     { value: 'preliminarily_accepted', label: 'Preliminary', count: stats.preliminarilyAccepted },
     { value: 'accepted', label: 'Accepted', count: stats.accepted },
-    { value: 'granted', label: 'Granted', count: stats.granted },
+    { value: 'final_approved', label: 'Final Approved', count: stats.granted },
     { value: 'rejected', label: 'Rejected', count: stats.rejected },
   ];
 
@@ -372,7 +390,7 @@ export function AdminDashboardPage() {
                 <div className="stat-icon-wrapper">✅</div>
                 <div className="stat-info">
                   <span className="stat-value">{stats.granted}</span>
-                  <span className="stat-label">Granted</span>
+                  <span className="stat-label">Final Approved</span>
                 </div>
               </div>
               <div className="stat-card">
@@ -587,6 +605,8 @@ export function AdminDashboardPage() {
           onReject={() => {
             openRejectModal(selectedApplication);
           }}
+          onUploadContract={(file) => handleUploadContract(selectedApplication.id, file)}
+          onFinalApprove={() => handleFinalApprove(selectedApplication.id)}
         />
       )}
 
