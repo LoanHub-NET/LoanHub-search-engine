@@ -13,6 +13,55 @@ public sealed class AuditLogRepository : IAuditLogRepository
 
     public AuditLogRepository(ApplicationDbContext dbContext) => _dbContext = dbContext;
 
+    public async Task AddAsync(AuditLogEntry entry, CancellationToken ct)
+    {
+        const string sql = """
+            INSERT INTO audit_logs (
+                logged_at, level, message, exception,
+                request_method, request_path, query_string,
+                status_code, elapsed_ms, request_headers, response_headers,
+                request_body, response_body, user_id, user_email,
+                client_ip, user_agent, trace_id
+            ) VALUES (
+                @logged_at, @level, @message, @exception,
+                @request_method, @request_path, @query_string,
+                @status_code, @elapsed_ms, @request_headers, @response_headers,
+                @request_body, @response_body, @user_id, @user_email,
+                @client_ip, @user_agent, @trace_id
+            );
+            """;
+
+        var connection = (NpgsqlConnection)_dbContext.Database.GetDbConnection();
+        var shouldClose = connection.State != ConnectionState.Open;
+        if (shouldClose)
+            await connection.OpenAsync(ct);
+
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("logged_at", entry.LoggedAt.UtcDateTime);
+        command.Parameters.AddWithValue("level", (object?)entry.Level ?? DBNull.Value);
+        command.Parameters.AddWithValue("message", (object?)entry.Message ?? DBNull.Value);
+        command.Parameters.AddWithValue("exception", (object?)entry.Exception ?? DBNull.Value);
+        command.Parameters.AddWithValue("request_method", (object?)entry.RequestMethod ?? DBNull.Value);
+        command.Parameters.AddWithValue("request_path", (object?)entry.RequestPath ?? DBNull.Value);
+        command.Parameters.AddWithValue("query_string", (object?)entry.QueryString ?? DBNull.Value);
+        command.Parameters.AddWithValue("status_code", (object?)entry.StatusCode ?? DBNull.Value);
+        command.Parameters.AddWithValue("elapsed_ms", (object?)entry.ElapsedMs ?? DBNull.Value);
+        command.Parameters.AddWithValue("request_headers", (object?)entry.RequestHeaders ?? DBNull.Value);
+        command.Parameters.AddWithValue("response_headers", (object?)entry.ResponseHeaders ?? DBNull.Value);
+        command.Parameters.AddWithValue("request_body", (object?)entry.RequestBody ?? DBNull.Value);
+        command.Parameters.AddWithValue("response_body", (object?)entry.ResponseBody ?? DBNull.Value);
+        command.Parameters.AddWithValue("user_id", (object?)entry.UserId ?? DBNull.Value);
+        command.Parameters.AddWithValue("user_email", (object?)entry.UserEmail ?? DBNull.Value);
+        command.Parameters.AddWithValue("client_ip", (object?)entry.ClientIp ?? DBNull.Value);
+        command.Parameters.AddWithValue("user_agent", (object?)entry.UserAgent ?? DBNull.Value);
+        command.Parameters.AddWithValue("trace_id", (object?)entry.TraceId ?? DBNull.Value);
+
+        await command.ExecuteNonQueryAsync(ct);
+
+        if (shouldClose)
+            await connection.CloseAsync();
+    }
+
     public async Task<PagedResult<AuditLogEntry>> ListAsync(AuditLogQuery query, CancellationToken ct)
     {
         var normalized = query.Normalize();

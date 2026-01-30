@@ -6,6 +6,8 @@ using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using LoanHub.Search.Core.Abstractions.Auditing;
+using LoanHub.Search.Core.Models.Auditing;
 using LoanHub.Search.Api.Options;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
@@ -107,6 +109,30 @@ public sealed class AuditLoggingMiddleware
                 .ForContext("ClientIp", context.Connection.RemoteIpAddress?.ToString())
                 .ForContext("UserAgent", context.Request.Headers["User-Agent"].ToString())
                 .ForContext("TraceId", Activity.Current?.TraceId.ToString() ?? context.TraceIdentifier);
+
+            var auditEntry = new AuditLogEntry
+            {
+                LoggedAt = DateTimeOffset.UtcNow,
+                Level = failure is null ? "Information" : "Error",
+                Message = $"Audit {context.Request.Method} {context.Request.Path} responded {context.Response.StatusCode} in {stopwatch.ElapsedMilliseconds} ms",
+                Exception = failure?.ToString(),
+                RequestMethod = context.Request.Method,
+                RequestPath = context.Request.Path.Value,
+                QueryString = queryString,
+                StatusCode = context.Response.StatusCode,
+                ElapsedMs = (int)stopwatch.ElapsedMilliseconds,
+                RequestHeaders = requestHeadersJson,
+                ResponseHeaders = responseHeadersJson,
+                RequestBody = requestBody,
+                ResponseBody = responseBody,
+                UserId = GetUserId(context),
+                UserEmail = GetUserEmail(context),
+                ClientIp = context.Connection.RemoteIpAddress?.ToString(),
+                UserAgent = context.Request.Headers["User-Agent"].ToString(),
+                TraceId = Activity.Current?.TraceId.ToString() ?? context.TraceIdentifier
+            };
+
+            await PersistAuditAsync(context, auditEntry);
 
             if (failure is null)
             {
@@ -325,4 +351,20 @@ public sealed class AuditLoggingMiddleware
 
     private static string? GetUserEmail(HttpContext context)
         => context.User.FindFirst("email")?.Value ?? context.User.FindFirst("preferred_username")?.Value;
+
+    private static async Task PersistAuditAsync(HttpContext context, AuditLogEntry entry)
+    {
+        try
+        {
+            var repository = context.RequestServices.GetService<IAuditLogRepository>();
+            if (repository is null)
+                return;
+
+            await repository.AddAsync(entry, context.RequestAborted);
+        }
+        catch
+        {
+            // Never break the request pipeline because auditing failed.
+        }
+    }
 }

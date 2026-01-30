@@ -491,15 +491,15 @@ static async Task InitializeDatabaseAsync(WebApplication app)
                     level varchar(20),
                     logged_at timestamptz NOT NULL,
                     exception text,
-                    properties jsonb,
-                    log_event jsonb,
+                    properties text,
+                    log_event text,
                     request_method text,
                     request_path text,
                     query_string text,
                     status_code integer,
                     elapsed_ms integer,
-                    request_headers jsonb,
-                    response_headers jsonb,
+                    request_headers text,
+                    response_headers text,
                     request_body text,
                     response_body text,
                     user_id text,
@@ -509,6 +509,14 @@ static async Task InitializeDatabaseAsync(WebApplication app)
                     trace_id text
                 );
                 CREATE INDEX IF NOT EXISTS ix_audit_logs_logged_at ON audit_logs (logged_at DESC);
+                """, CancellationToken.None);
+
+            await dbContext.Database.ExecuteSqlRawAsync("""
+                ALTER TABLE audit_logs
+                    ALTER COLUMN properties TYPE text USING properties::text,
+                    ALTER COLUMN log_event TYPE text USING log_event::text,
+                    ALTER COLUMN request_headers TYPE text USING request_headers::text,
+                    ALTER COLUMN response_headers TYPE text USING response_headers::text;
                 """, CancellationToken.None);
 
             app.Logger.LogInformation("Database initialized.");
