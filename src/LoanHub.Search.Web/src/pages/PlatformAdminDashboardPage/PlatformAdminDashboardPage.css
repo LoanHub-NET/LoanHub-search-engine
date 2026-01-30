@@ -3,6 +3,7 @@
   background: radial-gradient(circle at top, rgba(27, 78, 124, 0.08), transparent 45%),
     linear-gradient(180deg, #f6f8fb 0%, #eef3f9 100%);
   padding-bottom: 4rem;
+  color: #0b2b4e;
 }
 
 .platform-admin-hero {
@@ -126,6 +127,7 @@
   border-radius: 20px;
   padding: 1.8rem;
   box-shadow: 0 16px 40px rgba(15, 30, 50, 0.08);
+  color: #0b2b4e;
 }
 
 .platform-card h2 {
@@ -201,10 +203,10 @@
 }
 
 .platform-table-head {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #7a8aa0;
+  color: #3c4c61;
 }
 
 .platform-table-row {
@@ -219,7 +221,7 @@
 }
 
 .platform-table-row small {
-  color: #7a8aa0;
+  color: #5a6b7f;
   font-size: 0.75rem;
 }
 
@@ -264,7 +266,7 @@
 }
 
 .platform-muted {
-  color: #7a8aa0;
+  color: #54657a;
 }
 
 .audit-filters {
@@ -336,17 +338,17 @@
 }
 
 .audit-table-head {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #7a8aa0;
+  color: #3b4b61;
 }
 
 .audit-table-row {
   border: 1px solid transparent;
   border-radius: 12px;
-  padding: 0.65rem 0.8rem;
-  background: #f8fafc;
+  padding: 0.75rem 0.9rem;
+  background: #f2f6fb;
   text-align: left;
   cursor: pointer;
   width: 100%;
@@ -357,16 +359,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: #1f2f44;
 }
 
 .audit-table-row.active {
   border-color: #0b2b4e;
-  background: #eef4fb;
+  background: #e7f0fb;
 }
 
 .audit-path {
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-  font-size: 0.8rem;
+  font-size: 0.84rem;
+  color: #0b2b4e;
 }
 
 .audit-pagination {
@@ -375,7 +379,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  color: #4a5b6f;
+  color: #34465c;
 }
 
 .audit-pagination .ghost {
@@ -409,11 +413,11 @@
 
 .audit-detail-meta p {
   margin: 0.2rem 0;
-  color: #2a3c52;
+  color: #162538;
 }
 
 .audit-detail-meta small {
-  color: #7a8aa0;
+  color: #4f6076;
 }
 
 .audit-block {
@@ -424,8 +428,8 @@
 .audit-block pre {
   margin: 0;
   padding: 0.85rem;
-  background: #0b2b4e;
-  color: #fff;
+  background: #0f1f33;
+  color: #e6edf7;
   border-radius: 12px;
   font-size: 0.8rem;
   max-height: 240px;
