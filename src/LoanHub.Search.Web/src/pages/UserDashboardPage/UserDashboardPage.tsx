@@ -636,7 +636,7 @@ function ApplicationCard({ application, isSelected, onSelect, onResign, onContin
   const statusConfig = USER_STATUS_CONFIG[application.status];
   const daysRemaining = getDaysRemaining(application.expiresAt);
   const expiringSoon = isExpiringSoon(application.expiresAt);
-  const isActive = !['granted', 'rejected', 'expired', 'cancelled'].includes(application.status);
+  const isActive = !['granted', 'rejected', 'expired', 'cancelled', 'final_approved'].includes(application.status);
   
   return (
     <div className={`application-card ${isSelected ? 'selected' : ''} ${expiringSoon && isActive ? 'expiring' : ''}`}>
@@ -728,7 +728,7 @@ interface ApplicationDetailsProps {
 function ApplicationDetails({ application, onClose, onResign, onContinue }: ApplicationDetailsProps) {
   const statusConfig = USER_STATUS_CONFIG[application.status];
   const daysRemaining = getDaysRemaining(application.expiresAt);
-  const isActive = !['granted', 'rejected', 'expired', 'cancelled'].includes(application.status);
+  const isActive = !['granted', 'rejected', 'expired', 'cancelled', 'final_approved'].includes(application.status);
   
   return (
     <div className="application-details">
@@ -845,23 +845,6 @@ function ApplicationDetails({ application, onClose, onResign, onContinue }: Appl
             </div>
           </div>
         )}
-        
-        {/* Timeline */}
-        <div className="details-section">
-          <h4>Timeline</h4>
-          <div className="timeline">
-            <div className="timeline-item">
-              <span className="timeline-date">{formatDate(application.createdAt)}</span>
-              <span className="timeline-event">Application submitted</span>
-            </div>
-            {application.status !== 'new' && (
-              <div className="timeline-item">
-                <span className="timeline-date">{formatDate(application.updatedAt)}</span>
-                <span className="timeline-event">Status updated to {statusConfig.label}</span>
-              </div>
-            )}
-          </div>
-        </div>
         
         {/* Actions */}
         {(application.canResign || application.canContinue) && (

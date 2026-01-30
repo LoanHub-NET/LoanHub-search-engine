@@ -44,6 +44,9 @@ export function ApplicationDetailModal({
   const contractInputRef = useRef<HTMLInputElement | null>(null);
   const slaInfo = calculateSlaInfo(application);
   const statusConfig = ADMIN_STATUS_CONFIG[application.status];
+  const totalDocuments = documents.length;
+  const acceptedDocumentsCount = documents.filter(doc => doc.status === 'verified').length;
+  const allDocumentsAccepted = totalDocuments > 0 && acceptedDocumentsCount === totalDocuments;
 
   const mappedDocuments = useMemo(() => documents, [documents]);
 
@@ -144,6 +147,16 @@ export function ApplicationDetailModal({
                   setPreviewLoading(false);
                 }
               }}
+              onAccept={(doc) => {
+                setDocuments(prev =>
+                  prev.map(item => (item.id === doc.id ? { ...item, status: 'verified' } : item)),
+                );
+              }}
+              onReject={(doc) => {
+                setDocuments(prev =>
+                  prev.map(item => (item.id === doc.id ? { ...item, status: 'rejected' } : item)),
+                );
+              }}
             />
           )}
           {activeTab === 'history' && (
@@ -224,7 +237,8 @@ export function ApplicationDetailModal({
                   setFinalApproving(false);
                 }
               }}
-              disabled={finalApproving}
+              disabled={finalApproving || !allDocumentsAccepted}
+              title={!allDocumentsAccepted ? 'All documents must be accepted before final approval.' : undefined}
             >
               {finalApproving ? 'Approving...' : '✅ Final Approve'}
             </button>
@@ -327,23 +341,17 @@ function OverviewTab({ application, slaInfo }: { application: LoanApplication; s
             <span className="detail-label">Expires</span>
             <span className="detail-value">{formatDate(application.expiresAt)}</span>
           </div>
-          <div className="detail-item">
-            <span className="detail-label">Time in Queue</span>
-            <span className="detail-value">
-              {slaInfo.timeSinceSubmission < 24 
-                ? `${slaInfo.timeSinceSubmission.toFixed(1)} hours`
-                : `${Math.floor(slaInfo.timeSinceSubmission / 24)} days ${Math.round(slaInfo.timeSinceSubmission % 24)} hours`
-              }
-            </span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-label">Documents</span>
-            <span className="detail-value">{application.documents.length} uploaded</span>
-          </div>
-          <div className="detail-item">
-            <span className="detail-label">Status Changes</span>
-            <span className="detail-value">{application.statusHistory.length}</span>
-          </div>
+          {application.status !== 'final_approved' && application.status !== 'granted' && (
+            <div className="detail-item">
+              <span className="detail-label">Time in Queue</span>
+              <span className="detail-value">
+                {slaInfo.timeSinceSubmission < 24
+                  ? `${slaInfo.timeSinceSubmission.toFixed(1)} hours`
+                  : `${Math.floor(slaInfo.timeSinceSubmission / 24)} days ${Math.round(slaInfo.timeSinceSubmission % 24)} hours`
+                }
+              </span>
+            </div>
+          )}
         </div>
       </section>
 
@@ -517,11 +525,15 @@ function ApplicantTab({ application }: { application: LoanApplication }) {
 function DocumentsTab({
   documents,
   onView,
+  onAccept,
+  onReject,
   isLoading,
   error,
 }: {
   documents: ApplicationDocument[];
   onView: (doc: ApplicationDocument) => void;
+  onAccept: (doc: ApplicationDocument) => void;
+  onReject: (doc: ApplicationDocument) => void;
   isLoading: boolean;
   error: string | null;
 }) {
@@ -539,21 +551,13 @@ function DocumentsTab({
     return labels[type];
   };
 
-  const getStatusBadge = (status: ApplicationDocument['status']) => {
-    const configs: Record<ApplicationDocument['status'], { class: string; label: string }> = {
-      pending: { class: 'badge-warning', label: 'Pending Review' },
-      verified: { class: 'badge-success', label: 'Verified' },
-      rejected: { class: 'badge-danger', label: 'Rejected' },
-      expired: { class: 'badge-neutral', label: 'Expired' },
-    };
-    return configs[status];
-  };
-
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
+
+  const acceptedCount = documents.filter(doc => doc.status === 'verified').length;
 
   return (
     <div className="tab-content documents-tab">
@@ -573,9 +577,13 @@ function DocumentsTab({
           <p>No documents uploaded</p>
         </div>
       ) : (
+        <div className="documents-summary">
+          <span>Accepted {acceptedCount}/{documents.length}</span>
+        </div>
+      )}
+      {!isLoading && !error && documents.length > 0 && (
         <div className="documents-list">
           {documents.map(doc => {
-            const statusBadge = getStatusBadge(doc.status);
             const sideLabel = doc.side ? ` · ${doc.side.toUpperCase()}` : '';
             return (
               <div key={doc.id} className="document-card">
@@ -590,14 +598,13 @@ function DocumentsTab({
                   </div>
                 </div>
                 <div className="document-actions">
-                  <span className={`badge ${statusBadge.class}`}>{statusBadge.label}</span>
                   <button className="btn btn-sm btn-secondary" onClick={() => onView(doc)}>
                     View
                   </button>
                   {doc.status === 'pending' && (
                     <>
-                      <button className="btn btn-sm btn-success">✓</button>
-                      <button className="btn btn-sm btn-danger">✗</button>
+                      <button className="btn btn-sm btn-success" onClick={() => onAccept(doc)}>✓</button>
+                      <button className="btn btn-sm btn-danger" onClick={() => onReject(doc)}>✗</button>
                     </>
                   )}
                 </div>
