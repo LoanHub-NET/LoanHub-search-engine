@@ -168,6 +168,22 @@ public sealed class ApplicationService
             return null;
 
         AssignAdminIfMissing(application, adminId);
+
+        var existingDocuments = await _documentStorage.ListDocumentsAsync(application.Id, ct);
+        var hasContract = existingDocuments.Any(doc => doc.Type == DocumentType.Contract);
+        if (!hasContract)
+        {
+            var contract = _contractDocumentGenerator.GeneratePreliminaryContract(application);
+            await using var stream = new MemoryStream(contract.Content);
+            await _documentStorage.UploadDocumentAsync(
+                application.Id,
+                stream,
+                contract.FileName,
+                contract.ContentType,
+                DocumentType.Contract,
+                DocumentSide.Unknown,
+                ct);
+        }
         application.ContractReadyAt = DateTimeOffset.UtcNow;
         application.AddStatus(ApplicationStatus.ContractReady, null);
         var updated = await _repo.UpdateAsync(application, ct) ?? application;

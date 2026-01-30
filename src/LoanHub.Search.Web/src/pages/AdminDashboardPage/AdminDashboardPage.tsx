@@ -45,7 +45,7 @@ const mapStatus = (status: number | string): LoanApplication['status'] => {
       case 5:
         return 'cancelled';
       case 6:
-        return 'granted';
+        return 'final_approved';
       case 7:
         return 'contract_ready';
       case 8:
@@ -71,7 +71,7 @@ const mapStatus = (status: number | string): LoanApplication['status'] => {
     case 'cancelled':
       return 'cancelled';
     case 'granted':
-      return 'granted';
+      return 'final_approved';
     case 'contractready':
       return 'contract_ready';
     case 'signedcontractreceived':
@@ -339,7 +339,7 @@ export function AdminDashboardPage() {
     { value: 'new', label: 'New', count: stats.new },
     { value: 'preliminarily_accepted', label: 'Preliminary', count: stats.preliminarilyAccepted },
     { value: 'accepted', label: 'Accepted', count: stats.accepted },
-    { value: 'granted', label: 'Granted', count: stats.granted },
+    { value: 'final_approved', label: 'Final Approved', count: stats.granted },
     { value: 'rejected', label: 'Rejected', count: stats.rejected },
   ];
 
@@ -390,7 +390,7 @@ export function AdminDashboardPage() {
                 <div className="stat-icon-wrapper">✅</div>
                 <div className="stat-info">
                   <span className="stat-value">{stats.granted}</span>
-                  <span className="stat-label">Granted</span>
+                  <span className="stat-label">Final Approved</span>
                 </div>
               </div>
               <div className="stat-card">
