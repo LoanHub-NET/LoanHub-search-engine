@@ -49,7 +49,8 @@ public static class BankApiDescriptorParser
     public static string NormalizeEndpoint(string raw)
     {
         var trimmed = raw.Trim();
-        if (trimmed.Contains("/api/BankOffers", StringComparison.OrdinalIgnoreCase))
+        if (trimmed.Contains("/api/BankOffers", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Contains("/BankOffers", StringComparison.OrdinalIgnoreCase))
             return trimmed;
 
         trimmed = trimmed.TrimEnd('/');

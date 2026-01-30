@@ -53,8 +53,7 @@ public sealed class BankRepository : IBankRepository
 
         var updated = false;
         var baseUrl = NormalizeBaseUrl(bank.ApiBaseUrl);
-        if (!string.IsNullOrWhiteSpace(baseUrl) &&
-            !string.Equals(existing.ApiBaseUrl, baseUrl, StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(existing.ApiBaseUrl) && !string.IsNullOrWhiteSpace(baseUrl))
         {
             existing.ApiBaseUrl = baseUrl;
             updated = true;
