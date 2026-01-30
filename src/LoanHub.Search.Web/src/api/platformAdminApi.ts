@@ -13,6 +13,47 @@ export interface BankApiKeyCreatedResponse extends BankApiKeyResponse {
   apiKey: string;
 }
 
+export interface AuditLogResponse {
+  id: number;
+  loggedAt: string;
+  level?: string | null;
+  message?: string | null;
+  exception?: string | null;
+  requestMethod?: string | null;
+  requestPath?: string | null;
+  queryString?: string | null;
+  statusCode?: number | null;
+  elapsedMs?: number | null;
+  requestHeaders?: string | null;
+  responseHeaders?: string | null;
+  requestBody?: string | null;
+  responseBody?: string | null;
+  userId?: string | null;
+  userEmail?: string | null;
+  clientIp?: string | null;
+  userAgent?: string | null;
+  traceId?: string | null;
+}
+
+export interface AuditLogPagedResponse {
+  items: AuditLogResponse[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface AuditLogQuery {
+  from?: string;
+  to?: string;
+  method?: string;
+  path?: string;
+  email?: string;
+  statusCode?: number;
+  page?: number;
+  pageSize?: number;
+}
+
 interface PlatformAdminAuthResponse {
   id: string;
   email: string;
@@ -107,4 +148,29 @@ export const revokeBankApiKey = async (id: string) => {
   });
 
   return handleResponse<BankApiKeyResponse>(response);
+};
+
+export const listAuditLogs = async (query: AuditLogQuery) => {
+  const token = getAuthToken();
+  if (!token) {
+    throw new ApiError('Not authenticated.', 401);
+  }
+
+  const params = new URLSearchParams();
+  if (query.from) params.append('from', query.from);
+  if (query.to) params.append('to', query.to);
+  if (query.method) params.append('method', query.method);
+  if (query.path) params.append('path', query.path);
+  if (query.email) params.append('email', query.email);
+  if (query.statusCode !== undefined) params.append('statusCode', String(query.statusCode));
+  if (query.page) params.append('page', String(query.page));
+  if (query.pageSize) params.append('pageSize', String(query.pageSize));
+
+  const response = await fetch(`${getApiBaseUrl()}/api/admin/audits?${params.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return handleResponse<AuditLogPagedResponse>(response);
 };
