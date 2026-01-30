@@ -16,6 +16,8 @@ import {
   listAdminApplications,
   preliminarilyAcceptApplication,
   rejectAdminApplication,
+  uploadApplicationContract,
+  finalApproveApplication,
   type AdminApplicationResponse,
 } from '../../api/adminApplicationsApi';
 import { calculateDashboardStats } from '../../utils/adminDashboard';
@@ -315,6 +317,22 @@ export function AdminDashboardPage() {
     setDecisionModal({ application: app, type: 'reject' });
   };
 
+  const handleUploadContract = async (applicationId: string, file: File) => {
+    setActionError(null);
+    const updated = await uploadApplicationContract(applicationId, file);
+    const mapped = mapAdminApplication(updated);
+    setApplications(prev => prev.map(app => (app.id === mapped.id ? mapped : app)));
+    setSelectedApplication(prev => (prev && prev.id === mapped.id ? mapped : prev));
+  };
+
+  const handleFinalApprove = async (applicationId: string) => {
+    setActionError(null);
+    const updated = await finalApproveApplication(applicationId);
+    const mapped = mapAdminApplication(updated);
+    setApplications(prev => prev.map(app => (app.id === mapped.id ? mapped : app)));
+    setSelectedApplication(prev => (prev && prev.id === mapped.id ? mapped : prev));
+  };
+
   // Status filter options
   const statusOptions: { value: StatusFilter; label: string; count: number }[] = [
     { value: 'all', label: 'All', count: stats.total },
@@ -587,6 +605,8 @@ export function AdminDashboardPage() {
           onReject={() => {
             openRejectModal(selectedApplication);
           }}
+          onUploadContract={(file) => handleUploadContract(selectedApplication.id, file)}
+          onFinalApprove={() => handleFinalApprove(selectedApplication.id)}
         />
       )}
 

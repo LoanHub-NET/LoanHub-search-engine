@@ -20,6 +20,7 @@ import {
   cancelApplicationForCurrentUser,
   listApplicationsByEmail,
   listApplicationsForCurrentUser,
+  uploadSignedContract,
 } from '../../api/applicationsApi';
 import { getUserApplicationDocumentUrl, listUserApplicationDocuments } from '../../api/userDocumentsApi';
 import { uploadApplicationDocument } from '../../api/documentsApi';
@@ -168,9 +169,11 @@ export function UserDashboardPage() {
         case 6:
           return 'granted';
         case 7:
+          return 'contract_ready';
         case 8:
+          return 'signed_contract_received';
         case 9:
-          return 'accepted';
+          return 'final_approved';
         default:
           return 'new';
       }
@@ -1266,6 +1269,9 @@ function DocumentsSection({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [signedContractFile, setSignedContractFile] = useState<File | null>(null);
+  const [signedContractUploading, setSignedContractUploading] = useState(false);
+  const [signedContractError, setSignedContractError] = useState<string | null>(null);
   
   // Get all required documents across applications
   const pendingDocuments = applications
@@ -1293,6 +1299,51 @@ function DocumentsSection({
   useEffect(() => {
     setLatestDocumentsState(latestDocuments);
   }, [latestDocuments]);
+
+  const latestApplication = latestApplicationId
+    ? applications.find(app => app.id === latestApplicationId)
+    : undefined;
+
+  const contractDocument = latestDocumentsState.find(
+    doc => doc.type?.toString().toLowerCase() === 'contract',
+  );
+
+  const signedContractDocument = latestDocumentsState.find(
+    doc => doc.type?.toString().toLowerCase() === 'signedcontract' || doc.type?.toString().toLowerCase() === 'signed_contract',
+  );
+
+  const canUploadSignedContract =
+    Boolean(latestApplicationId) &&
+    Boolean(contractDocument) &&
+    latestApplication?.status === 'contract_ready' &&
+    !signedContractDocument;
+
+  const handleUploadSignedContract = async () => {
+    if (!latestApplicationId) {
+      setSignedContractError('No application found for signed contract upload.');
+      return;
+    }
+    if (!signedContractFile) {
+      setSignedContractError('Please select a signed contract PDF to upload.');
+      return;
+    }
+    if (!signedContractFile.name.toLowerCase().endsWith('.pdf')) {
+      setSignedContractError('Signed contract must be a PDF file.');
+      return;
+    }
+    setSignedContractUploading(true);
+    setSignedContractError(null);
+    try {
+      await uploadSignedContract(latestApplicationId, signedContractFile);
+      await refreshLatestDocuments();
+      setSignedContractFile(null);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unable to upload signed contract.';
+      setSignedContractError(message);
+    } finally {
+      setSignedContractUploading(false);
+    }
+  };
 
   const handleUploadDocuments = async () => {
     if (!latestApplicationId) {
@@ -1419,6 +1470,72 @@ function DocumentsSection({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {(contractDocument || canUploadSignedContract) && (
+        <div className="documents-list-section">
+          <h3>Loan Contract</h3>
+          <p className="section-description">
+            Download the contract, sign it, and upload the signed PDF.
+          </p>
+          {contractDocument ? (
+            <div className="contract-card">
+              <div className="doc-info">
+                <h4>{contractDocument.name}</h4>
+                <p>{contractDocument.type.toString().replace(/_/g, ' ')}</p>
+              </div>
+              <button
+                className="btn btn-secondary"
+                onClick={async () => {
+                  if (!latestApplicationId) {
+                    setPreviewError('No application found for document preview.');
+                    return;
+                  }
+                  setPreviewDoc(contractDocument);
+                  setPreviewUrl(null);
+                  setPreviewError(null);
+                  setPreviewLoading(true);
+                  try {
+                    const url = await getUserApplicationDocumentUrl(latestApplicationId, contractDocument.id);
+                    setPreviewUrl(url);
+                  } catch (err: unknown) {
+                    const message = err instanceof Error ? err.message : 'Unable to load contract preview.';
+                    setPreviewError(message);
+                  } finally {
+                    setPreviewLoading(false);
+                  }
+                }}
+              >
+                View Contract
+              </button>
+            </div>
+          ) : (
+            <div className="empty-state small">
+              <p>No contract uploaded yet.</p>
+            </div>
+          )}
+
+          {canUploadSignedContract && (
+            <div className="signed-contract-upload">
+              <div className="upload-field">
+                <label>Signed Contract (PDF)</label>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(e) => setSignedContractFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+              {signedContractError && <div className="upload-error">{signedContractError}</div>}
+              <button
+                className="btn btn-primary"
+                onClick={handleUploadSignedContract}
+                disabled={signedContractUploading}
+              >
+                {signedContractUploading ? 'Uploading...' : 'Upload Signed Contract'}
+              </button>
+            </div>
+          )}
         </div>
       )}
       

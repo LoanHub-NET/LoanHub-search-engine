@@ -5,6 +5,7 @@ using LoanHub.Search.Core.Services.Applications;
 using LoanHub.Search.Core.Services.Users;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.IO;
 using System.Security.Claims;
 
 namespace LoanHub.Search.Api.Controllers;
@@ -197,6 +198,10 @@ public sealed class ApplicationsController : ControllerBase
     {
         if (request.File is null || request.File.Length == 0)
             return BadRequest("File is required.");
+
+        var extension = Path.GetExtension(request.File.FileName).ToLowerInvariant();
+        if (extension != ".pdf")
+            return BadRequest("Only PDF contracts are supported.");
 
         await using var stream = request.File.OpenReadStream();
         var application = await _service.UploadSignedContractAsync(

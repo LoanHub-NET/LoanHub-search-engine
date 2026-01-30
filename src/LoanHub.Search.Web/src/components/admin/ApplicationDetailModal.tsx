@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { 
   LoanApplication, 
   ApplicationDocument, 
@@ -15,6 +15,8 @@ interface ApplicationDetailModalProps {
   onClose: () => void;
   onAccept: () => void;
   onReject: () => void;
+  onUploadContract: (file: File) => Promise<void>;
+  onFinalApprove: () => Promise<void>;
 }
 
 type TabId = 'overview' | 'applicant' | 'documents' | 'history' | 'provider';
@@ -24,6 +26,8 @@ export function ApplicationDetailModal({
   onClose,
   onAccept,
   onReject,
+  onUploadContract,
+  onFinalApprove,
 }: ApplicationDetailModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [documents, setDocuments] = useState<ApplicationDocument[]>(application.documents);
@@ -33,6 +37,11 @@ export function ApplicationDetailModal({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [contractUploadError, setContractUploadError] = useState<string | null>(null);
+  const [contractUploading, setContractUploading] = useState(false);
+  const [finalApproveError, setFinalApproveError] = useState<string | null>(null);
+  const [finalApproving, setFinalApproving] = useState(false);
+  const contractInputRef = useRef<HTMLInputElement | null>(null);
   const slaInfo = calculateSlaInfo(application);
   const statusConfig = ADMIN_STATUS_CONFIG[application.status];
 
@@ -65,6 +74,9 @@ export function ApplicationDetailModal({
   ];
 
   const canMakeDecision = application.status === 'new' || application.status === 'preliminarily_accepted';
+  const canSendContract = application.status === 'accepted' || application.status === 'preliminarily_accepted';
+  const canFinalApprove = application.status === 'signed_contract_received';
+  const canReject = canMakeDecision || canFinalApprove;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -161,14 +173,72 @@ export function ApplicationDetailModal({
           <button className="btn btn-secondary" onClick={onClose}>
             Close
           </button>
-          {canMakeDecision && (
+          {contractUploadError && <span className="modal-error">{contractUploadError}</span>}
+          {finalApproveError && <span className="modal-error">{finalApproveError}</span>}
+          {canSendContract && (
+            <>
+              <input
+                ref={contractInputRef}
+                type="file"
+                accept="application/pdf"
+                style={{ display: 'none' }}
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  setContractUploadError(null);
+                  setContractUploading(true);
+                  try {
+                    await onUploadContract(file);
+                  } catch (err: unknown) {
+                    const message = err instanceof Error ? err.message : 'Failed to upload contract.';
+                    setContractUploadError(message);
+                  } finally {
+                    setContractUploading(false);
+                    if (contractInputRef.current) {
+                      contractInputRef.current.value = '';
+                    }
+                  }
+                }}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={() => contractInputRef.current?.click()}
+                disabled={contractUploading}
+              >
+                {contractUploading ? 'Uploading...' : '📄 Send Contract'}
+              </button>
+            </>
+          )}
+          {canFinalApprove && (
+            <button
+              className="btn btn-success"
+              onClick={async () => {
+                setFinalApproveError(null);
+                setFinalApproving(true);
+                try {
+                  await onFinalApprove();
+                } catch (err: unknown) {
+                  const message = err instanceof Error ? err.message : 'Failed to final approve.';
+                  setFinalApproveError(message);
+                } finally {
+                  setFinalApproving(false);
+                }
+              }}
+              disabled={finalApproving}
+            >
+              {finalApproving ? 'Approving...' : '✅ Final Approve'}
+            </button>
+          )}
+          {canReject && (
             <>
               <button className="btn btn-danger" onClick={onReject}>
                 ❌ Reject
               </button>
-              <button className="btn btn-success" onClick={onAccept}>
-                ✅ Accept
-              </button>
+              {canMakeDecision && (
+                <button className="btn btn-success" onClick={onAccept}>
+                  ✅ Accept
+                </button>
+              )}
             </>
           )}
         </div>
@@ -551,6 +621,7 @@ function mapApiDocument(doc: {
 }): ApplicationDocument {
   const type = mapDocumentType(doc.documentType);
   const side = mapDocumentSide(doc.documentSide);
+  const uploadedBy = type === 'contract' ? 'admin' : type === 'signed_contract' ? 'applicant' : 'applicant';
 
   return {
     id: doc.blobName,
@@ -560,7 +631,7 @@ function mapApiDocument(doc: {
     blobName: doc.blobName,
     side,
     uploadedAt: new Date(doc.uploadedAt),
-    uploadedBy: 'applicant',
+    uploadedBy,
     size: doc.sizeBytes,
     status: 'pending',
   };
@@ -584,6 +655,11 @@ function mapDocumentType(value: string): ApplicationDocument['type'] {
     case 'employmentcontract':
     case 'employment_contract':
       return 'employment_contract';
+    case 'contract':
+      return 'contract';
+    case 'signedcontract':
+    case 'signed_contract':
+      return 'signed_contract';
     default:
       return 'other';
   }

@@ -12,6 +12,7 @@ public sealed class ApplicationService
 {
     private readonly IApplicationRepository _repo;
     private readonly IContractStorage _contractStorage;
+    private readonly IDocumentStorage _documentStorage;
     private readonly IContractDocumentGenerator _contractDocumentGenerator;
     private readonly IContractLinkGenerator _contractLinkGenerator;
     private readonly IEmailSender _emailSender;
@@ -24,6 +25,7 @@ public sealed class ApplicationService
     public ApplicationService(
         IApplicationRepository repo,
         IContractStorage contractStorage,
+        IDocumentStorage documentStorage,
         IContractDocumentGenerator contractDocumentGenerator,
         IContractLinkGenerator contractLinkGenerator,
         IEmailSender emailSender,
@@ -34,6 +36,7 @@ public sealed class ApplicationService
     {
         _repo = repo;
         _contractStorage = contractStorage;
+        _documentStorage = documentStorage;
         _contractDocumentGenerator = contractDocumentGenerator;
         _contractLinkGenerator = contractLinkGenerator;
         _emailSender = emailSender;
@@ -172,6 +175,36 @@ public sealed class ApplicationService
         return updated;
     }
 
+    public async Task<LoanApplication?> UploadContractAsync(
+        Guid id,
+        Stream content,
+        string fileName,
+        string? contentType,
+        Guid? adminId,
+        CancellationToken ct)
+    {
+        var application = await _repo.GetAsync(id, ct);
+        if (application is null)
+            return null;
+
+        AssignAdminIfMissing(application, adminId);
+
+        await _documentStorage.UploadDocumentAsync(
+            application.Id,
+            content,
+            fileName,
+            contentType,
+            DocumentType.Contract,
+            DocumentSide.Unknown,
+            ct);
+
+        application.ContractReadyAt = DateTimeOffset.UtcNow;
+        application.AddStatus(ApplicationStatus.ContractReady, null);
+        var updated = await _repo.UpdateAsync(application, ct) ?? application;
+        await NotifyStatusAsync(updated, "Kontrakt gotowy do podpisu", ct);
+        return updated;
+    }
+
     public async Task<LoanApplication?> UploadSignedContractAsync(
         Guid id,
         Stream content,
@@ -183,11 +216,25 @@ public sealed class ApplicationService
         if (application is null)
             return null;
 
+        await using var memory = new MemoryStream();
+        await content.CopyToAsync(memory, ct);
+        memory.Position = 0;
+
         var stored = await _contractStorage.UploadSignedContractAsync(
             application.Id,
-            content,
+            memory,
             fileName,
             contentType,
+            ct);
+
+        memory.Position = 0;
+        await _documentStorage.UploadDocumentAsync(
+            application.Id,
+            memory,
+            fileName,
+            contentType,
+            DocumentType.SignedContract,
+            DocumentSide.Unknown,
             ct);
 
         application.SignedContractFileName = stored.FileName;
@@ -235,6 +282,26 @@ public sealed class ApplicationService
 
         if (application.Status is ApplicationStatus.New or ApplicationStatus.Rejected or ApplicationStatus.Cancelled)
             return null;
+
+        var storedDocuments = await _documentStorage.ListDocumentsAsync(application.Id, ct);
+        var contractDocument = storedDocuments
+            .Where(doc => doc.Type == DocumentType.Contract)
+            .OrderByDescending(doc => doc.UploadedAt)
+            .FirstOrDefault();
+
+        if (contractDocument is not null)
+        {
+            var stream = await _documentStorage.DownloadDocumentAsync(contractDocument.BlobName, ct);
+            if (stream is not null)
+            {
+                await using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms, ct);
+                return new ContractDocument(
+                    contractDocument.OriginalFileName,
+                    contractDocument.ContentType,
+                    ms.ToArray());
+            }
+        }
 
         return _contractDocumentGenerator.GeneratePreliminaryContract(application);
     }

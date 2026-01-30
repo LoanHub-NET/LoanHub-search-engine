@@ -23,6 +23,8 @@ public enum DocumentType
     ProofOfAddress = 2,
     BankStatement = 3,
     EmploymentContract = 4,
+    Contract = 5,
+    SignedContract = 6,
     Other = 99
 }
 

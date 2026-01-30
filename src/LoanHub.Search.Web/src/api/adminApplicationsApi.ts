@@ -146,3 +146,45 @@ export const rejectAdminApplication = async (applicationId: string, reason: stri
 
   return handleResponse<AdminApplicationResponse>(response);
 };
+
+export const uploadApplicationContract = async (applicationId: string, file: File) => {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('You must be logged in to upload contracts.');
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(
+    `${getApiBaseUrl()}/api/admin/applications/${applicationId}/contract`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    },
+  );
+
+  return handleResponse<AdminApplicationResponse>(response);
+};
+
+export const finalApproveApplication = async (applicationId: string) => {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('You must be logged in to update applications.');
+  }
+
+  const response = await fetch(
+    `${getApiBaseUrl()}/api/admin/applications/${applicationId}/final-approve`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  return handleResponse<AdminApplicationResponse>(response);
+};
