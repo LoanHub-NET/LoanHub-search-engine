@@ -8,6 +8,7 @@ using LoanHub.Search.Core.Abstractions.Users;
 using LoanHub.Search.Core.Services;
 using LoanHub.Search.Core.Services.Applications;
 using LoanHub.Search.Core.Services.Auth;
+using LoanHub.Search.Core.Services.Banks;
 using LoanHub.Search.Core.Services.Notifications;
 using LoanHub.Search.Core.Services.Selections;
 using LoanHub.Search.Core.Services.Users;
@@ -158,10 +159,15 @@ builder.Services.AddAuthorization(options =>
     
     options.AddPolicy("NotAdmin", policy =>
         policy.AddRequirements(new NotAdminRequirement()));
+
+    options.AddPolicy("PlatformAdminOnly", policy =>
+        policy.RequireAuthenticatedUser()
+            .AddRequirements(new PlatformAdminRequirement()));
 });
 builder.Services.AddScoped<IAuthorizationHandler, AdminAccessHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, UserOnlyHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, NotAdminHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, PlatformAdminHandler>();
 
 builder.Services.AddScoped<ILoanOfferProviderRegistry, BankApiOfferProviderRegistry>();
 builder.Services.AddScoped<OffersAggregator>();
@@ -169,6 +175,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Applications")));
 builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
 builder.Services.AddScoped<ApplicationService>();
+builder.Services.AddScoped<IBankApiClientRepository, BankApiClientRepository>();
+builder.Services.AddScoped<BankApiKeyService>();
 
 // Contract storage configuration (for signed contracts)
 builder.Services.Configure<ContractStorageOptions>(builder.Configuration.GetSection("ContractStorage"));
@@ -207,6 +215,8 @@ builder.Services.AddSingleton<IEmailTemplateRenderer, EmailTemplateRenderer>();
 builder.Services.AddSingleton<IContractLinkGenerator, ContractLinkGenerator>();
 builder.Services.AddSingleton<IContractDocumentGenerator, ContractDocumentGenerator>();
 builder.Services.Configure<EmailBrandingOptions>(builder.Configuration.GetSection("EmailBranding"));
+builder.Services.Configure<PlatformAdminOptions>(builder.Configuration.GetSection("PlatformAdmins"));
+builder.Services.AddScoped<PlatformAdminAuthService>();
 var contentRoot = builder.Environment.ContentRootPath;
 builder.Services.PostConfigure<EmailBrandingOptions>(options =>
 {
@@ -397,6 +407,21 @@ static async Task InitializeDatabaseAsync(WebApplication app)
                     CONSTRAINT "PK_BankAdmins" PRIMARY KEY ("Id")
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS "IX_BankAdmins_BankId_UserAccountId" ON "BankAdmins" ("BankId", "UserAccountId");
+                """, CancellationToken.None);
+
+            await dbContext.Database.ExecuteSqlRawAsync("""
+                CREATE TABLE IF NOT EXISTS "BankApiClients" (
+                    "Id" uuid NOT NULL,
+                    "Name" varchar(200) NOT NULL,
+                    "KeyHash" varchar(128) NOT NULL,
+                    "IsActive" boolean NOT NULL,
+                    "CreatedByUserId" uuid,
+                    "CreatedAt" timestamptz NOT NULL,
+                    "LastUsedAt" timestamptz,
+                    CONSTRAINT "PK_BankApiClients" PRIMARY KEY ("Id")
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_BankApiClients_KeyHash" ON "BankApiClients" ("KeyHash");
+                CREATE INDEX IF NOT EXISTS "IX_BankApiClients_Name" ON "BankApiClients" ("Name");
                 """, CancellationToken.None);
 
             app.Logger.LogInformation("Database initialized.");

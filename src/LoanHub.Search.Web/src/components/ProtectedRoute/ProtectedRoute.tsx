@@ -1,7 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { getAuthSession } from '../../api/apiConfig';
 
-export type AllowedRole = 'User' | 'Admin' | 'any' | 'notAdmin';
+export type AllowedRole = 'User' | 'Admin' | 'PlatformAdmin' | 'any' | 'notAdmin';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -26,6 +26,14 @@ const isAdminRole = (role: string | number): boolean => {
   );
 };
 
+const isPlatformAdminRole = (role: string | number): boolean => {
+  if (typeof role === 'number') {
+    return role === 2;
+  }
+  const normalizedRole = String(role).toLowerCase();
+  return normalizedRole === 'platformadmin' || normalizedRole === 'platform_admin' || normalizedRole === '2';
+};
+
 /**
  * Protected route component that checks authentication and authorization
  * 
@@ -45,7 +53,10 @@ export function ProtectedRoute({
 
   // For 'notAdmin' role - allow guests and users, block only admins
   if (allowedRole === 'notAdmin') {
-    if (session && isAdminRole(session.role)) {
+    if (session && (isAdminRole(session.role) || isPlatformAdminRole(session.role))) {
+      if (isPlatformAdminRole(session.role)) {
+        return <Navigate to="/platform-admin" replace />;
+      }
       // Admin trying to access - redirect to admin dashboard
       return <Navigate to="/admin" replace />;
     }
@@ -69,15 +80,28 @@ export function ProtectedRoute({
   if (allowedRole === 'Admin') {
     if (!isAdminRole(userRole)) {
       // User trying to access admin area - redirect to user dashboard
+      if (isPlatformAdminRole(userRole)) {
+        return <Navigate to="/platform-admin" replace />;
+      }
       return <Navigate to="/dashboard" replace />;
     }
     return <>{children}</>;
   }
 
   if (allowedRole === 'User') {
-    if (isAdminRole(userRole)) {
+    if (isAdminRole(userRole) || isPlatformAdminRole(userRole)) {
       // Admin trying to access user area - redirect to admin dashboard
-      return <Navigate to="/admin" replace />;
+      return <Navigate to={isPlatformAdminRole(userRole) ? '/platform-admin' : '/admin'} replace />;
+    }
+    return <>{children}</>;
+  }
+
+  if (allowedRole === 'PlatformAdmin') {
+    if (!isPlatformAdminRole(userRole)) {
+      if (isAdminRole(userRole)) {
+        return <Navigate to="/admin" replace />;
+      }
+      return <Navigate to="/dashboard" replace />;
     }
     return <>{children}</>;
   }

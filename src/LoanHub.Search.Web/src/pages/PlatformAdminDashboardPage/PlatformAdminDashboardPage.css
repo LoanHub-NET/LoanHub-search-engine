@@ -1,0 +1,247 @@
+.platform-admin-page {
+  min-height: calc(100vh - 120px);
+  background: radial-gradient(circle at top, rgba(27, 78, 124, 0.08), transparent 45%),
+    linear-gradient(180deg, #f6f8fb 0%, #eef3f9 100%);
+  padding-bottom: 4rem;
+}
+
+.platform-admin-hero {
+  padding: 3rem 8vw 2rem;
+}
+
+.platform-admin-hero-inner {
+  max-width: 800px;
+}
+
+.platform-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.8rem;
+  background: #0b2b4e;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.platform-admin-hero h1 {
+  font-size: clamp(2rem, 3.5vw, 3rem);
+  margin: 1rem 0 0.5rem;
+  color: #0b2b4e;
+}
+
+.platform-admin-hero p {
+  color: #4a5b6f;
+  font-size: 1.05rem;
+}
+
+.platform-admin-card {
+  max-width: 520px;
+  margin: 0 auto;
+  background: #fff;
+  padding: 2rem;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(15, 30, 50, 0.12);
+}
+
+.platform-admin-card h2 {
+  margin-bottom: 0.5rem;
+  color: #0b2b4e;
+}
+
+.platform-admin-card p {
+  color: #5a6b7f;
+  margin-bottom: 1.5rem;
+}
+
+.platform-admin-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.platform-admin-form label {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: #4a5b6f;
+}
+
+.platform-admin-form input {
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid #d6dee8;
+  font-size: 0.95rem;
+}
+
+.platform-admin-form button {
+  margin-top: 0.5rem;
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  border: none;
+  background: #0b2b4e;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.platform-admin-grid {
+  display: grid;
+  gap: 1.5rem;
+  padding: 0 8vw;
+}
+
+.platform-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 1.8rem;
+  box-shadow: 0 16px 40px rgba(15, 30, 50, 0.08);
+}
+
+.platform-card h2 {
+  margin-bottom: 0.4rem;
+  color: #0b2b4e;
+}
+
+.platform-card p {
+  color: #5a6b7f;
+  margin-bottom: 1.2rem;
+}
+
+.platform-create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.platform-create input {
+  flex: 1;
+  min-width: 220px;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid #d6dee8;
+}
+
+.platform-create button {
+  padding: 0.75rem 1.2rem;
+  border-radius: 12px;
+  border: none;
+  background: #17a2b8;
+  color: #fff;
+  font-weight: 600;
+}
+
+.platform-created {
+  margin-top: 1.2rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background: #f1f7ff;
+  border: 1px dashed #86a8d7;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.platform-created code {
+  font-size: 0.85rem;
+  padding: 0.6rem 0.8rem;
+  background: #0b2b4e;
+  color: #fff;
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+
+.platform-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.platform-table {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.platform-table-head,
+.platform-table-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  align-items: center;
+  gap: 1rem;
+}
+
+.platform-table-head {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7a8aa0;
+}
+
+.platform-table-row {
+  padding: 0.8rem 0.6rem;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.platform-table-row strong {
+  display: block;
+  color: #0b2b4e;
+}
+
+.platform-table-row small {
+  color: #7a8aa0;
+  font-size: 0.75rem;
+}
+
+.pill {
+  display: inline-flex;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.pill.active {
+  background: #e1f8ee;
+  color: #198754;
+}
+
+.pill.revoked {
+  background: #fde8e8;
+  color: #d92d20;
+}
+
+.link-btn {
+  border: none;
+  background: transparent;
+  color: #d92d20;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.platform-message {
+  margin-top: 1rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  background: #e9f5ff;
+  color: #0b2b4e;
+}
+
+.platform-message.error {
+  background: #fde8e8;
+  color: #d92d20;
+}
+
+.platform-muted {
+  color: #7a8aa0;
+}
+
+@media (max-width: 900px) {
+  .platform-table-head,
+  .platform-table-row {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+}

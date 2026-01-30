@@ -553,6 +553,15 @@ export function LoginPage() {
             </div>
           </div>
         </section>
+        <button
+          type="button"
+          className="platform-admin-entry"
+          onClick={() => navigate('/platform-admin')}
+          aria-label="Platform admin dashboard"
+          title="Platform admin dashboard"
+        >
+          ⚙
+        </button>
       </main>
       <Footer />
     </>

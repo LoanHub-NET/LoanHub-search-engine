@@ -32,9 +32,16 @@ public sealed class NotAdminHandler : AuthorizationHandler<NotAdminRequirement>
         if (context.User.IsInRole(UserRole.Admin.ToString()))
             return;
 
+        if (context.User.IsInRole(UserRole.PlatformAdmin.ToString()))
+            return;
+
         // Check is_admin claim
         var isAdminClaim = context.User.FindFirst("is_admin")?.Value;
         if (string.Equals(isAdminClaim, "true", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var isPlatformAdminClaim = context.User.FindFirst("platform_admin")?.Value;
+        if (string.Equals(isPlatformAdminClaim, "true", StringComparison.OrdinalIgnoreCase))
             return;
 
         // Double-check against the database
@@ -50,7 +57,7 @@ public sealed class NotAdminHandler : AuthorizationHandler<NotAdminRequirement>
         var user = await _users.GetByEmailAsync(email, CancellationToken.None);
         
         // If user not found in DB or is not admin, allow access
-        if (user is null || user.Role != UserRole.Admin)
+        if (user is null || (user.Role != UserRole.Admin && user.Role != UserRole.PlatformAdmin))
         {
             context.Succeed(requirement);
         }

@@ -15,6 +15,7 @@ import {
   LoginPage,
   AdminDashboardPage,
   UserDashboardPage,
+  PlatformAdminDashboardPage,
 } from './pages';
 import { ProtectedRoute, RedirectToLandingOnReload } from './components';
 import './App.css';
@@ -55,6 +56,7 @@ function App() {
           <Route path="/cookies" element={<CookiesPage />} />
           <Route path="/gdpr" element={<GdprPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/platform-admin" element={<PlatformAdminDashboardPage />} />
           
           {/* Admin-only routes - regular users cannot access */}
           <Route 

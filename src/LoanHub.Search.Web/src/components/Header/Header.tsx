@@ -17,6 +17,9 @@ const getRoleDisplayName = (role: string | number): string => {
   if (role === 1 || role === '1' || role === 'Admin' || role === 'Administrator') {
     return 'Administrator';
   }
+  if (role === 2 || role === '2' || role === 'PlatformAdmin' || role === 'Platform_Admin') {
+    return 'Platform Admin';
+  }
   return 'User';
 };
 
@@ -25,6 +28,10 @@ const getRoleDisplayName = (role: string | number): string => {
  */
 const isAdminRole = (role: string | number): boolean => {
   return role === 1 || role === '1' || role === 'Admin' || role === 'Administrator';
+};
+
+const isPlatformAdminRole = (role: string | number): boolean => {
+  return role === 2 || role === '2' || role === 'PlatformAdmin' || role === 'Platform_Admin';
 };
 
 interface HeaderProps {
@@ -63,7 +70,13 @@ export function Header({ onLoginClick, onSearchClick, adminUser, onLogout }: Hea
   };
 
   // Determine logo destination based on user role
-  const logoDestination = adminUser && isAdminRole(adminUser.role) ? '/admin' : '/';
+  const logoDestination = adminUser
+    ? isPlatformAdminRole(adminUser.role)
+      ? '/platform-admin'
+      : isAdminRole(adminUser.role)
+        ? '/admin'
+        : '/'
+    : '/';
 
   return (
     <header className="header">
@@ -87,7 +100,7 @@ export function Header({ onLoginClick, onSearchClick, adminUser, onLogout }: Hea
         <nav className={`nav ${menuOpen ? 'nav-open' : ''}`}>
           <ul className="nav-list">
             {/* Hide How it works and Search for admin users */}
-            {(!adminUser || !isAdminRole(adminUser.role)) && (
+            {(!adminUser || (!isAdminRole(adminUser.role) && !isPlatformAdminRole(adminUser.role))) && (
               <>
                 <li>
                   <a
@@ -148,7 +161,9 @@ export function Header({ onLoginClick, onSearchClick, adminUser, onLogout }: Hea
                           setUserMenuOpen(false); 
                           const role = adminUser.role;
                           const isAdmin = role === 'Administrator' || role === 'Admin' || role === 1 || role === '1';
-                          navigate(isAdmin ? '/admin' : '/dashboard'); 
+                          const isPlatformAdmin =
+                            role === 'PlatformAdmin' || role === 'Platform_Admin' || role === 2 || role === '2';
+                          navigate(isPlatformAdmin ? '/platform-admin' : (isAdmin ? '/admin' : '/dashboard')); 
                         }}>
                           📋 Dashboard
                         </button>

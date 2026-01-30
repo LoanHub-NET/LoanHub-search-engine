@@ -6,7 +6,7 @@ import {
   type AuthSession 
 } from '../api/apiConfig';
 
-export type UserRole = 'User' | 'Admin' | 'Unknown';
+export type UserRole = 'User' | 'Admin' | 'PlatformAdmin' | 'Unknown';
 
 interface UseAuthReturn {
   /** Current auth session */
@@ -17,6 +17,8 @@ interface UseAuthReturn {
   role: UserRole;
   /** Whether user is admin */
   isAdmin: boolean;
+  /** Whether user is platform admin */
+  isPlatformAdmin: boolean;
   /** Whether user is regular user (not admin) */
   isUser: boolean;
   /** Log out and redirect to login */
@@ -42,6 +44,14 @@ const isAdminRole = (role: string | number): boolean => {
     normalizedRole === 'administrator' ||
     normalizedRole === '1'
   );
+};
+
+const isPlatformAdminRole = (role: string | number): boolean => {
+  if (typeof role === 'number') {
+    return role === 2;
+  }
+  const normalizedRole = String(role).toLowerCase();
+  return normalizedRole === 'platformadmin' || normalizedRole === 'platform_admin' || normalizedRole === '2';
 };
 
 /**
@@ -71,10 +81,12 @@ export function useAuth(): UseAuthReturn {
 
   const role = useMemo((): UserRole => {
     if (!session) return 'Unknown';
+    if (isPlatformAdminRole(session.role)) return 'PlatformAdmin';
     return isAdminRole(session.role) ? 'Admin' : 'User';
   }, [session]);
 
   const isAdmin = role === 'Admin';
+  const isPlatformAdmin = role === 'PlatformAdmin';
   const isUser = role === 'User';
 
   const logout = useCallback(() => {
@@ -88,14 +100,19 @@ export function useAuth(): UseAuthReturn {
       navigate('/login');
       return;
     }
+    if (isPlatformAdmin) {
+      navigate('/platform-admin');
+      return;
+    }
     navigate(isAdmin ? '/admin' : '/dashboard');
-  }, [session, isAdmin, navigate]);
+  }, [session, isAdmin, isPlatformAdmin, navigate]);
 
   return {
     session,
     isAuthenticated,
     role,
     isAdmin,
+    isPlatformAdmin,
     isUser,
     logout,
     refresh,
