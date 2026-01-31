@@ -215,9 +215,7 @@ export function UserDashboardPage() {
       return merged;
     });
 
-    // Get fresh session from localStorage in case state is stale
-    const session = authSession ?? getAuthSession();
-    console.log('handleProfileUpdate - session:', session?.id, 'authSession state:', authSession?.id);
+    const session = authSession;
     if (session?.id) {
       try {
         const merged = { ...profile, ...updatedProfile };
@@ -1053,7 +1051,6 @@ function ProfileSection({ profile, isEditing, onEdit, onSave, onCancel }: Profil
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('ProfileSection handleSubmit called');
     void onSave(formData);
   };
 
@@ -1085,10 +1082,7 @@ function ProfileSection({ profile, isEditing, onEdit, onSave, onCancel }: Profil
         </p>
       </div>
       
-      <form className="profile-form" onSubmit={(e) => {
-        console.log('form onSubmit triggered');
-        handleSubmit(e);
-      }}>
+      <form className="profile-form" onSubmit={handleSubmit}>
         {/* Personal Information */}
         <div className="form-section">
           <h3>Personal Information</h3>

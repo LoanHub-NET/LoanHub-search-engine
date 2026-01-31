@@ -43,7 +43,7 @@ const AUTH_STORAGE_KEY = 'loanhub_auth';
 const PENDING_PROFILE_KEY = 'loanhub_pending_profile';
 
 export const getApiBaseUrl = () => {
-  const configured = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+  const configured = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
   if (configured) {
     return configured;
   }
