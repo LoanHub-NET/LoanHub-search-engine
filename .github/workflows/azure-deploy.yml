@@ -1,0 +1,118 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Pozwala uruchomić ręcznie z GitHub
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  NODE_VERSION: '20.x'
+  AZURE_WEBAPP_NAME: 'loanhub-api-2025'
+  AZURE_STATICWEBAPP_NAME: 'loanhub-web-2025'
+
+jobs:
+  # ===== BUILD & TEST BACKEND =====
+  build-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore LoanHub.SearchEngine.sln
+
+      - name: Build
+        run: dotnet build LoanHub.SearchEngine.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test LoanHub.SearchEngine.sln --configuration Release --no-build --verbosity normal
+
+      - name: Publish API
+        run: dotnet publish src/LoanHub.Search.Api/LoanHub.Search.Api.csproj -c Release -o ./publish
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-artifact
+          path: ./publish
+
+  # ===== BUILD FRONTEND =====
+  build-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/LoanHub.Search.Web
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: src/LoanHub.Search.Web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-artifact
+          path: src/LoanHub.Search.Web/dist
+
+  # ===== DEPLOY BACKEND TO AZURE APP SERVICE =====
+  deploy-backend:
+    runs-on: ubuntu-latest
+    needs: build-backend
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.webapp-url }}
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-artifact
+          path: ./publish
+
+      - name: Deploy to Azure Web App
+        id: deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ./publish
+
+  # ===== DEPLOY FRONTEND TO AZURE STATIC WEB APPS =====
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    needs: build-frontend
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-artifact
+          path: ./dist
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_ORANGE_BEACH_080C34910 }}
+          action: 'upload'
+          app_location: './dist'
+          skip_app_build: true
