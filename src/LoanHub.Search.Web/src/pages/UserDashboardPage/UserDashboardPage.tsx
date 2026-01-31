@@ -24,6 +24,7 @@ import {
 } from '../../api/applicationsApi';
 import { getUserApplicationDocumentUrl, listUserApplicationDocuments } from '../../api/userDocumentsApi';
 import { uploadApplicationDocument } from '../../api/documentsApi';
+import { updateUserProfile } from '../../api/userApi';
 import { ApiError, clearAuthSession, getAuthSession } from '../../api/apiConfig';
 import { Header, Footer } from '../../components';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -34,6 +35,69 @@ export function UserDashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const storedProfileKeyPrefix = 'loanhub_user_profile_';
   const [authSession, setAuthSession] = useState(getAuthSession());
+
+  const buildAddressText = (address?: UserProfile['address'], fallback?: string | null) => {
+    if (!address) return fallback ?? null;
+    const parts = [
+      address.street,
+      address.apartment ? `Apt ${address.apartment}` : null,
+      address.postalCode && address.city ? `${address.postalCode} ${address.city}` : address.city,
+      address.country,
+    ].filter(Boolean);
+    return parts.length ? parts.join(', ') : fallback ?? null;
+  };
+
+  const parseAddressText = (address?: string | null): UserProfile['address'] | undefined => {
+    if (!address) return undefined;
+    const parts = address.split(',').map((part) => part.trim()).filter(Boolean);
+    if (!parts.length) return undefined;
+
+    const street = parts[0] ?? '';
+    let apartment: string | undefined;
+    let postalCode = '';
+    let city = '';
+    let country = '';
+
+    const hasApartment = parts[1]?.toLowerCase().startsWith('apt ');
+    if (hasApartment) {
+      apartment = parts[1].slice(4).trim() || undefined;
+    }
+
+    const postalCityPart = parts[hasApartment ? 2 : 1];
+    if (postalCityPart) {
+      const match = postalCityPart.match(/^(\S+)\s+(.+)$/);
+      if (match) {
+        postalCode = match[1];
+        city = match[2];
+      } else {
+        city = postalCityPart;
+      }
+    }
+
+    country = parts[hasApartment ? 3 : 2] ?? '';
+
+    if (!street && !city && !country) return undefined;
+    return {
+      street,
+      apartment,
+      city,
+      postalCode,
+      country,
+    };
+  };
+
+  const computeAge = (dateOfBirth?: string | Date | null) => {
+    if (!dateOfBirth) return null;
+    const parsed = typeof dateOfBirth === 'string' ? new Date(dateOfBirth) : dateOfBirth;
+    if (Number.isNaN(parsed.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - parsed.getFullYear();
+    const monthDiff = today.getMonth() - parsed.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < parsed.getDate())) {
+      age -= 1;
+    }
+    return Math.max(0, age);
+  };
   
   // State
   const [activeTab, setActiveTab] = useState<DashboardTab>(
@@ -142,7 +206,7 @@ export function UserDashboardPage() {
     navigate(`/search?amount=${entry.searchParams.amount}&duration=${entry.searchParams.duration}`);
   };
   
-  const handleProfileUpdate = (updatedProfile: Partial<UserProfile>) => {
+  const handleProfileUpdate = async (updatedProfile: Partial<UserProfile>) => {
     setProfile(prev => {
       const merged = { ...prev, ...updatedProfile };
       if (typeof window !== 'undefined') {
@@ -150,6 +214,65 @@ export function UserDashboardPage() {
       }
       return merged;
     });
+
+    // Get fresh session from localStorage in case state is stale
+    const session = authSession ?? getAuthSession();
+    console.log('handleProfileUpdate - session:', session?.id, 'authSession state:', authSession?.id);
+    if (session?.id) {
+      try {
+        const merged = { ...profile, ...updatedProfile };
+        const addressText = buildAddressText(merged.address, null);
+        const dateOfBirth = merged.dateOfBirth
+          ? (merged.dateOfBirth instanceof Date
+            ? merged.dateOfBirth.toISOString()
+            : merged.dateOfBirth)
+          : null;
+        const age = computeAge(dateOfBirth);
+        const jobTitle = merged.employment?.position
+          || merged.employment?.employerName
+          || null;
+
+        const updated = await updateUserProfile(session.id, {
+          firstName: merged.firstName || null,
+          lastName: merged.lastName || null,
+          age,
+          jobTitle,
+          address: addressText,
+          phone: merged.phone || null,
+          dateOfBirth: dateOfBirth || null,
+          monthlyIncome: typeof merged.monthlyIncome === 'number' && !Number.isNaN(merged.monthlyIncome)
+            ? merged.monthlyIncome
+            : null,
+          livingCosts: typeof merged.livingCosts === 'number' && !Number.isNaN(merged.livingCosts)
+            ? merged.livingCosts
+            : null,
+          dependents: typeof merged.dependents === 'number' && !Number.isNaN(merged.dependents)
+            ? merged.dependents
+            : null,
+          idDocumentNumber: merged.idDocument?.number || null,
+        });
+
+        setAuthSession({
+          id: updated.id,
+          email: updated.email,
+          role: updated.role,
+          firstName: updated.firstName,
+          lastName: updated.lastName,
+          phone: updated.phone,
+          dateOfBirth: updated.dateOfBirth,
+          address: updated.address,
+          jobTitle: updated.jobTitle,
+          monthlyIncome: updated.monthlyIncome,
+          livingCosts: updated.livingCosts,
+          dependents: updated.dependents,
+          idDocumentNumber: updated.idDocumentNumber,
+          token: updated.token,
+        });
+      } catch {
+        // Keep local changes if backend update fails.
+      }
+    }
+
     setIsEditingProfile(false);
   };
 
@@ -201,6 +324,24 @@ export function UserDashboardPage() {
           storedProfile = null;
         }
       }
+      const sessionAddress = typeof session.address === 'string'
+        ? parseAddressText(session.address)
+        : undefined;
+      const sessionDateOfBirth = session.dateOfBirth ? new Date(session.dateOfBirth) : undefined;
+      const hasValidDob = sessionDateOfBirth && !Number.isNaN(sessionDateOfBirth.getTime());
+      const sessionEmployment = session.jobTitle
+        ? {
+            status: 'employed' as const,
+            position: session.jobTitle,
+          }
+        : undefined;
+      const sessionIdDocument = session.idDocumentNumber
+        ? {
+            type: 'national_id' as const,
+            number: session.idDocumentNumber,
+            verified: false,
+          }
+        : undefined;
       setProfile((prev) => ({
         ...prev,
         ...storedProfile,
@@ -208,6 +349,14 @@ export function UserDashboardPage() {
         email: session.email,
         firstName: storedProfile?.firstName || session.firstName || 'User',
         lastName: storedProfile?.lastName || session.lastName || '',
+        phone: storedProfile?.phone ?? session.phone ?? prev.phone,
+        dateOfBirth: storedProfile?.dateOfBirth ?? (hasValidDob ? sessionDateOfBirth : prev.dateOfBirth),
+        address: storedProfile?.address ?? sessionAddress ?? prev.address,
+        employment: storedProfile?.employment ?? sessionEmployment ?? prev.employment,
+        monthlyIncome: storedProfile?.monthlyIncome ?? session.monthlyIncome ?? prev.monthlyIncome,
+        livingCosts: storedProfile?.livingCosts ?? session.livingCosts ?? prev.livingCosts,
+        dependents: storedProfile?.dependents ?? session.dependents ?? prev.dependents,
+        idDocument: storedProfile?.idDocument ?? sessionIdDocument ?? prev.idDocument,
       }));
     }
 
@@ -873,7 +1022,7 @@ interface ProfileSectionProps {
   profile: UserProfile;
   isEditing: boolean;
   onEdit: () => void;
-  onSave: (profile: Partial<UserProfile>) => void;
+  onSave: (profile: Partial<UserProfile>) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -904,7 +1053,8 @@ function ProfileSection({ profile, isEditing, onEdit, onSave, onCancel }: Profil
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    console.log('ProfileSection handleSubmit called');
+    void onSave(formData);
   };
 
   return (
@@ -935,7 +1085,10 @@ function ProfileSection({ profile, isEditing, onEdit, onSave, onCancel }: Profil
         </p>
       </div>
       
-      <form className="profile-form" onSubmit={handleSubmit}>
+      <form className="profile-form" onSubmit={(e) => {
+        console.log('form onSubmit triggered');
+        handleSubmit(e);
+      }}>
         {/* Personal Information */}
         <div className="form-section">
           <h3>Personal Information</h3>
