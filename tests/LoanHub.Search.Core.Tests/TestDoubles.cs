@@ -195,6 +195,13 @@ internal sealed class InMemoryBankRepository : IBankRepository
 
     public Task<bool> IsAdminAsync(Guid userId, CancellationToken ct)
         => Task.FromResult(_admins.Any(admin => admin.UserAccountId == userId));
+
+    public Task<IReadOnlyList<Guid>> GetBankIdsForAdminAsync(Guid userId, CancellationToken ct)
+        => Task.FromResult<IReadOnlyList<Guid>>(
+            _admins.Where(admin => admin.UserAccountId == userId)
+                .Select(admin => admin.BankId)
+                .Distinct()
+                .ToList());
 }
 
 internal sealed class InMemoryApplicationRepository : IApplicationRepository
@@ -228,6 +235,15 @@ internal sealed class InMemoryApplicationRepository : IApplicationRepository
     public Task<PagedResult<LoanApplication>> ListAdminAsync(ApplicationAdminQuery query, CancellationToken ct)
     {
         var normalized = query.Normalize();
+        if (normalized.BankIds is { Count: 0 })
+        {
+            return Task.FromResult(new PagedResult<LoanApplication>(
+                Array.Empty<LoanApplication>(),
+                normalized.Page,
+                normalized.PageSize,
+                0));
+        }
+
         IEnumerable<LoanApplication> applications = _storage.Values;
 
         if (!string.IsNullOrWhiteSpace(normalized.ApplicantEmail))
@@ -256,6 +272,12 @@ internal sealed class InMemoryApplicationRepository : IApplicationRepository
 
         if (normalized.UpdatedTo is not null)
             applications = applications.Where(application => application.UpdatedAt <= normalized.UpdatedTo);
+
+        if (normalized.BankIds is { Count: > 0 })
+        {
+            applications = applications.Where(application =>
+                application.BankId.HasValue && normalized.BankIds.Contains(application.BankId.Value));
+        }
 
         var ordered = applications.OrderByDescending(application => application.CreatedAt).ToList();
         var totalCount = ordered.Count;

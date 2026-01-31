@@ -54,6 +54,9 @@ public sealed class ApplicationRepository : IApplicationRepository
 
     public async Task<PagedResult<LoanApplication>> ListAdminAsync(ApplicationAdminQuery query, CancellationToken ct)
     {
+        if (query.BankIds is { Count: 0 })
+            return new PagedResult<LoanApplication>(Array.Empty<LoanApplication>(), query.Page, query.PageSize, 0);
+
         var applications = _dbContext.Applications.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(query.ApplicantEmail))
@@ -82,6 +85,10 @@ public sealed class ApplicationRepository : IApplicationRepository
 
         if (query.UpdatedTo is not null)
             applications = applications.Where(application => application.UpdatedAt <= query.UpdatedTo);
+
+        if (query.BankIds is { Count: > 0 })
+            applications = applications.Where(application =>
+                application.BankId.HasValue && query.BankIds.Contains(application.BankId.Value));
 
         var totalCount = await applications.CountAsync(ct);
         var items = await applications

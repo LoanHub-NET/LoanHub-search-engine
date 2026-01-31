@@ -8,6 +8,7 @@ public sealed record ApplicationAdminQuery(
     DateTimeOffset? CreatedTo,
     DateTimeOffset? UpdatedFrom,
     DateTimeOffset? UpdatedTo,
+    IReadOnlyList<Guid>? BankIds,
     int Page = 1,
     int PageSize = 20)
 {
@@ -15,11 +16,16 @@ public sealed record ApplicationAdminQuery(
     {
         var normalizedPage = Page < 1 ? 1 : Page;
         var normalizedPageSize = PageSize < 1 ? 20 : Math.Min(PageSize, maxPageSize);
+        IReadOnlyList<Guid>? normalizedBankIds = BankIds;
+
+        if (BankIds is { Count: > 0 })
+            normalizedBankIds = BankIds.Distinct().ToArray();
 
         return this with
         {
             Page = normalizedPage,
-            PageSize = normalizedPageSize
+            PageSize = normalizedPageSize,
+            BankIds = normalizedBankIds
         };
     }
 }

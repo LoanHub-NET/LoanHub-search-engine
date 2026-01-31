@@ -2,18 +2,22 @@ using LoanHub.Search.Core.Abstractions;
 using LoanHub.Search.Core.Abstractions.Applications;
 using LoanHub.Search.Core.Abstractions.Banks;
 using LoanHub.Search.Core.Abstractions.Auth;
+using LoanHub.Search.Core.Abstractions.Auditing;
 using LoanHub.Search.Core.Abstractions.Notifications;
 using LoanHub.Search.Core.Abstractions.Selections;
 using LoanHub.Search.Core.Abstractions.Users;
 using LoanHub.Search.Core.Services;
 using LoanHub.Search.Core.Services.Applications;
+using LoanHub.Search.Core.Services.Auditing;
 using LoanHub.Search.Core.Services.Auth;
+using LoanHub.Search.Core.Services.Banks;
 using LoanHub.Search.Core.Services.Notifications;
 using LoanHub.Search.Core.Services.Selections;
 using LoanHub.Search.Core.Services.Users;
 using LoanHub.Search.Core.Models.Notifications;
 using LoanHub.Search.Api.Notifications;
 using LoanHub.Search.Api.Authorization;
+using LoanHub.Search.Api.Middleware;
 using LoanHub.Search.Api.Options;
 using LoanHub.Search.Api.Services;
 using LoanHub.Search.Infrastructure;
@@ -33,6 +37,9 @@ using System.IO;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Processing;
+using Serilog;
+using Serilog.Events;
+using Serilog.Sinks.PostgreSQL;
 
 LoadEnvironmentFileIfPresent(".env", onlyIfMissing: true);
 if (IsDevelopmentEnvironment())
@@ -41,6 +48,54 @@ if (IsDevelopmentEnvironment())
 }
 
 var builder = WebApplication.CreateBuilder(args);
+
+var auditOptions = builder.Configuration.GetSection("Audit").Get<AuditOptions>() ?? new AuditOptions();
+builder.Host.UseSerilog((context, services, loggerConfiguration) =>
+{
+    var connectionString = context.Configuration.GetConnectionString("Applications") ?? string.Empty;
+
+    loggerConfiguration
+        .MinimumLevel.Information()
+        .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+        .Enrich.FromLogContext()
+        .WriteTo.Console();
+
+    if (auditOptions.Enabled && !string.IsNullOrWhiteSpace(connectionString))
+    {
+        var columnWriters = new Dictionary<string, ColumnWriterBase>
+        {
+            ["message"] = new RenderedMessageColumnWriter(),
+            ["message_template"] = new MessageTemplateColumnWriter(),
+            ["level"] = new LevelColumnWriter(),
+            ["logged_at"] = new TimestampColumnWriter(),
+            ["exception"] = new ExceptionColumnWriter(),
+            ["properties"] = new PropertiesColumnWriter(),
+            ["log_event"] = new LogEventSerializedColumnWriter(),
+            ["request_method"] = new SinglePropertyColumnWriter("RequestMethod"),
+            ["request_path"] = new SinglePropertyColumnWriter("RequestPath"),
+            ["query_string"] = new SinglePropertyColumnWriter("QueryString"),
+            ["status_code"] = new SinglePropertyColumnWriter("StatusCode"),
+            ["elapsed_ms"] = new SinglePropertyColumnWriter("ElapsedMs"),
+            ["request_headers"] = new SinglePropertyColumnWriter("RequestHeaders"),
+            ["response_headers"] = new SinglePropertyColumnWriter("ResponseHeaders"),
+            ["request_body"] = new SinglePropertyColumnWriter("RequestBody"),
+            ["response_body"] = new SinglePropertyColumnWriter("ResponseBody"),
+            ["user_id"] = new SinglePropertyColumnWriter("UserId"),
+            ["user_email"] = new SinglePropertyColumnWriter("UserEmail"),
+            ["client_ip"] = new SinglePropertyColumnWriter("ClientIp"),
+            ["user_agent"] = new SinglePropertyColumnWriter("UserAgent"),
+            ["trace_id"] = new SinglePropertyColumnWriter("TraceId")
+        };
+
+        loggerConfiguration.WriteTo.Logger(logger =>
+            logger.Filter.ByIncludingOnly(evt => evt.Properties.ContainsKey("IsAudit"))
+                .WriteTo.PostgreSQL(
+                    connectionString,
+                    "audit_logs",
+                    columnWriters,
+                    needAutoCreateTable: true));
+    }
+});
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -73,6 +128,7 @@ builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("Se
 builder.Services.Configure<ProviderContactOptions>(builder.Configuration.GetSection("ProviderContacts"));
 builder.Services.Configure<ContractStorageOptions>(builder.Configuration.GetSection("ContractStorage"));
 builder.Services.Configure<ContractLinkOptions>(builder.Configuration.GetSection("ContractLinks"));
+builder.Services.Configure<AuditOptions>(builder.Configuration.GetSection("Audit"));
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 builder.Services.AddHttpClient();
 builder.Services.PostConfigure<GoogleOAuthOptions>(options =>
@@ -158,10 +214,15 @@ builder.Services.AddAuthorization(options =>
     
     options.AddPolicy("NotAdmin", policy =>
         policy.AddRequirements(new NotAdminRequirement()));
+
+    options.AddPolicy("PlatformAdminOnly", policy =>
+        policy.RequireAuthenticatedUser()
+            .AddRequirements(new PlatformAdminRequirement()));
 });
 builder.Services.AddScoped<IAuthorizationHandler, AdminAccessHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, UserOnlyHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, NotAdminHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, PlatformAdminHandler>();
 
 builder.Services.AddScoped<ILoanOfferProviderRegistry, BankApiOfferProviderRegistry>();
 builder.Services.AddScoped<OffersAggregator>();
@@ -169,6 +230,11 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Applications")));
 builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
 builder.Services.AddScoped<ApplicationService>();
+builder.Services.AddScoped<IBankApiClientRepository, BankApiClientRepository>();
+builder.Services.AddScoped<BankApiKeyService>();
+builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddScoped<AuditLogService>();
+builder.Services.AddHostedService<AuditRetentionService>();
 
 // Contract storage configuration (for signed contracts)
 builder.Services.Configure<ContractStorageOptions>(builder.Configuration.GetSection("ContractStorage"));
@@ -207,6 +273,8 @@ builder.Services.AddSingleton<IEmailTemplateRenderer, EmailTemplateRenderer>();
 builder.Services.AddSingleton<IContractLinkGenerator, ContractLinkGenerator>();
 builder.Services.AddSingleton<IContractDocumentGenerator, ContractDocumentGenerator>();
 builder.Services.Configure<EmailBrandingOptions>(builder.Configuration.GetSection("EmailBranding"));
+builder.Services.Configure<PlatformAdminOptions>(builder.Configuration.GetSection("PlatformAdmins"));
+builder.Services.AddScoped<PlatformAdminAuthService>();
 var contentRoot = builder.Environment.ContentRootPath;
 builder.Services.PostConfigure<EmailBrandingOptions>(options =>
 {
@@ -306,6 +374,7 @@ app.UseSwaggerUI();
 
 app.UseCors("Frontend");
 app.UseAuthentication();
+app.UseMiddleware<AuditLoggingMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();
@@ -397,6 +466,57 @@ static async Task InitializeDatabaseAsync(WebApplication app)
                     CONSTRAINT "PK_BankAdmins" PRIMARY KEY ("Id")
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS "IX_BankAdmins_BankId_UserAccountId" ON "BankAdmins" ("BankId", "UserAccountId");
+                """, CancellationToken.None);
+
+            await dbContext.Database.ExecuteSqlRawAsync("""
+                CREATE TABLE IF NOT EXISTS "BankApiClients" (
+                    "Id" uuid NOT NULL,
+                    "Name" varchar(200) NOT NULL,
+                    "KeyHash" varchar(128) NOT NULL,
+                    "IsActive" boolean NOT NULL,
+                    "CreatedByUserId" uuid,
+                    "CreatedAt" timestamptz NOT NULL,
+                    "LastUsedAt" timestamptz,
+                    CONSTRAINT "PK_BankApiClients" PRIMARY KEY ("Id")
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_BankApiClients_KeyHash" ON "BankApiClients" ("KeyHash");
+                CREATE INDEX IF NOT EXISTS "IX_BankApiClients_Name" ON "BankApiClients" ("Name");
+                """, CancellationToken.None);
+
+            await dbContext.Database.ExecuteSqlRawAsync("""
+                CREATE TABLE IF NOT EXISTS audit_logs (
+                    id bigserial PRIMARY KEY,
+                    message text,
+                    message_template text,
+                    level varchar(20),
+                    logged_at timestamptz NOT NULL,
+                    exception text,
+                    properties text,
+                    log_event text,
+                    request_method text,
+                    request_path text,
+                    query_string text,
+                    status_code integer,
+                    elapsed_ms integer,
+                    request_headers text,
+                    response_headers text,
+                    request_body text,
+                    response_body text,
+                    user_id text,
+                    user_email text,
+                    client_ip text,
+                    user_agent text,
+                    trace_id text
+                );
+                CREATE INDEX IF NOT EXISTS ix_audit_logs_logged_at ON audit_logs (logged_at DESC);
+                """, CancellationToken.None);
+
+            await dbContext.Database.ExecuteSqlRawAsync("""
+                ALTER TABLE audit_logs
+                    ALTER COLUMN properties TYPE text USING properties::text,
+                    ALTER COLUMN log_event TYPE text USING log_event::text,
+                    ALTER COLUMN request_headers TYPE text USING request_headers::text,
+                    ALTER COLUMN response_headers TYPE text USING response_headers::text;
                 """, CancellationToken.None);
 
             app.Logger.LogInformation("Database initialized.");

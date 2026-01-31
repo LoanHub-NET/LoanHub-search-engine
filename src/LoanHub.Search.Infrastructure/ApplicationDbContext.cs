@@ -19,6 +19,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<OfferSelection> OfferSelections => Set<OfferSelection>();
     public DbSet<Bank> Banks => Set<Bank>();
     public DbSet<BankAdmin> BankAdmins => Set<BankAdmin>();
+    public DbSet<BankApiClient> BankApiClients => Set<BankApiClient>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -150,6 +151,16 @@ public sealed class ApplicationDbContext : DbContext
                 snapshot.Property(s => s.Provider).HasMaxLength(120);
                 snapshot.Property(s => s.ProviderOfferId).HasMaxLength(120);
             });
+        });
+
+        modelBuilder.Entity<BankApiClient>(entity =>
+        {
+            entity.HasKey(client => client.Id);
+            entity.Property(client => client.Name).HasMaxLength(200).IsRequired();
+            entity.Property(client => client.KeyHash).HasMaxLength(128).IsRequired();
+            entity.Property(client => client.IsActive).HasDefaultValue(true);
+            entity.HasIndex(client => client.Name);
+            entity.HasIndex(client => client.KeyHash).IsUnique();
         });
     }
 }

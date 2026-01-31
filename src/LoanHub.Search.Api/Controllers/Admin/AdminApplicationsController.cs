@@ -1,6 +1,7 @@
 using LoanHub.Search.Core.Models.Applications;
 using LoanHub.Search.Core.Services.Applications;
 using LoanHub.Search.Core.Services.Users;
+using LoanHub.Search.Core.Abstractions.Banks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.IO;
@@ -15,11 +16,16 @@ public sealed class AdminApplicationsController : ControllerBase
 {
     private readonly ApplicationService _service;
     private readonly UserService _userService;
+    private readonly IBankRepository _bankRepository;
 
-    public AdminApplicationsController(ApplicationService service, UserService userService)
+    public AdminApplicationsController(
+        ApplicationService service,
+        UserService userService,
+        IBankRepository bankRepository)
     {
         _service = service;
         _userService = userService;
+        _bankRepository = bankRepository;
     }
 
     [HttpGet]
@@ -35,6 +41,11 @@ public sealed class AdminApplicationsController : ControllerBase
         [FromQuery] int pageSize = 20,
         CancellationToken ct = default)
     {
+        var adminId = GetAdminId();
+        if (!adminId.HasValue)
+            return Forbid();
+
+        var bankIds = await _bankRepository.GetBankIdsForAdminAsync(adminId.Value, ct);
         var query = new ApplicationAdminQuery(
             applicantEmail,
             status,
@@ -43,6 +54,7 @@ public sealed class AdminApplicationsController : ControllerBase
             createdTo,
             updatedFrom,
             updatedTo,
+            bankIds,
             page,
             pageSize);
 
@@ -69,6 +81,9 @@ public sealed class AdminApplicationsController : ControllerBase
         if (application is null)
             return NotFound();
 
+        if (!await CanAccessAsync(application, ct))
+            return Forbid();
+
         var adminSummary = await GetAssignedAdminSummaryAsync(application.AssignedAdminId, ct);
         return Ok(ApplicationsController.ApplicationResponse.From(application, adminSummary));
     }
@@ -76,6 +91,13 @@ public sealed class AdminApplicationsController : ControllerBase
     [HttpPost("{id:guid}/accept")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> Accept(Guid id, CancellationToken ct)
     {
+        var existing = await _service.GetAsync(id, ct);
+        if (existing is null)
+            return NotFound();
+
+        if (!await CanAccessAsync(existing, ct))
+            return Forbid();
+
         var application = await _service.AcceptAsync(id, GetAdminId(), ct);
         if (application is null)
             return NotFound();
@@ -87,6 +109,13 @@ public sealed class AdminApplicationsController : ControllerBase
     [HttpPost("{id:guid}/preliminary-accept")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> PreliminarilyAccept(Guid id, CancellationToken ct)
     {
+        var existing = await _service.GetAsync(id, ct);
+        if (existing is null)
+            return NotFound();
+
+        if (!await CanAccessAsync(existing, ct))
+            return Forbid();
+
         var application = await _service.PreliminarilyAcceptAsync(id, GetAdminId(), ct);
         if (application is null)
             return NotFound();
@@ -98,6 +127,13 @@ public sealed class AdminApplicationsController : ControllerBase
     [HttpPost("{id:guid}/grant")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> Grant(Guid id, CancellationToken ct)
     {
+        var existing = await _service.GetAsync(id, ct);
+        if (existing is null)
+            return NotFound();
+
+        if (!await CanAccessAsync(existing, ct))
+            return Forbid();
+
         var application = await _service.GrantAsync(id, GetAdminId(), ct);
         if (application is null)
             return NotFound();
@@ -109,6 +145,13 @@ public sealed class AdminApplicationsController : ControllerBase
     [HttpPost("{id:guid}/contract-ready")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> ContractReady(Guid id, CancellationToken ct)
     {
+        var existing = await _service.GetAsync(id, ct);
+        if (existing is null)
+            return NotFound();
+
+        if (!await CanAccessAsync(existing, ct))
+            return Forbid();
+
         var application = await _service.MarkContractReadyAsync(id, GetAdminId(), ct);
         if (application is null)
             return NotFound();
@@ -131,6 +174,13 @@ public sealed class AdminApplicationsController : ControllerBase
         if (extension != ".pdf")
             return BadRequest("Only PDF contracts are supported.");
 
+        var existing = await _service.GetAsync(id, ct);
+        if (existing is null)
+            return NotFound();
+
+        if (!await CanAccessAsync(existing, ct))
+            return Forbid();
+
         await using var stream = request.File.OpenReadStream();
         var application = await _service.UploadContractAsync(
             id,
@@ -149,6 +199,13 @@ public sealed class AdminApplicationsController : ControllerBase
     [HttpPost("{id:guid}/final-approve")]
     public async Task<ActionResult<ApplicationsController.ApplicationResponse>> FinalApprove(Guid id, CancellationToken ct)
     {
+        var existing = await _service.GetAsync(id, ct);
+        if (existing is null)
+            return NotFound();
+
+        if (!await CanAccessAsync(existing, ct))
+            return Forbid();
+
         var application = await _service.FinalApproveAsync(id, GetAdminId(), ct);
         if (application is null)
             return NotFound();
@@ -162,6 +219,13 @@ public sealed class AdminApplicationsController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(request.Reason))
             return BadRequest("Reason is required.");
+
+        var existing = await _service.GetAsync(id, ct);
+        if (existing is null)
+            return NotFound();
+
+        if (!await CanAccessAsync(existing, ct))
+            return Forbid();
 
         var application = await _service.RejectAsync(id, request.Reason, GetAdminId(), ct);
         if (application is null)
@@ -227,5 +291,18 @@ public sealed class AdminApplicationsController : ControllerBase
         return summaries.TryGetValue(application.AssignedAdminId.Value, out var summary)
             ? summary
             : null;
+    }
+
+    private async Task<bool> CanAccessAsync(LoanApplication application, CancellationToken ct)
+    {
+        var adminId = GetAdminId();
+        if (!adminId.HasValue)
+            return false;
+
+        var bankIds = await _bankRepository.GetBankIdsForAdminAsync(adminId.Value, ct);
+        if (bankIds.Count == 0 || !application.BankId.HasValue)
+            return false;
+
+        return bankIds.Contains(application.BankId.Value);
     }
 }

@@ -53,8 +53,7 @@ public sealed class BankRepository : IBankRepository
 
         var updated = false;
         var baseUrl = NormalizeBaseUrl(bank.ApiBaseUrl);
-        if (!string.IsNullOrWhiteSpace(baseUrl) &&
-            !string.Equals(existing.ApiBaseUrl, baseUrl, StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(existing.ApiBaseUrl) && !string.IsNullOrWhiteSpace(baseUrl))
         {
             existing.ApiBaseUrl = baseUrl;
             updated = true;
@@ -99,6 +98,14 @@ public sealed class BankRepository : IBankRepository
 
     public Task<bool> IsAdminAsync(Guid userId, CancellationToken ct)
         => _dbContext.BankAdmins.AnyAsync(admin => admin.UserAccountId == userId, ct);
+
+    public async Task<IReadOnlyList<Guid>> GetBankIdsForAdminAsync(Guid userId, CancellationToken ct)
+        => await _dbContext.BankAdmins
+            .AsNoTracking()
+            .Where(admin => admin.UserAccountId == userId)
+            .Select(admin => admin.BankId)
+            .Distinct()
+            .ToListAsync(ct);
 
     private static string NormalizeBaseUrl(string raw)
     {
