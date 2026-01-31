@@ -1,0 +1,30 @@
+### 1) Swagger (opcjonalnie) - czy to ten backend
+GET {{api}}/swagger/index.html
+
+@api = http://localhost:8080
+@email = mateusz.stawicki212@gmail.com
+@password = Test!12345
+
+### Register (poprawny payload wg Swagger)
+POST {{api}}/api/users/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "profile": {
+    "firstName": "MVP",
+    "lastName": "Test",
+    "age": 25,
+    "jobTitle": "Student",
+    "address": "Warsaw",
+    "phone": "+48111111111",
+    "dateOfBirth": "2000-01-01T00:00:00.000Z",
+    "monthlyIncome": 8000,
+    "livingCosts": 2500,
+    "dependents": 0,
+    "idDocumentNumber": "ABC123456"
+  }
+}
+
+

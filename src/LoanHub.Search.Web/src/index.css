@@ -1,0 +1,150 @@
+:root {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  
+  /* Light mode colors (default) */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f7fafc;
+  --color-bg-tertiary: #f5f7fa;
+  --color-bg-card: #ffffff;
+  --color-bg-header: rgba(255, 255, 255, 0.95);
+  --color-bg-input: #f7fafc;
+  --color-bg-input-focus: #ffffff;
+  
+  --color-text-primary: #1e3a5f;
+  --color-text-secondary: #4a5568;
+  --color-text-muted: #718096;
+  --color-text-placeholder: #a0aec0;
+  
+  --color-border: #e2e8f0;
+  --color-border-hover: #2d5a87;
+  
+  --color-accent-primary: #2d5a87;
+  --color-accent-secondary: #1e3a5f;
+  --color-accent-green: #48bb78;
+  
+  --color-shadow: rgba(0, 0, 0, 0.1);
+  --color-shadow-strong: rgba(0, 0, 0, 0.15);
+  
+  --gradient-hero: linear-gradient(135deg, #f5f7fa 0%, #e4e8ed 100%);
+  --gradient-card: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark mode colors */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg-primary: #0f172a;
+    --color-bg-secondary: #1e293b;
+    --color-bg-tertiary: #1e293b;
+    --color-bg-card: #1e293b;
+    --color-bg-header: rgba(15, 23, 42, 0.95);
+    --color-bg-input: #334155;
+    --color-bg-input-focus: #1e293b;
+    
+    --color-text-primary: #f1f5f9;
+    --color-text-secondary: #cbd5e1;
+    --color-text-muted: #94a3b8;
+    --color-text-placeholder: #64748b;
+    
+    --color-border: #334155;
+    --color-border-hover: #60a5fa;
+    
+    --color-accent-primary: #60a5fa;
+    --color-accent-secondary: #3b82f6;
+    --color-accent-green: #4ade80;
+    
+    --color-shadow: rgba(0, 0, 0, 0.3);
+    --color-shadow-strong: rgba(0, 0, 0, 0.4);
+    
+    --gradient-hero: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    --gradient-card: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  }
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+html,
+body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.2;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+.page-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  margin-bottom: 0.75rem;
+}
+
+.page-back-link:hover {
+  color: var(--color-text-primary);
+}
+
+/* Custom selection color */
+::selection {
+  background: rgba(45, 90, 135, 0.2);
+  color: var(--color-text-primary);
+}
+
+@media (prefers-color-scheme: dark) {
+  ::selection {
+    background: rgba(96, 165, 250, 0.3);
+  }
+}
