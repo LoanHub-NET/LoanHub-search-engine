@@ -43,6 +43,18 @@ export default defineConfig([
 ])
 ```
 
+## E2E tests (Playwright)
+
+From this folder run:
+
+- `npm run test:e2e` (headless)
+- `npm run test:e2e:headed` (headed)
+
+Run a single spec:
+
+- `npm run test:e2e:headed -- tests/register.spec.ts`
+- `npm run test:e2e:headed -- tests/admin.spec.ts`
+
 You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
 ```js
